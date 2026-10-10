@@ -1,0 +1,18 @@
+import { runChain } from '../js/engine/chain.js';
+const S = (ids, extra = {}) => ids.map((id, i) => (id ? { uid: 'c' + i, id, up: false, ...(extra[i] || {}) } : null));
+const r = (ids, o = {}, extra) => { const c = runChain(S(ids, extra), { startV: 0, memo: 0, relics: [], grade: 2, ...o }); return c; };
+const show = (ids, o, extra) => { const c = r(ids, o, extra); console.log(ids.join(' '), '=>', c.v, 'blk', c.blockTotal, c.flags, '|', c.steps.filter(s => s.eq).map(s => s.eq).join(' ; ')); };
+show(['p3', 'x2', 'rep']);
+show(['tri', 'tri', 'rep']);
+show(['tri', 'sqr']);
+show(['p2', 'next3', 'p3']);
+show(['p2', 'p3', 'repAll']);
+show(['p4', 'ifBig', 'p5']);
+show(['p5', 'p5', 'ifBig']);
+show(['p3', 'sq']);
+show(['ant', 'spider', 'net']);
+show(['p3', 'm2', 'shield', 'p2']);
+show(['dice', 'dice7'], {}, { 0: { roll: [4] }, 1: { roll: [2] } });
+show(['p3', 'p4', 'd3']);
+show(['circle', 'circle']);
+show(['tri', 'sqr', 'setsq']);
