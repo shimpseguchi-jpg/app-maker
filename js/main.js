@@ -104,7 +104,7 @@ function openSettings({ inRun = false, refresh } = {}) {
     if (k === 'speed') settings.speed = v;
     saveSettings();
   })));
-  $('[data-ok]', m).addEventListener('click', () => { sfx('tap'); close(); });
+  $('[data-ok]', m).addEventListener('click', () => { sfx('tap'); close(); refresh && refresh(); });
   const q = $('[data-quit]', m);
   if (q) q.addEventListener('click', async () => { close(); if (await confirmBox('タイトルに もどる？', 'ぼうけんは セーブ されるよ。「つづきから」で また あそべる。', 'もどる', 'やめる')) { persist(); titleScreen(); } });
   const r = $('[data-reset]', m);

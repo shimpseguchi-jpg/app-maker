@@ -1,0 +1,15 @@
+import { detectHands } from '../js/data/hands.js';
+const R = (vs, el = 'fire') => vs.map((v, i) => ({ v, els: new Set([Array.isArray(el) ? el[i] : el]) }));
+const t = (vs, el, o) => { const d = detectHands(R(vs, el), o); console.log(JSON.stringify(vs), '→', d.best, [...d.has].join(','), d.members.kukuEq || ''); };
+t([7, 7, 7, 7, 7]);
+t([3, 4, 5, 6, 7]);
+t([3, 4, 5, 6, 7], ['fire', 'fire', 'water', 'fire', 'fire']);
+t([2, 3, 6], ['fire', 'water', 'wood']);
+t([3, 7], ['fire', 'water']);
+t([6, 6, 6, 2, 2], ['fire', 'water', 'wood', 'fire', 'water']);
+t([5, 5], ['fire', 'water']);
+t([1, 4, 6, 9]);
+t([9], ['fire']);
+t([4, 4, 4, 4], ['fire', 'water', 'wood', 'thunder']);
+t([3, 3, 9, 1], ['fire', 'water', 'wood', 'thunder']);
+t([5, 5, 2], ['fire', 'water', 'wood'], { noPair: true });

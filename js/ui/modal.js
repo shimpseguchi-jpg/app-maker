@@ -16,10 +16,13 @@ export function openModal(html, { closable = true, onClose, cls = '' } = {}) {
   const back = el(`<div class="modal-back"><div class="modal ${cls}">${closable ? '<button class="icon-btn close-x" data-close>✖</button>' : ''}${html}</div></div>`);
   stage.appendChild(back);
   const m = back.firstElementChild;
-  const close = (v) => { back.remove(); onClose && onClose(v); };
+  let closed = false;
+  // えらんで とじる ときは onClose を よばない（えらんだ あたいを かえす ため）
+  const close = () => { if (closed) return; closed = true; back.remove(); };
+  const dismiss = () => { if (closed) return; close(); onClose && onClose(null); };
   if (closable) {
-    back.addEventListener('pointerdown', (e) => { if (e.target === back) { sfx('tap'); close(); } });
-    m.querySelector('[data-close]').addEventListener('click', () => { sfx('tap'); close(); });
+    back.addEventListener('pointerdown', (e) => { if (e.target === back) { sfx('tap'); dismiss(); } });
+    m.querySelector('[data-close]').addEventListener('click', () => { sfx('tap'); dismiss(); });
   }
   return { back, m, close };
 }
