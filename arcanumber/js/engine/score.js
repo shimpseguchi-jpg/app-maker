@@ -70,6 +70,10 @@ export class ScoreCtx {
   inPair(i) { return this.pairSlots.has(i); }
   neighbors(i) { return [i - 1, i + 1].map((j) => { const x = this.slots[j]; return x && CARDS[x.id].type === 'rune' ? runeView(x) : null; }); }
   handLeft() { return this.S.handLeft || 0; }
+  handRunesOf(el) { return (this.S.handCards || []).filter((x) => x.id === 'rune' && runeView(x).isEl(el)).length; }
+  drawRunesOf(el) { return (this.S.drawCards || []).filter((x) => x.id === 'rune' && runeView(x).isEl(el)).length; }
+  discardCount() { return (this.S.discardCards || []).length; }
+  deckSize() { return this.S.deckSize || 0; }
   retrigNext(n) { this.pendingRetrig = (this.pendingRetrig || 0) + n; this.push({ kind: 'note', label: `つぎの ルーン ×${n + 1}`, src: this.src() }); }
 
   // ルーンを かぞえる

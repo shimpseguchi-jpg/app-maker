@@ -3,6 +3,8 @@ import * as B from '../js/engine/battle.js';
 import * as R from '../js/engine/run.js';
 import { CARDS, cardCost } from '../js/data/cards.js';
 import { ARCANA } from '../js/data/arcana.js';
+import { openPack } from '../js/data/packs.js';
+import { HEROES } from '../js/data/heroes.js';
 
 function* combos(arr, k, start = 0, cur = []) {
   if (cur.length === k) { yield cur; return; }
@@ -70,6 +72,12 @@ const CH = Number(process.env.CH ?? 0.5);
 function simRun(hero, seed, diff) {
   const run = R.newRun({ hero, grade: 2, diff, seed });
   const { rng } = R.runRng(run);
+  const els = HEROES[hero].els;
+  if (!process.env.NOPACK) {
+    const pool = [...run.deck, ...openPack(els[0], rng), ...openPack(els[1], rng), ...openPack(rng.pick([els[0], 'silver']), rng)];
+    run.deck = R.autoBuild(pool, els, Number(process.env.DECKN || 15));
+    run.side = pool.filter((c) => !run.deck.includes(c));
+  }
   const log = [];
   for (let act = 1; act <= 3; act++) {
     run.act = act;
@@ -94,7 +102,11 @@ function simRun(hero, seed, diff) {
         const pick = offer.find((c) => c.id !== 'rune' && CARDS[c.id].type === 'spell') || offer[0];
         if (rng() < 0.8) run.deck.push(pick);
         if (t === 'elite') { const a = R.rollArcana(run, rng); if (a) R.addArcana(run, a); }
-        if (t === 'boss') { const a = R.rollArcana(run, rng, 'r'); if (a) R.addArcana(run, a); R.heal(run, Math.round((run.maxHp - run.hp) * 0.6)); break; }
+        if (t === 'boss') {
+          const a = R.rollArcana(run, rng, 'r'); if (a) R.addArcana(run, a); R.heal(run, Math.round((run.maxHp - run.hp) * 0.7));
+          if (!process.env.NOPACK) { const pool = [...run.deck, ...run.side, ...openPack(rng.pick(els), rng, { rareBoost: 0.4 })]; run.deck = R.autoBuild(pool, els, Math.min(20, run.deck.length + 1)); run.side = pool.filter((c) => !run.deck.includes(c)); }
+          break;
+        }
       } else if (t === 'rest') {
         if (run.hp < run.maxHp * 0.65) R.heal(run, Math.round(run.maxHp * 0.35));
         else { const c = run.deck.find((x) => !x.up && x.id !== 'rune'); if (c) c.up = true; }

@@ -6,6 +6,7 @@ import { HANDS } from '../data/hands.js';
 import { ENCOUNTERS } from '../data/enemies.js';
 import { HEROES } from '../data/heroes.js';
 import { makeRng, uid } from '../util.js';
+import { PACK_TYPES } from '../data/packs.js';
 
 export const ACTS = {
   1: { name: 'くらやみの もり', theme: 'forest', icon: '🌲' },
@@ -35,7 +36,7 @@ export function newRun({ hero, grade, diff, seed }) {
     v: 1, seed, rngState: seed, hero, grade, diff,
     hp: H.hp, maxHp: H.hp, coins: 4,
     deck: H.deck.map((d) => (Array.isArray(d) ? makeRune(d[0], d[1]) : makeCard(d))),
-    arcana: [{ uid: uid(), id: H.arcana, n: 0 }], scrolls: [], handLv: {},
+    arcana: [{ uid: uid(), id: H.arcana, n: 0 }], scrolls: [], handLv: {}, side: [],
     act: 1, map: null, pos: null, pending: null, removeCost: 5, rerollBase: 2,
     stats: { battles: 0, casts: 0, best: 0, challengeTry: 0, challengeOk: 0, quizOk: 0, quizTry: 0, hands: {} },
   };
@@ -165,11 +166,14 @@ export function makeShop(run, rng) {
     if (id) arc.push({ id, price: arcanaPrice(id), sold: false });
   }
   const scrolls = [rollScroll(run, rng), rollScroll(run, rng)].map((s) => ({ scroll: s, price: SCROLL_PRICE[SCROLLS[s.id].rar] || 3, sold: false }));
-  return { cards, arcana: arc, scrolls, rerolls: 0 };
+  const els = heroEls(run);
+  const packs = [rng.pick(els), rng.pick(PACK_TYPES)].map((t) => ({ type: t, price: 6, sold: false }));
+  if (packs[0].type === packs[1].type) packs[1].type = 'silver';
+  return { cards, arcana: arc, scrolls, packs, rerolls: 0 };
 }
 export function rerollShop(run, rng, shop) {
   const n = makeShop(run, rng);
-  shop.cards = n.cards; shop.arcana = n.arcana; shop.rerolls++;
+  shop.cards = n.cards; shop.arcana = n.arcana; shop.packs = n.packs; shop.rerolls++;
 }
 export function rerollCost(shop, run) { return run.rerollBase + shop.rerolls; }
 
@@ -184,4 +188,45 @@ export function deckSorted(deck) {
     if (ea !== eb) return eOrder.indexOf(ea) - eOrder.indexOf(eb);
     return (a.v || 0) - (b.v || 0) || a.id.localeCompare(b.id);
   });
+}
+
+// おまかせで デッキを くむ（よさそうな カードから じゅんに）
+export function autoBuild(pool, els, target = 15) {
+  const rarVal = { s: 3, c: 4, u: 7, r: 10 };
+  const chosen = [];
+  const left = [...pool];
+  const score = (c) => {
+    const d = CARDS[c.id];
+    if (c.id === 'rune') {
+      const runes = chosen.filter((x) => x.id === 'rune');
+      let v = 2;
+      v += 3 * runes.filter((x) => x.v === c.v).length;
+      v += 2 * runes.filter((x) => x.v + c.v === 10).length;
+      v += 1 * runes.filter((x) => Math.abs(x.v - c.v) === 1).length;
+      if (els.includes(c.el)) v += 2;
+      if (c.enh) v += 3;
+      if (runes.length < 7) v += 4;
+      return v;
+    }
+    if (d.type === 'curse') return -99;
+    let v = rarVal[d.rar] || 3;
+    if (els.includes(d.el)) v += 2;
+    if (c.up) v += 2;
+    const spells = chosen.filter((x) => x.id !== 'rune').length;
+    if (spells >= 7) v -= 6;
+    if (c.id === 'guard' && chosen.filter((x) => x.id === 'guard').length >= 2) v -= 5;
+    // まもりと ばいりつの カードを すこしは いれる
+    const DEF = ['guard', 'waterShield', 'roots', 'tide', 'barrier', 'waterVeil', 'waterHeart'];
+    const MULT = ['focus', 'flameSpear', 'spark', 'inferno', 'phoenix', 'bloom', 'static', 'pact', 'eclipse', 'fireHeart', 'gather', 'square', 'deepSea', 'storm'];
+    if (DEF.includes(c.id) && !chosen.some((x) => DEF.includes(x.id))) v += 8;
+    if (MULT.includes(c.id) && chosen.filter((x) => MULT.includes(x.id)).length < 2) v += 5;
+    return v;
+  };
+  while (chosen.length < target && left.length) {
+    let bi = 0, bs = -Infinity;
+    left.forEach((c, i) => { const v = score(c); if (v > bs) { bs = v; bi = i; } });
+    if (bs < 0) break;
+    chosen.push(left.splice(bi, 1)[0]);
+  }
+  return chosen;
 }

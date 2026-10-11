@@ -15,6 +15,9 @@ import { swirl } from './bg.js';
 import { openModal, cardDetail, deckView, quizPrompt, guide, alertBox, arcanaDetail, arcanaHtml, chooseBox, elementPicker, scrollDetail } from './modal.js';
 import { clockSvg, gridSvg, coinsSvg, shapeSvg } from './qart.js';
 import * as FX from './fx.js';
+import { packHtml, openPacks, rebuildRun } from './deckbuild.js';
+import { PACKS } from '../data/packs.js';
+import { HEROES } from '../data/heroes.js';
 
 function mountWith(app, inner, theme) {
   const root = el(`<div class="screen fade-in">${bgHtml()}${topbarHtml(app.run)}${inner}</div>`);
@@ -155,6 +158,18 @@ export async function rewardScreen(app, kind) {
     if (arc) add(ARCANA[arc].icon, `アルカナ：${ARCANA[arc].name}`, () => gainArcana(app, arc));
     if (bossArcs && bossArcs.length) add('👑', 'ボスの アルカナを えらぶ', async () => { const id = await arcanaChoice(bossArcs, 'ボスの アルカナ（1つ えらぶ）'); if (!id) return false; return gainArcana(app, id); });
     if (scroll) add(SCROLLS[scroll.id].icon, `まきもの：${scrollName(scroll)}`, () => gainScroll(app, scroll));
+    if (kind === 'boss') add('📦', 'ボスの パック（レアが でやすい）', async () => {
+      const els = HEROES[run.hero].els;
+      const type = await new Promise((res) => {
+        const opts = [...new Set([...els, 'silver'])];
+        const { m, close } = openModal(`<h2>${T('どの パックを あける？')}</h2><div class="row" style="gap:20px">${opts.map((t) => packHtml(t)).join('')}</div>`, { closable: false });
+        $$('.pack', m).forEach((p) => p.addEventListener('click', () => { sfx('tap'); close(); res(p.dataset.pack); }));
+      });
+      const { rng: r2, save: s2 } = app.rng();
+      const cards = await openPacks(app, [type], r2, { rareBoost: 0.4 }); s2();
+      await rebuildRun(app, { newCards: cards, title: 'あたらしい カードを デッキに いれる？', canCancel: false });
+      return true;
+    });
     $('[data-next]', root).addEventListener('click', () => { sfx('tap'); if (!coinBtn.classList.contains('taken')) run.coins += coins.total; resolve(); });
     if (kind === 'battle') guide('rw_interest', 'コインは 5{枚|まい}ごとに 1{枚|まい}「りそく」が つくよ（さいだい 5{枚|まい}）。ためておくと どんどん ふえる！ おみせで アルカナを かおう。');
   });
@@ -179,9 +194,11 @@ export function restScreen(app) {
     const healN = Math.round(run.maxHp * 0.35);
     const root = mountWith(app, `<div class="panel-screen"><h1>${T('たきび')}</h1><div class="fire-pit">🔥</div>
       <div class="opt-row"><div class="opt" data-a="heal"><div class="p-icon">💤</div><div class="p-title">${T('やすむ')}</div><div class="p-desc">${T(`HPを ${healN} かいふく`)}</div></div>
-      <div class="opt" data-a="up"><div class="p-icon">⚒️</div><div class="p-title">${T('きたえる')}</div><div class="p-desc">${T('カードを 1{枚|まい} つよく する（ルーンは {倍率|ばいりつ} +1）')}</div></div></div></div>`, 'rest');
+      <div class="opt" data-a="up"><div class="p-icon">⚒️</div><div class="p-title">${T('きたえる')}</div><div class="p-desc">${T('カードを 1{枚|まい} つよく する（ルーンは {倍率|ばいりつ} +1）')}</div></div>
+      <div class="opt" data-a="build"><div class="p-icon">🃏</div><div class="p-title">${T('くみなおす')}</div><div class="p-desc">${T(`サイドの カード（${run.side.length}{枚|まい}）と いれかえて デッキを つくりなおす`)}</div></div></div></div>`, 'rest');
     $$('.opt', root).forEach((o) => o.addEventListener('click', async () => {
       if (o.dataset.a === 'heal') { sfx('heal'); const n = R.heal(run, healN); updateTopbar(root, run); FX.toast(T(`HPが ${n} かいふく`), '💖'); await FX.wait(900); resolve(); return; }
+      if (o.dataset.a === 'build') { if (await rebuildRun(app, { title: 'デッキを くみなおそう' })) { FX.toast(T(`デッキ ${run.deck.length}{枚|まい}に なった`), '🃏'); await FX.wait(700); resolve(); } return; }
       const inst = await deckView(run.deck, { title: 'きたえる カードを えらぼう', pick: true, filter: (c) => !c.up });
       if (!inst) return;
       inst.up = true; sfx('upgrade');
@@ -243,6 +260,18 @@ export function shopScreen(app) {
         const n = el(`<div class="shop-item ${it.sold ? 'sold' : ''}"><div class="scroll-card"><div class="si">${SCROLLS[s.id].icon}</div><div class="sn">${T(scrollName(s))}</div></div><span class="price ${run.coins < it.price ? 'cant' : ''}">🪙 ${it.price}</span></div>`);
         $('.scroll-card', n).addEventListener('click', () => { sfx('tap'); scrollDetail(s, { canUse: false }); });
         $('.price', n).addEventListener('click', async () => { if (it.sold) return; if (run.coins < it.price) { sfx('wrong'); say('コインが たりないよ'); return; } run.coins -= it.price; if (await gainScroll(app, s)) it.sold = true; else run.coins += it.price; render(); });
+        mEl.appendChild(n);
+      });
+      (shop.packs || []).forEach((it) => {
+        const n = el(`<div class="shop-item ${it.sold ? 'sold' : ''}"><div style="transform:scale(.56);transform-origin:top center;height:120px;width:96px;display:flex;justify-content:center">${packHtml(it.type)}</div><span class="price ${run.coins < it.price ? 'cant' : ''}">🪙 ${it.price}</span></div>`);
+        $('.price', n).addEventListener('click', async () => {
+          if (it.sold) return;
+          if (run.coins < it.price) { sfx('wrong'); say('コインが たりないよ'); return; }
+          run.coins -= it.price; it.sold = true; render();
+          const cards = await openPacks(app, [it.type], rng); save();
+          await rebuildRun(app, { newCards: cards, title: 'あたらしい カードを デッキに いれる？', canCancel: false });
+          render();
+        });
         mEl.appendChild(n);
       });
       const rm = el(`<div class="shop-item"><div class="scroll-card"><div class="si">🗑️</div><div class="sn">${T('カードを わすれる')}</div></div><span class="price ${run.coins < run.removeCost ? 'cant' : ''}">🪙 ${run.removeCost}</span></div>`);

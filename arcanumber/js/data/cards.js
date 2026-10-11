@@ -167,6 +167,30 @@ def({ id: 'darkPact', name: 'やみの ちかい', type: 'aura', el: 'shadow', r
 def({ id: 'manaShard', name: 'マナの かけら', type: 'instant', el: 'none', rar: 'u', cost: 0, icon: '🔹',
   text: (up) => `マナ +${up ? 3 : 2}。たたかいで 1{回|かい}きり`, exhaust: () => true, play: (b, up, api) => api.mana(up ? 3 : 2) });
 
+// ───── デッキの かたちで つよく なる カード ─────
+def({ id: 'fireHeart', name: 'ほのおの こころ', type: 'spell', el: 'fire', rar: 'u', cost: 1, icon: '❤️‍🔥',
+  text: (up) => `${K.hand}に のこした 🔥${K.rune} 1${K.mai}に つき ${K.mult} +${up ? 4 : 3}`,
+  exec: (c, i, up) => { const n = c.handRunesOf('fire'); c.addMult(n * (up ? 4 : 3), `てふだの 🔥 ${n}${K.mai}`); } });
+def({ id: 'waterHeart', name: 'みずの こころ', type: 'spell', el: 'water', rar: 'u', cost: 1, icon: '💙',
+  text: (up) => `${K.hand}に のこした カード 1${K.mai}に つき ${K.shield} +${up ? 5 : 4}`,
+  exec: (c, i, up) => { const n = c.handLeft(); c.addShield(n * (up ? 5 : 4), `てふだ ${n}${K.mai}`); } });
+def({ id: 'woodHeart', name: 'もりの こころ', type: 'spell', el: 'wood', rar: 'u', cost: 1, icon: '💚',
+  text: (up) => `やまに のこっている 🌿${K.rune} 1${K.mai}に つき ${K.pow} +${up ? 15 : 10}`,
+  exec: (c, i, up) => { const n = c.drawRunesOf('wood'); c.addPower(n * (up ? 15 : 10), `やまの 🌿 ${n}${K.mai}`); } });
+def({ id: 'thunderHeart', name: 'いかずちの こころ', type: 'spell', el: 'thunder', rar: 'u', cost: 1, icon: '💛',
+  text: (up) => `じゅもんの ⚡${K.rune}を ぜんぶ もう{一度|いちど} かぞえる` + (up ? '（コスト 0）' : ''), costUp: 0,
+  exec: (c, i) => { const list = c.runesOf('thunder'); if (!list.length) { c.note('⚡が ない'); return; } for (const k of list) c.scoreRune(k, true); c.curSlot = i; } });
+def({ id: 'shadowHeart', name: 'やみの こころ', type: 'spell', el: 'shadow', rar: 'u', cost: 1, icon: '💜',
+  text: (up) => `すてふだ ${up ? 2 : 3}${K.mai}に つき ${K.mult} +1`,
+  exec: (c, i, up) => { const n = Math.floor(c.discardCount() / (up ? 2 : 3)); c.addMult(n, `すてふだ ${c.discardCount()}${K.mai}`); } });
+def({ id: 'fewMagic', name: 'ひとにぎりの まほう', type: 'spell', el: 'none', rar: 'r', cost: 1, icon: '🤏',
+  text: (up) => `デッキが ${up ? 14 : 12}${K.mai} いか なら ${K.mult} ×3`,
+  fact: 'デッキの {枚|まい}すうが すくないと、つよい カードを なんども ひける。デッキを すっきり させる ことも だいじな さくせん！',
+  exec: (c, i, up) => { const d = c.deckSize(); if (c.cond(`デッキ ${d}${K.mai}`, d <= (up ? 14 : 12))) c.xMult(3); } });
+def({ id: 'manyMagic', name: 'たいぐんの まほう', type: 'spell', el: 'none', rar: 'u', cost: 1, icon: '🐜',
+  text: (up) => `デッキ 5${K.mai}に つき ${K.pow} +${up ? 12 : 8}`,
+  exec: (c, i, up) => { const d = c.deckSize(); c.addPower(Math.floor(d / 5) * (up ? 12 : 8), `${d} ÷ 5`); } });
+
 // ───── おじゃま ─────
 def({ id: 'sleepy', name: 'ねむけ', type: 'curse', el: 'none', rar: 'x', icon: '💤', unplayable: true, text: () => 'つかえない。たたかいが おわると きえる' });
 def({ id: 'web', name: 'くもの いと', type: 'curse', el: 'none', rar: 'x', icon: '🕸️', unplayable: true, text: () => 'つかえない。たたかいが おわると きえる' });

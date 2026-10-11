@@ -8,7 +8,7 @@ export const HEROES = [
     desc: '{守|まも}りが かたく、じゅうの わで {力|ちから}を ためる。みずと もり。',
     deck: [['water', 1], ['water', 4], ['water', 6], ['water', 9], ['wood', 2], ['wood', 5], ['wood', 5], ['wood', 8], 'wave', 'sprout', 'guard', 'guard'],
     arcana: 'tenRing' },
-  { id: 'kuro', name: 'クロ', title: 'かげの ぬすびと', art: '🥷', els: ['shadow', 'thunder'], hp: 90,
+  { id: 'kuro', name: 'クロ', title: 'かげの ぬすびと', art: '🥷', els: ['shadow', 'thunder'], hp: 100,
     desc: 'ペアと くりかえしで おおわざを ねらう。やみと いかずち。',
     deck: [['shadow', 2], ['shadow', 2], ['shadow', 4], ['shadow', 4], ['shadow', 8], ['thunder', 3], ['thunder', 6], ['thunder', 7], 'clone', 'chain', 'guard', 'eclipse'],
     arcana: 'pairCharm' },

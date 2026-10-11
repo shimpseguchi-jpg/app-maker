@@ -205,6 +205,7 @@ export function scoreState(b, preview) {
   return {
     slots: b.slots, board: b.board, arcana: b.run.arcana, handLv: b.run.handLv, rule: b.rule, turn: b.turn,
     coins: b.run.coins, buff: b.buff, handLeft: b.hand.length, preview,
+    handCards: b.hand, drawCards: b.draw, discardCards: b.discard, deckSize: b.run.deck.length,
   };
 }
 export function preview(b) { return scoreSpell(scoreState(b, true)); }

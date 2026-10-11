@@ -17,6 +17,8 @@ import { enemyArt } from './ui/art.js';
 import { swirl } from './ui/bg.js';
 import { battleScreen } from './ui/battle.js';
 import { mapScreen, rewardScreen, treasureScreen, restScreen, shopScreen, eventScreen, useScrollOutside } from './ui/screens.js';
+import { packSelect, openPacks, deckBuilder } from './ui/deckbuild.js';
+import { DECK_MIN, DECK_MAX } from './data/packs.js';
 
 const VERSION = '1.0.0';
 const stage = $('#stage');
@@ -63,7 +65,7 @@ const app = {
       if (onScroll) await onScroll(i); else await useScrollOutside(app, i, root);
       persist(); updateTopbar(root, run); app.wireTopbar(root, { refresh, onScroll });
     }));
-    const d = $('[data-deck]', root); if (d && !d._w) { d._w = 1; d.addEventListener('click', () => { sfx('tap'); deckView(run.deck, { title: 'デッキ' }); }); }
+    const d = $('[data-deck]', root); if (d && !d._w) { d._w = 1; d.addEventListener('click', () => { sfx('tap'); deckView(run.deck, { title: 'デッキ', sub: run.side && run.side.length ? `サイドの カード ${run.side.length}{枚|まい}（たきびで いれかえ できる）` : '' }); }); }
     const h = $('[data-hands]', root); if (h && !h._w) { h._w = 1; h.addEventListener('click', () => { sfx('tap'); handsTable(run.handLv); }); }
     const s = $('[data-settings]', root); if (s && !s._w) { s._w = 1; s.addEventListener('click', () => { sfx('tap'); openSettings({ inRun: true, refresh }); }); }
   },
@@ -126,6 +128,7 @@ function titleScreen() {
 
 function howTo() {
   const pages = [
+    ['📦', 'パックで デッキを つくる', 'ぼうけんの はじめに パックを 3つ えらんで あけよう。<br>はじめの カードと パックの カードから、10〜20{枚|まい}を えらんで デッキに する。<br>つかわなかった カードは「サイド」に のこって、🔥たきびで いれかえ られる。<br>おみせでも パックが かえるよ！'],
     ['🃏', 'ルーンで {役|やく}を つくる', '{手札|てふだ}の ルーンを じゅもんの わく（5{枚|まい}まで）に いれよう。<br>おなじ {数|かず}なら「ペア」、たして 10なら「じゅうの わ」、<br>2・3・6 なら「くくの わ」（2×3=6）！ {役|やく}が つよいほど {力|ちから}と {倍率|ばいりつ}が ふえる。'],
     ['💥', 'ダメージ ＝ {力|ちから} × {倍率|ばいりつ}', 'ルーンの {数|かず}は <b style="color:var(--power)">{力|ちから}</b>に たされる。<br>スペルや アルカナで <b style="color:var(--mult)">{倍率|ばいりつ}</b>が ふえる。<br>さいごに かけ{算|ざん}！ 20 × 8 ＝ 160 ダメージ！'],
     ['➡️', 'じゅんばんが だいじ', 'カードは ひだりから じゅんばんに はたらく。<br>「+2{倍率|ばいりつ}」→「×2」なら (2+2)×2＝8、<br>「×2」→「+2{倍率|ばいりつ}」なら 2×2+2＝6。<br>×は みぎに おこう！ ドラッグで ならびかえ できる。'],
@@ -133,7 +136,7 @@ function howTo() {
     ['🔮', 'アルカナ', 'アルカナは ずっと はたらく おまもり（5つまで）。<br>ひだりから じゅんばんに こうかが でる。<br>くみあわせ しだいで ダメージが なんばいにも！'],
     ['💀', 'のろい と ボス', 'つよい てきは「のろい」を もっている。<br>（{力|ちから}が はんぶん、ペアが できない など）<br>のろいに あわせて じゅもんを くふう しよう。'],
     ['🧮', 'けいさん チャレンジ', 'はなった あと、{力|ちから} × {倍率|ばいりつ} の こたえを えらぶ。<br>あたると ダメージ 1.5{倍|ばい}！<br>🔍みとおし を つかうと さきに ダメージが みえる（ボーナスは なし）。'],
-    ['🗺️', 'デッキを そだてる', 'かつと カードや アルカナが もらえる。<br>おみせで かったり、いらない カードを わすれたり。<br>じぶんだけの さいきょう デッキで 3しょうの ボスを たおそう！'],
+    ['🗺️', 'デッキを そだてる', 'かつと カードや アルカナが もらえる。ボスを たおすと パックも！<br>おなじ {数|かず}の ルーンを あつめる？ ひとつの ぞくせいに しぼる？<br>デッキの {枚|まい}すうを へらして つよい カードを なんども ひく？<br>じぶんだけの さいきょう デッキで 3しょうの ボスを たおそう！'],
   ];
   let i = 0;
   const { m, close } = openModal('<div data-page style="width:740px;display:flex;flex-direction:column;align-items:center;gap:12px;min-height:280px"></div><div class="row"><button class="btn dark" data-prev>◀</button><span data-no class="num" style="font-size:20px"></span><button class="btn green" data-nextp>▶</button></div>');
@@ -170,10 +173,26 @@ function setupScreen() {
     meta.lastHero = hero; meta.lastGrade = grade; meta.lastDiff = diff; meta.records.runs++; saveMeta();
     app.run = R.newRun({ hero, grade, diff, seed: newSeed() });
     mark('arcana', HEROES[hero].arcana);
+    await buildStartDeck();
     persist();
     await story();
     runLoop();
   });
+}
+
+// はじめの デッキづくり：パックを 3つ あけて、はじめの カードと まぜる
+async function buildStartDeck() {
+  const run = app.run;
+  const els = HEROES[run.hero].els;
+  const types = await packSelect(app, { n: 3, els });
+  const { rng, save } = app.rng();
+  const opened = await openPacks(app, types, rng);
+  save();
+  const pool = [...run.deck, ...opened];
+  const chosen = await deckBuilder(app, { pool, selected: run.deck, min: DECK_MIN, max: DECK_MAX, title: 'じぶんの デッキを つくろう', newUids: opened.map((c) => c.uid), els });
+  const ids = new Set(chosen.map((c) => c.uid));
+  run.deck = pool.filter((c) => ids.has(c.uid));
+  run.side = pool.filter((c) => !ids.has(c.uid));
 }
 
 async function story() {

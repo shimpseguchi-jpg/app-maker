@@ -16,40 +16,40 @@ export const ENEMIES = {};
 function def(e) { ENEMIES[e.id] = e; }
 
 // ── 1しょう：くらやみの もり ──
-def({ id: 'wolf', name: 'かげおおかみ', art: '🐺', hp: 380, moves: [{ k: 'atk', n: 7 }, { k: 'multi', n: 3, times: 2 }, { k: 'buff', n: 2 }] });
-def({ id: 'bat', name: 'よるこうもり', art: '🦇', hp: 240, pattern: 'random', moves: [{ k: 'multi', n: 2, times: 3 }, { k: 'atk', n: 5 }] });
-def({ id: 'shroom', name: 'ねむりだけ', art: '🍄', hp: 420, moves: [{ k: 'curse', card: 'sleepy', count: 2 }, { k: 'atk', n: 8 }, { k: 'blk', n: 60 }] });
-def({ id: 'spider', name: 'もりぐも', art: '🕷️', hp: 330, moves: [{ k: 'curse', card: 'web', count: 1, n: 4 }, { k: 'multi', n: 3, times: 3 }] });
-def({ id: 'boar', name: 'いわいのしし', art: '🐗', hp: 520, moves: [{ k: 'blk', n: 80 }, { k: 'atk', n: 10 }, { k: 'atk', n: 7 }] });
-def({ id: 'wisp', name: 'まよいび', art: '👻', hp: 280, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 3 }, { k: 'atk', n: 7 }] });
-def({ id: 'troll', name: 'もりの トロル', art: '🧌', hp: 1300, elite: true, rule: 'noDiscard', moves: [{ k: 'atk', n: 11 }, { k: 'buff', n: 3 }, { k: 'multi', n: 5, times: 2 }] });
-def({ id: 'scorpion', name: 'どくさそり', art: '🦂', hp: 1100, elite: true, rule: 'max4', moves: [{ k: 'multi', n: 4, times: 2 }, { k: 'drain', what: 'hand', n: 2, dmg: 7 }, { k: 'atk', n: 13 }] });
-def({ id: 'treant', name: 'くちた たいじゅ', art: '🌳', hp: 2200, boss: true, rule: 'halfPower',
-  script: ['atk', 'summon', 'blk', 'charge', 'big'], movesByKey: { atk: { k: 'atk', n: 9 }, summon: { k: 'summon', id: 'wisp' }, blk: { k: 'atkblk', n: 7, b: 200 }, charge: { k: 'charge' }, big: { k: 'atk', n: 20 } },
+def({ id: 'wolf', name: 'かげおおかみ', art: '🐺', hp: 610, moves: [{ k: 'atk', n: 7 }, { k: 'multi', n: 3, times: 2 }, { k: 'buff', n: 2 }] });
+def({ id: 'bat', name: 'よるこうもり', art: '🦇', hp: 380, pattern: 'random', moves: [{ k: 'multi', n: 2, times: 3 }, { k: 'atk', n: 5 }] });
+def({ id: 'shroom', name: 'ねむりだけ', art: '🍄', hp: 670, moves: [{ k: 'curse', card: 'sleepy', count: 2 }, { k: 'atk', n: 8 }, { k: 'blk', n: 100 }] });
+def({ id: 'spider', name: 'もりぐも', art: '🕷️', hp: 530, moves: [{ k: 'curse', card: 'web', count: 1, n: 4 }, { k: 'multi', n: 3, times: 3 }] });
+def({ id: 'boar', name: 'いわいのしし', art: '🐗', hp: 830, moves: [{ k: 'blk', n: 130 }, { k: 'atk', n: 10 }, { k: 'atk', n: 7 }] });
+def({ id: 'wisp', name: 'まよいび', art: '👻', hp: 450, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 3 }, { k: 'atk', n: 7 }] });
+def({ id: 'troll', name: 'もりの トロル', art: '🧌', hp: 2080, elite: true, rule: 'noDiscard', moves: [{ k: 'atk', n: 11 }, { k: 'buff', n: 3 }, { k: 'multi', n: 5, times: 2 }] });
+def({ id: 'scorpion', name: 'どくさそり', art: '🦂', hp: 1760, elite: true, rule: 'max4', moves: [{ k: 'multi', n: 4, times: 2 }, { k: 'drain', what: 'hand', n: 2, dmg: 7 }, { k: 'atk', n: 13 }] });
+def({ id: 'treant', name: 'くちた たいじゅ', art: '🌳', hp: 3520, boss: true, rule: 'halfPower',
+  script: ['atk', 'summon', 'blk', 'charge', 'big'], movesByKey: { atk: { k: 'atk', n: 9 }, summon: { k: 'summon', id: 'wisp' }, blk: { k: 'atkblk', n: 7, b: 320 }, charge: { k: 'charge' }, big: { k: 'atk', n: 20 } },
   desc: 'もりの おくに ねむる たいじゅ。のろいで {力|ちから}を はんぶんに して しまう。ためている ときは {守|まも}りを かためよう' });
 
 // ── 2しょう：しずんだ みやこ ──
-def({ id: 'crab', name: 'よろいがに', art: '🦀', hp: 1200, moves: [{ k: 'blk', n: 240 }, { k: 'atk', n: 9 }, { k: 'multi', n: 4, times: 2 }] });
-def({ id: 'serpent', name: 'うみへび', art: '🐍', hp: 900, pattern: 'random', moves: [{ k: 'multi', n: 3, times: 3 }, { k: 'atk', n: 10 }, { k: 'buff', n: 3 }] });
-def({ id: 'jelly', name: 'でんきふぐ', art: '🐡', hp: 700, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 5 }, { k: 'multi', n: 2, times: 4 }] });
-def({ id: 'squid', name: 'すみいか', art: '🦑', hp: 1000, moves: [{ k: 'drain', what: 'hand', n: 2, dmg: 6 }, { k: 'atk', n: 11 }] });
-def({ id: 'ghost2', name: 'しずんだ へいし', art: '💀', hp: 1150, moves: [{ k: 'atk', n: 10 }, { k: 'curse', card: 'sleepy', count: 2, n: 5 }, { k: 'blk', n: 210 }] });
-def({ id: 'siren', name: 'うたう まもの', art: '🧜‍♀️', hp: 2700, elite: true, rule: 'noPair', moves: [{ k: 'curse', card: 'sleepy', count: 2 }, { k: 'multi', n: 4, times: 3 }, { k: 'atk', n: 14 }] });
-def({ id: 'knight', name: 'ぼうれい きし', art: '🛡️', hp: 2050, elite: true, rule: 'evenOnly', moves: [{ k: 'atkblk', n: 10, b: 420 }, { k: 'buff', n: 3 }, { k: 'atk', n: 15 }] });
-def({ id: 'leviathan', name: 'しんかいの おう', art: '🐙', hp: 4200, boss: true, rule: 'max3',
-  script: ['multi', 'drain', 'blk', 'charge', 'big'], movesByKey: { multi: { k: 'multi', n: 4, times: 4 }, drain: { k: 'drain', what: 'hand', n: 2, dmg: 8 }, blk: { k: 'blk', n: 900, buff: 1 }, charge: { k: 'charge' }, big: { k: 'atk', n: 24 } },
+def({ id: 'crab', name: 'よろいがに', art: '🦀', hp: 1920, moves: [{ k: 'blk', n: 380 }, { k: 'atk', n: 10 }, { k: 'multi', n: 4, times: 2 }] });
+def({ id: 'serpent', name: 'うみへび', art: '🐍', hp: 1440, pattern: 'random', moves: [{ k: 'multi', n: 3, times: 3 }, { k: 'atk', n: 11 }, { k: 'buff', n: 3 }] });
+def({ id: 'jelly', name: 'でんきふぐ', art: '🐡', hp: 1120, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 6 }, { k: 'multi', n: 2, times: 4 }] });
+def({ id: 'squid', name: 'すみいか', art: '🦑', hp: 1600, moves: [{ k: 'drain', what: 'hand', n: 2, dmg: 7 }, { k: 'atk', n: 12 }] });
+def({ id: 'ghost2', name: 'しずんだ へいし', art: '💀', hp: 1840, moves: [{ k: 'atk', n: 11 }, { k: 'curse', card: 'sleepy', count: 2, n: 5 }, { k: 'blk', n: 340 }] });
+def({ id: 'siren', name: 'うたう まもの', art: '🧜‍♀️', hp: 4320, elite: true, rule: 'noPair', moves: [{ k: 'curse', card: 'sleepy', count: 2 }, { k: 'multi', n: 4, times: 3 }, { k: 'atk', n: 15 }] });
+def({ id: 'knight', name: 'ぼうれい きし', art: '🛡️', hp: 3280, elite: true, rule: 'evenOnly', moves: [{ k: 'atkblk', n: 11, b: 670 }, { k: 'buff', n: 3 }, { k: 'atk', n: 16 }] });
+def({ id: 'leviathan', name: 'しんかいの おう', art: '🐙', hp: 6720, boss: true, rule: 'max3',
+  script: ['multi', 'drain', 'blk', 'charge', 'big'], movesByKey: { multi: { k: 'multi', n: 4, times: 4 }, drain: { k: 'drain', what: 'hand', n: 2, dmg: 9 }, blk: { k: 'blk', n: 1440, buff: 1 }, charge: { k: 'charge' }, big: { k: 'atk', n: 26 } },
   desc: 'しずんだ みやこの ぬし。じゅもんは 3{枚|まい}まで。すくない カードで おおきな {役|やく}を つくろう' });
 
 // ── 3しょう：ほしふる とう ──
-def({ id: 'eye', name: 'みはりの め', art: '👁️', hp: 1700, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 7 }, { k: 'atk', n: 11 }, { k: 'blk', n: 360 }] });
-def({ id: 'drake', name: 'ほしの りゅう', art: '🐲', hp: 2100, moves: [{ k: 'atk', n: 13 }, { k: 'multi', n: 4, times: 3 }, { k: 'buff', n: 3 }] });
-def({ id: 'golem', name: 'ほしくず ゴーレム', art: '🗿', hp: 2600, moves: [{ k: 'blk', n: 800 }, { k: 'atk', n: 14 }, { k: 'atk', n: 9 }] });
-def({ id: 'oni', name: 'あかおに', art: '👹', hp: 2250, moves: [{ k: 'buff', n: 4 }, { k: 'atk', n: 12 }, { k: 'multi', n: 3, times: 3 }] });
-def({ id: 'griffin', name: 'グリフォン', art: '🦅', hp: 1850, pattern: 'random', moves: [{ k: 'multi', n: 3, times: 4 }, { k: 'atk', n: 13 }] });
-def({ id: 'dragon', name: 'てんくうの りゅう', art: '🐉', hp: 5200, elite: true, rule: 'oddOnly', moves: [{ k: 'atk', n: 15 }, { k: 'multi', n: 5, times: 3 }, { k: 'blk', n: 1000, buff: 2 }] });
-def({ id: 'lich', name: 'やみの だいまどうし', art: '🧙‍♂️', hp: 4800, elite: true, rule: 'noSpells', moves: [{ k: 'curse', card: 'void', count: 3, n: 8 }, { k: 'atk', n: 14 }, { k: 'drain', what: 'mana', n: 1, dmg: 9 }] });
-def({ id: 'zeroKing', name: 'ゼロの おう', art: 'svg:zero', hp: 12000, boss: true, rule: 'rotate', rotate: ['halfPower', 'noPair', 'max4', 'evenOnly', 'smallHand', 'oddOnly'],
-  script: ['atk', 'curse', 'multi', 'blk', 'charge', 'big'], movesByKey: { atk: { k: 'atk', n: 13 }, curse: { k: 'curse', card: 'void', count: 2, n: 7 }, multi: { k: 'multi', n: 3, times: 4 }, blk: { k: 'blk', n: 1600, buff: 2 }, charge: { k: 'charge' }, big: { k: 'atk', n: 26 } },
+def({ id: 'eye', name: 'みはりの め', art: '👁️', hp: 2380, moves: [{ k: 'drain', what: 'mana', n: 1, dmg: 8 }, { k: 'atk', n: 12 }, { k: 'blk', n: 500 }] });
+def({ id: 'drake', name: 'ほしの りゅう', art: '🐲', hp: 2940, moves: [{ k: 'atk', n: 14 }, { k: 'multi', n: 4, times: 3 }, { k: 'buff', n: 3 }] });
+def({ id: 'golem', name: 'ほしくず ゴーレム', art: '🗿', hp: 3640, moves: [{ k: 'blk', n: 1120 }, { k: 'atk', n: 15 }, { k: 'atk', n: 10 }] });
+def({ id: 'oni', name: 'あかおに', art: '👹', hp: 3150, moves: [{ k: 'buff', n: 4 }, { k: 'atk', n: 13 }, { k: 'multi', n: 3, times: 3 }] });
+def({ id: 'griffin', name: 'グリフォン', art: '🦅', hp: 2590, pattern: 'random', moves: [{ k: 'multi', n: 3, times: 4 }, { k: 'atk', n: 14 }] });
+def({ id: 'dragon', name: 'てんくうの りゅう', art: '🐉', hp: 7280, elite: true, rule: 'oddOnly', moves: [{ k: 'atk', n: 16 }, { k: 'multi', n: 6, times: 3 }, { k: 'blk', n: 1400, buff: 2 }] });
+def({ id: 'lich', name: 'やみの だいまどうし', art: '🧙‍♂️', hp: 6720, elite: true, rule: 'noSpells', moves: [{ k: 'curse', card: 'void', count: 3, n: 8 }, { k: 'atk', n: 15 }, { k: 'drain', what: 'mana', n: 1, dmg: 10 }] });
+def({ id: 'zeroKing', name: 'ゼロの おう', art: 'svg:zero', hp: 16800, boss: true, rule: 'rotate', rotate: ['halfPower', 'noPair', 'max4', 'evenOnly', 'smallHand', 'oddOnly'],
+  script: ['atk', 'curse', 'multi', 'blk', 'charge', 'big'], movesByKey: { atk: { k: 'atk', n: 14 }, curse: { k: 'curse', card: 'void', count: 2, n: 7 }, multi: { k: 'multi', n: 3, times: 4 }, blk: { k: 'blk', n: 2240, buff: 2 }, charge: { k: 'charge' }, big: { k: 'atk', n: 29 } },
   desc: 'すべての {数|かず}を 0に しようと する おう。ターンごとに のろいが かわる！' });
 
 export const ENCOUNTERS = {

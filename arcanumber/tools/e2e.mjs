@@ -21,6 +21,21 @@ for (let t = 0; t < MAXT; t++) {
     const q = (s) => document.querySelector(s);
     const tap = (n) => { const o = { bubbles: true, pointerId: 1, isPrimary: true, button: 0 }; n.dispatchEvent(new PointerEvent('pointerdown', o)); n.dispatchEvent(new PointerEvent('pointerup', o)); };
     if (q('.guide-dim')) { q('.guide-dim').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return 'guide'; }
+    const ov = q('.overlay');
+    if (ov && !q('.modal')) {
+      const open = ov.querySelector('[data-open]');
+      if (open) { if (!open.disabled) { open.click(); return 'pk-open'; } const ps = ov.querySelectorAll('.pack-pick .pack'); ps[Math.floor(Math.random() * ps.length)].click(); return 'pk-pick'; }
+      const nx = ov.querySelector('[data-next]'); if (nx && nx.style.display !== 'none') { nx.click(); return 'pk-next'; }
+      const fl = ov.querySelector('.flip:not(.open)'); if (fl) { fl.click(); return 'pk-flip'; }
+      const pk = ov.querySelector('.pack.big'); if (pk) { pk.click(); return 'pk-tear'; }
+      const ok = ov.querySelector('.db-pool') && ov.querySelector('[data-ok]');
+      if (ok) {
+        if (ok.disabled || Math.random() < 0.4) { ov.querySelector('[data-auto]').click(); return 'db-auto'; }
+        const items = ov.querySelectorAll('.db-item'); if (Math.random() < 0.3 && items.length) { const it = items[Math.floor(Math.random() * items.length)]; it.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); it.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); return 'db-toggle'; }
+        ok.click(); return 'db-ok';
+      }
+      return 'overlay-wait';
+    }
     const modal = q('.modal');
     if (modal) {
       const h2 = modal.querySelector('h2')?.textContent || '';
@@ -33,6 +48,7 @@ for (let t = 0; t < MAXT; t++) {
         return 'quiz';
       }
       const okb = modal.querySelector('[data-ok]'); if (okb) { okb.click(); return 'ok:' + h2; }
+      const mp = modal.querySelector('.pack'); if (mp) { mp.click(); return 'boss-pack'; }
       const pick = modal.querySelector('[data-i]') || modal.querySelector('.arc-offer[data-id]') || modal.querySelector('.card-grid .card') || modal.querySelector('[data-auid]');
       if (pick) { pick.click(); return 'pick:' + h2; }
       const b = modal.querySelector('[data-ok], [data-yes], [data-use], [data-nextp]') || modal.querySelector('[data-i]') || modal.querySelector('.row .btn');
@@ -54,8 +70,8 @@ for (let t = 0; t < MAXT; t++) {
       q('.cast-btn').click(); return 'cast';
     }
     if (q('[data-chest]')) { q('[data-chest]').click(); return 'chest'; }
-    if (q('.opt')) { const o = document.querySelectorAll('.opt'); o[Math.random() < 0.6 ? 0 : 1].click(); return 'rest'; }
-    if (q('[data-leave]')) { const pr = [...document.querySelectorAll('.shop-item:not(.sold) .price:not(.cant)')]; if (pr.length && Math.random() < 0.5) { pr[0].click(); return 'buy'; } q('[data-leave]').click(); return 'leave'; }
+    if (q('.opt')) { const o = document.querySelectorAll('.opt'); o[Math.floor(Math.random() * o.length)].click(); return 'rest'; }
+    if (q('[data-leave]')) { const pr = [...document.querySelectorAll('.shop-item:not(.sold) .price:not(.cant)')]; if (pr.length && Math.random() < 0.5) { pr[Math.floor(Math.random() * pr.length)].click(); return 'buy'; } q('[data-leave]').click(); return 'leave'; }
     const ri = q('.reward-item:not(.taken)'); if (ri) { ri.click(); return 'reward'; }
     if (q('.panel-screen [data-next]')) { q('.panel-screen [data-next]').click(); return 'next'; }
     const go = q('.map-pop .btn'); if (go) { go.click(); return 'go'; }
@@ -69,7 +85,7 @@ for (let t = 0; t < MAXT; t++) {
   if (st.startsWith('ERR')) errors.push(st);
   const key = st.split(':')[0];
   if (process.env.SHOTS && !seen.has(key)) { seen.add(key); await page.screenshot({ path: `${out}/an_e2e_h${hero}_${String(shots++).padStart(2, '0')}_${key}.png` }); }
-  if (st === last && !['battle-wait', 'guide'].includes(st)) same++; else same = 0;
+  if (st === last && !['battle-wait', 'guide', 'overlay-wait', 'pk-flip', 'db-toggle', 'db-auto'].includes(st)) same++; else same = 0;
   last = st;
   if (same > 40) { console.log('STUCK at', st); await page.screenshot({ path: `${out}/an_stuck_h${hero}.png` }); break; }
   await page.waitForTimeout(st === 'battle-wait' ? 60 : 35);

@@ -19,9 +19,10 @@ await page.evaluate(async ({ scene, text }) => {
   run.arcana.push({ uid: 'a2', id: 'pairCharm', n: 0 }, { uid: 'a3', id: 'snowball', n: 3 }, { uid: 'a4', id: 'trioCrown', n: 0 });
   run.deck = [R.makeRune('fire', 5), R.makeRune('fire', 5), R.makeRune('thunder', 5, { enh: 'foil' }), R.makeRune('fire', 2), R.makeRune('thunder', 3), R.makeCard('focus'), R.makeCard('inferno'), R.makeCard('fireAltar'), R.makeCard('guard')];
   run.scrolls.push({ uid: 's1', id: 'star', hand: 'triple' });
+  run.side = [R.makeRune('fire', 7), R.makeRune('water', 3), R.makeCard('spark'), R.makeCard('fireHeart')];
   run.handLv.triple = 2;
   const node = Object.values(run.map.nodes).find((n) => n.col === 0);
-  const t = { shop: 'shop', battle: 'battle', nochallenge: 'battle', event: 'event', rest: 'rest', boss: 'boss', elite: 'elite' }[scene];
+  const t = { shopb: 'shop', shop: 'shop', battle: 'battle', nochallenge: 'battle', event: 'event', rest: 'rest', boss: 'boss', elite: 'elite' }[scene];
   if (t) { node.type = t; run.pos = node.id; run.map.visited.push(node.id); run.pending = node.id; if (t === 'battle') node.enc = ['wolf', 'bat']; if (t === 'elite') node.enc = ['troll']; if (t === 'boss') { node.enc = ['zeroKing']; run.act = 3; } }
   localStorage.setItem('arcanumber.run', JSON.stringify(run));
 }, { scene, text: process.env.TEXT || 'ruby' });
