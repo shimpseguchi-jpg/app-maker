@@ -147,22 +147,82 @@ const CONTENT = {
 const ADULT = { id: 21, eg: 21, th: 20, kr: 19 };
 
 // せかいぎんこうの すうじと、かいた せつめいを あわせる
-const areaMean = {};
-for (const k of ['uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest']) {
-  areaMean[k] = {};
-  for (const a of Object.keys(AREA)) {
-    const xs = STATS.filter((c) => c.area === a && c[k] != null);
-    const w = xs.reduce((t, c) => t + c.pop, 0);
-    areaMean[k][a] = w ? xs.reduce((t, c) => t + c[k] * c.pop, 0) / w : WORLD[k];
+// ない 値の うめかた：くらしの すうじは おなじ たいりく、がっこう・まずしさは おなじ しょとくの グループ（世界銀行の くわけ）の へいきん
+const meanBy = (keys, groupOf) => {
+  const m = {};
+  for (const k of keys) {
+    m[k] = {};
+    for (const c of STATS) {
+      if (c[k] == null) continue;
+      const g = groupOf(c);
+      m[k][g] ||= [0, 0];
+      m[k][g][0] += c[k] * c.pop; m[k][g][1] += c.pop;
+    }
   }
-}
+  return (k, c) => { const x = m[k][groupOf(c)]; return x ? x[0] / x[1] : WORLD[k] ?? 0; };
+};
+const byArea = meanBy(['uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf'], (c) => c.area);
+const byIncome = meanBy(['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab'], (c) => c.income);
 export const COUNTRIES = STATS.map((st) => {
   const c = { ...st, ...(CONTENT[st.id] || {}), rich: !!CONTENT[st.id], adult: ADULT[st.id] || 18 };
-  // ない 値は おなじ たいりくの へいきんで うめる（estimated に しるしを つける）
+  // ない 値を うめる（estimated に しるしを つける）。ゆたかな くにの こどもの けっこん・こどもの しごとは 0 と みなす
   c.estimated = [];
-  for (const k of Object.keys(areaMean)) if (c[k] == null) { c[k] = Math.round(areaMean[k][c.area]); c.estimated.push(k); }
+  for (const k of ['uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf']) {
+    if (c[k] == null) { c[k] = Math.round(byArea(k, c) * 10) / 10; c.estimated.push(k); }
+  }
+  for (const k of ['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab']) {
+    if (c[k] == null) { c[k] = (k === 'cm18' || k === 'clab') && c.income === 'HIC' ? 0 : Math.round(byIncome(k, c) * 10) / 10; c.estimated.push(k); }
+  }
   return c;
 });
+
+// ───── いのちの ひょう（生命表） ─────
+// 世界銀行の「なんさいまでに 1000にんの うち なんにん なくなるか」と へいきんじゅみょうから、
+// ねんれいごとの 1ねんで なくなる かくりつ q[0..110] を つくる。
+// 0さい：乳児死亡率 / 1〜4さい：5さい未満死亡率の のこり / 5〜24さい：5さいきざみの 死亡確率 /
+// 25〜59さい：成人死亡率（15〜60さい）の のこりを ねんれいと ともに ふえる かたち（ゴンペルツ）で わける /
+// 60さい〜：ゴンペルツで のばし、へいきんじゅみょうが 世界銀行の 値に あうように ちょうせい する。
+function spread(p, years) { return 1 - Math.pow(1 - Math.min(p, 0.999), 1 / years); }
+const cache = {};
+export function lifeTable(c, g) {
+  const key = c.id + g;
+  if (cache[key]) return cache[key];
+  const q = new Array(111).fill(0);
+  const imr = c.imr / 1000, u5 = Math.max(c.u5, c.imr) / 1000;
+  q[0] = imr;
+  const q14 = spread(1 - (1 - u5) / (1 - imr), 4);
+  for (let a = 1; a <= 4; a++) q[a] = q14;
+  [[5, c.m0509], [10, c.m1014], [15, c.m1519], [20, c.m2024]].forEach(([a0, p]) => {
+    const qa = spread(p / 1000, 5);
+    for (let a = a0; a < a0 + 5; a++) q[a] = qa;
+  });
+  const am = (g === 'm' ? c.amm : c.amf) / 1000;
+  const s1525 = (1 - c.m1519 / 1000) * (1 - c.m2024 / 1000);
+  const s2560 = Math.min(0.999, Math.max(0.05, (1 - am) / s1525));
+  const B = 0.08, H = -Math.log(s2560);
+  const k = (H * B) / (Math.exp(35 * B) - 1);
+  for (let a = 25; a < 60; a++) q[a] = 1 - Math.exp(-(k / B) * (Math.exp(B * (a + 1 - 25)) - Math.exp(B * (a - 25))));
+  const le = g === 'm' ? c.lem : c.lef;
+  const B2 = 0.1;
+  const fill = (h60) => {
+    for (let a = 60; a <= 110; a++) q[a] = a === 110 ? 1 : Math.min(1, 1 - Math.exp(-(h60 / B2) * (Math.exp(B2 * (a + 1 - 60)) - Math.exp(B2 * (a - 60)))));
+    let alive = 1, e = 0;
+    for (let a = 0; a <= 110; a++) { e += alive * (1 - q[a] / 2); alive *= 1 - q[a]; }
+    return e;
+  };
+  // h60 を にぶんたんさくで きめる
+  let lo = 1e-4, hi = 1;
+  for (let it = 0; it < 40; it++) { const mid = Math.sqrt(lo * hi); if (fill(mid) > le) lo = mid; else hi = mid; }
+  fill(Math.sqrt(lo * hi));
+  return (cache[key] = q);
+}
+// なくなる ねんれいを きめる（minAge より まえには なくならない ように できる）
+export function deathAge(c, g, minAge = 0) {
+  const q = lifeTable(c, g);
+  for (let a = minAge; a <= 110; a++) if (Math.random() < q[a]) return a;
+  return 110;
+}
+
 // なまえ（その くにで よく ある なまえの れい。「おとこのこ / おんなのこ」）
 const NAMES = {
   in: 'アーラヴ ラーフル アルジュン / プリヤ アナニャ ディヴィヤ', cn: 'ハオラン ズーハン ウェイ / シンイー ユートン メイ',

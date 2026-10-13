@@ -146,6 +146,10 @@ b { color: #1b5fa8; }
 .mini.on { background: var(--green); color: #fff; }
 
 /* じんせいの きろく */
+.lastbox { width: 100%; background: #f1f4fa; border-radius: 18px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.lastbox.young { background: #eef0f8; }
+.wl { font-size: .85em; color: var(--ink-soft); }
+.warn { color: #b0602a; }
 .headline { font-size: 1.15em !important; }
 .oldava { font-size: .55em; margin-left: .1em; vertical-align: bottom; }
 .loghead { margin: 4px 0 0; align-self: flex-start; }

@@ -27,6 +27,22 @@ const IND = {
   land: 'AG.LND.TOTL.K2', // りくちの ひろさ km2
   lem: 'SP.DYN.LE00.MA.IN', // へいきん じゅみょう（おとこ）… としを とった ときの ねんれいの めやすに つかう
   lef: 'SP.DYN.LE00.FE.IN', // へいきん じゅみょう（おんな）
+  // いのち（1000にんあたり）… 生命表の もとに する
+  imr: 'SP.DYN.IMRT.IN', // 1さいまでに なくなる
+  u5: 'SH.DYN.MORT', // 5さいまでに なくなる
+  m0509: 'SH.DYN.0509', // 5〜9さいの あいだに なくなる
+  m1014: 'SH.DYN.1014', // 10〜14さい
+  m1519: 'SH.DYN.1519', // 15〜19さい
+  m2024: 'SH.DYN.2024', // 20〜24さい
+  amm: 'SP.DYN.AMRT.MA', // 15〜60さいの あいだに なくなる（おとこ）
+  amf: 'SP.DYN.AMRT.FE', // 15〜60さい（おんな）
+  // がっこう・くらし（%）
+  prim: 'SE.PRM.CMPT.ZS', // しょうがっこうを さいごまで おえる（100で うちきり）
+  lsec: 'SE.SEC.CMPT.LO.ZS', // ちゅうがっこうを さいごまで おえる（100で うちきり）
+  pov3: 'SI.POV.DDAY', // 1にち 3ドル（2021 PPP）みまんで くらす ひと
+  pov8: 'SI.POV.UMIC', // 1にち 8.30ドル みまんで くらす ひと
+  cm18: 'SP.M18.2024.FE.ZS', // 18さいまでに けっこんした じょせい（20〜24さいの うち）
+  clab: 'SL.TLF.0714.ZS', // はたらいて いる こども（7〜14さい）
 };
 
 // くにでは ない ちいき（ずかんに でると こどもが まよう）
@@ -72,7 +88,7 @@ const flag = (iso2) => String.fromCodePoint(...[...iso2].map((ch) => 0x1f1e6 + c
 async function get(path) {
   for (let i = 0; i < 4; i++) {
     try {
-      const r = await fetch(`${API}/${path}${path.includes('?') ? '&' : '?'}format=json&per_page=20000`);
+      const r = await fetch(`${API}/${path}${path.includes('?') ? '&' : '?'}format=json&per_page=20000`, { signal: AbortSignal.timeout(180000) });
       if (r.ok) return (await r.json())[1] || [];
     } catch (e) { /* もう いちど */ }
     await new Promise((res) => setTimeout(res, 2000 * 2 ** i));
@@ -107,6 +123,7 @@ for (const c of countries) {
     name: jaName(c.iso2Code),
     area: areaOf(c.iso2Code, c.region.value),
     region: c.region.id,
+    income: c.incomeLevel.id, // HIC/UMC/LMC/LIC
     pop: Math.round(pop),
     births: Math.round((pop * cbr) / 1000),
     tfr: r1(g('tfr')),
@@ -122,6 +139,10 @@ for (const c of countries) {
     land: g('land') != null ? Math.round(g('land')) : null,
     lem: g('lem') != null ? Math.round(g('lem')) : null,
     lef: g('lef') != null ? Math.round(g('lef')) : null,
+    ...Object.fromEntries(['imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf', 'pov3', 'pov8', 'cm18', 'clab']
+      .map((k) => [k, g(k) != null ? r1(g(k)) : null])),
+    prim: g('prim') != null ? r1(Math.min(100, g('prim'))) : null,
+    lsec: g('lsec') != null ? r1(Math.min(100, g('lsec'))) : null,
   });
 }
 out.sort((a, b) => b.births - a.births);
