@@ -622,3 +622,10 @@ canvas.swirl { position: absolute; inset: 0; width: 100%; height: 100%; z-index:
 .hs.board tr.me .bn { color: var(--gold-hi); }
 .sc-daily { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-dim); text-align: center; }
 .sc-daily small { color: #ffb3c0; }
+.daily-info { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.daily-info .di { display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 14px; background: rgba(10,8,18,.75); border: 1px solid var(--gold-dim); }
+.daily-info .di-l { font-size: 13px; color: var(--gold); }
+.daily-info .di-v { display: flex; align-items: center; gap: 4px; font-family: var(--display); font-size: 22px; color: var(--ink); }
+.daily-info .di-v small { font-family: var(--body, inherit); font-size: 12px; color: var(--ink-dim); margin: 0 4px; }
+#stage.short .modc { min-height: 250px; padding: 12px; }
+#stage.short .modc .mc-icon { font-size: 50px; }

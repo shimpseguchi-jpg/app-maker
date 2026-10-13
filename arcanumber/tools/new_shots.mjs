@@ -19,8 +19,7 @@ await shot('01_title');
 await page.click('[data-board]'); await shot('01b_board');
 await page.click('.modal [data-close]');
 await page.click('[data-sa]'); await page.waitForSelector('.name-list'); await shot('01c_name');
-await page.click('.modal [data-ok]');
-await page.click('[data-h="1"]'); await page.click('[data-next]');
+await page.click('.modal [data-ok]'); // きょうの ちょうせんは しゅじんこうが きまっているので、すぐ うでだめしへ
 await shot('02_level');
 await page.click('[data-start]');
 await page.waitForTimeout(300);

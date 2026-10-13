@@ -23,7 +23,7 @@ import { hasMod, MODS } from './data/mods.js';
 import { levelStep, levelLabel } from './ui/placement.js';
 import { dailyScreen, modsModal } from './ui/modsui.js';
 import { pickName, boardModal, submitDaily } from './ui/board.js';
-import { todayJST, dateShort, dailyMods, dailySeed } from './engine/daily.js';
+import { todayJST, dateShort, dailyMods, dailySeed, dailyHero, dailyPackTypes, dailyPackRng } from './engine/daily.js';
 import { playScore, highScoresHtml, MODE_NAME } from './ui/scoreui.js';
 
 const VERSION = '1.1.0';
@@ -136,13 +136,13 @@ function titleScreen() {
     <div class="title-wrap">
       <div class="logo"><div class="en">ARCANUMBER</div><div class="jp">アルカ<b>ナンバー</b></div><div class="tag">${T('ルーンを くみあわせ、{数|かず}の まほうで たたかえ')}</div></div>
       <div class="menu"><button class="btn big" data-new>${T('はじめから')}</button>${saved ? `<button class="btn big blue" data-cont>${T('つづきから')}</button>` : ''}</div>
-      <div class="menu"><button class="btn gold sa-btn" data-sa>🏆 ${T('きょうの ちょうせん')}<small>${T(`${dateShort(today)}の ルール ${dailyMods(today).map((id) => MODS[id].icon).join('')}　みんなで おなじ ルールで スコアを きそう`)}${todayBest ? `　${T('きょうの ベスト')} ${todayBest}` : ''}</small></button></div>
+      <div class="menu"><button class="btn gold sa-btn" data-sa>🏆 ${T('きょうの ちょうせん')}<small>${T(`${dateShort(today)}　${HEROES[dailyHero(today)].art} ${dailyMods(today).map((id) => MODS[id].icon).join('')}　みんなで おなじ ルールで スコアを きそう`)}${todayBest ? `　${T('きょうの ベスト')} ${todayBest}` : ''}</small></button></div>
       <div class="menu" style="margin-top:4px"><button class="btn dark" data-zukan>📚 ${T('ずかん')}</button><button class="btn dark" data-board>🏅 ${T('ランキング')}</button><button class="btn dark" data-howto>❓ ${T('あそびかた')}</button><button class="btn dark" data-settings>⚙️ ${T('せってい')}</button></div>
     </div><div class="version">v${VERSION}</div></div>`);
   app.mount(root);
   swirl($('canvas.swirl', root), 'title');
   $('[data-new]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('あたらしく はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen('normal'); });
-  $('[data-sa]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('きょうの ちょうせんを はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; await pickName(); setupScreen('random'); });
+  $('[data-sa]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('きょうの ちょうせんを はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; await pickName(); dailyFlow(); });
   $('[data-board]', root).addEventListener('click', () => { sfx('tap'); boardModal(); });
   $('[data-cont]', root)?.addEventListener('click', () => { sfx('tap'); app.run = saved; runLoop(); });
   $('[data-zukan]', root).addEventListener('click', () => { sfx('tap'); zukanScreen(); });
@@ -166,7 +166,7 @@ function howTo() {
     ['💀', 'のろい と ボス', 'つよい てきは「のろい」を もっている。<br>（{力|ちから}が はんぶん、ペアが できない など）<br>のろいに あわせて じゅもんを くふう しよう。'],
     ['🧮', 'けいさん チャレンジ', 'はなった あと、{力|ちから} × {倍率|ばいりつ} の こたえを えらぶ。<br>あたると ダメージ 1.5{倍|ばい}！<br>🔍みとおし を つかうと さきに ダメージが みえる（ボーナスは なし）。'],
     ['🏅', 'スコア', 'ぼうけんが おわると スコアが でるよ。<br>すすんだ マス・たおした {敵|てき}・ボス・ノーダメージ・けいさんの せいかい などで ふえる。<br>むずかしさ「ふつう」なら +20%！ ずかんの「きろく」で ハイスコアが みられる。'],
-    ['🏆', 'きょうの ちょうせん', 'まいにち とくしゅルールが 3つ かわる（ガラスの からだ・ドラフト など 26しゅるい）。<br>その ひは だれが あそんでも おなじ ルール・おなじ マップ！<br>たいへんな ルールほど スコアの ばいりつが あがる。<br>🏅ランキングで みんなの スコアと くらべよう。'],
+    ['🏆', 'きょうの ちょうせん', 'まいにち しゅじんこう・パック・とくしゅルール 3つが かわる。<br>その ひは だれが あそんでも おなじ しゅじんこう・おなじ パックの なかみ・おなじ マップ！<br>たいへんな ルールほど スコアの ばいりつが あがる。<br>🏅ランキングで みんなの スコアと くらべよう。'],
     ['🗺️', 'デッキを そだてる', 'かつと カードや アルカナが もらえる。ボスを たおすと パックも！<br>おなじ {数|かず}の ルーンを あつめる？ ひとつの ぞくせいに しぼる？<br>デッキの {枚|まい}すうを へらして つよい カードを なんども ひく？<br>じぶんだけの さいきょう デッキで 3しょうの ボスを たおそう！'],
   ];
   let i = 0;
@@ -194,16 +194,19 @@ function setupScreen(mode = 'normal') {
     meta.lastHero = hero; saveMeta();
     const lvl = await levelStep(app);
     if (!lvl) { setupScreen(mode); return; }
-    if (mode === 'random') {
-      // きょうの ちょうせん：ひづけで ルールと マップが きまる
-      const date = todayJST();
-      const mods = await dailyScreen(app, { ...lvl, date });
-      if (!mods) { setupScreen(mode); return; }
-      startRun({ hero, ...lvl, mode, mods, daily: date, seed: dailySeed(date) });
-      return;
-    }
     startRun({ hero, ...lvl, mode, mods: [] });
   });
+}
+
+// きょうの ちょうせん：ひづけで しゅじんこう・パック・ルール・マップが きまる（だれでも おなじ）
+async function dailyFlow() {
+  const date = todayJST();
+  const hero = dailyHero(date);
+  const lvl = await levelStep(app);
+  if (!lvl) { titleScreen(); return; }
+  const mods = await dailyScreen(app, { ...lvl, date, hero, packs: dailyPackTypes(date) });
+  if (!mods) { titleScreen(); return; }
+  startRun({ hero, ...lvl, mode: 'random', mods, daily: date, seed: dailySeed(date) });
 }
 
 async function startRun({ hero, grade, diff, mode, mods, daily = null, seed = newSeed() }) {
@@ -237,7 +240,8 @@ async function buildStartDeck() {
       run.deck.push(c);
     }
   } else if (sm === 'sealed') {
-    const opened = await openPacks(app, R.sealedTypes(run, rng), rng); save();
+    const prng = run.daily ? dailyPackRng(run.daily) : rng;
+    const opened = await openPacks(app, R.sealedTypes(run, prng), prng); save();
     const chosen = await deckBuilder(app, { pool: opened, selected: [], min: 10, max: 14, title: 'シールド：この カードだけで デッキを つくろう', newUids: [], els });
     const ids = new Set(chosen.map((c) => c.uid));
     run.deck = opened.filter((c) => ids.has(c.uid)); run.side = opened.filter((c) => !ids.has(c.uid));
@@ -248,8 +252,9 @@ async function buildStartDeck() {
     await showDeck('🎒 はじめの デッキだけ', 'カードの ほうしゅうは でないよ。アルカナで たたかおう！', run.deck);
   } else {
     const base = sm === 'chimera' ? [...run.deck, ...HEROES.flatMap((h, i) => (i === run.hero ? [] : R.starterDeck(i)))] : run.deck;
-    const types = await packSelect(app, { n: 3, els });
-    const opened = await openPacks(app, types, rng);
+    // きょうの ちょうせんは パックの しゅるいも なかみも きまっている
+    const types = run.daily ? dailyPackTypes(run.daily) : await packSelect(app, { n: 3, els });
+    const opened = await openPacks(app, types, run.daily ? dailyPackRng(run.daily) : rng);
     save();
     const pool = [...base, ...opened];
     const chosen = await deckBuilder(app, { pool, selected: run.deck, min: DECK_MIN, max: DECK_MAX, title: 'じぶんの デッキを つくろう', newUids: opened.map((c) => c.uid), els });

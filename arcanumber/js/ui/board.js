@@ -7,7 +7,7 @@ import { meta, saveMeta } from '../save.js';
 import { HEROES } from '../data/heroes.js';
 import { MODS } from '../data/mods.js';
 import { openModal } from './modal.js';
-import { todayJST, shiftDate, dateLabel, dateShort, dailyMods, nameCandidates, newTag } from '../engine/daily.js';
+import { todayJST, shiftDate, dateLabel, dateShort, dailyMods, dailyHero, nameCandidates, newTag } from '../engine/daily.js';
 
 export const hasServer = () => !!(window.google && window.google.script && window.google.script.run);
 function gasCall(fn, ...args) {
@@ -98,7 +98,7 @@ export function boardModal(date = todayJST()) {
     <div class="row"><button class="btn dark small" data-rename>✏️ ${T('なまえを かえる')}</button></div>`, { cls: 'board-modal' });
   const load = async () => {
     $$('[data-day]', m).forEach((b) => { b.classList.toggle('gold', b.dataset.day === cur); b.classList.toggle('dark', b.dataset.day !== cur); });
-    $('[data-mods]', m).innerHTML = `${T(dateLabel(cur))}　${dailyMods(cur).map((id) => `${MODS[id].icon} ${T(MODS[id].name)}`).join('　')}`;
+    $('[data-mods]', m).innerHTML = `${T(dateLabel(cur))}　${HEROES[dailyHero(cur)].art} ${HEROES[dailyHero(cur)].name}　${dailyMods(cur).map((id) => `${MODS[id].icon} ${T(MODS[id].name)}`).join('　')}`;
     $('[data-body]', m).innerHTML = `<div class="sub">${T('よみこみちゅう…')}</div>`;
     const b = await fetchBoard(cur);
     if (!m.isConnected) return;

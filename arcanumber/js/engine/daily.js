@@ -2,6 +2,8 @@
 // 日本の 日付から ルールと 乱数の たねを きめる → だれが あそんでも おなじ ルール
 import { makeRng } from '../util.js';
 import { pickMods } from '../data/mods.js';
+import { HEROES } from '../data/heroes.js';
+import { PACK_TYPES } from '../data/packs.js';
 
 // にほんの 日付（YYYY-MM-DD）
 export function todayJST(now = Date.now()) { return new Date(now + 9 * 3600 * 1000).toISOString().slice(0, 10); }
@@ -17,6 +19,15 @@ export function hashStr(s) {
 }
 export function dailyMods(date) { return pickMods(makeRng(hashStr(`arcanumber-daily-mods:${date}`))); }
 export function dailySeed(date) { return hashStr(`arcanumber-daily-run:${date}`); }
+// しゅじんこうと はじめの パック（3つの しゅるいと なかみ）も ひづけで きめる
+export function dailyHero(date) { return hashStr(`arcanumber-daily-hero:${date}`) % HEROES.length; }
+export function dailyPackTypes(date) {
+  const els = HEROES[dailyHero(date)].els;
+  const rng = makeRng(hashStr(`arcanumber-daily-packtypes:${date}`));
+  return [els[0], els[1], rng.pick(PACK_TYPES)];
+}
+// パックの なかみ よう（あそびかたに よらず いつも おなじ じゅんばんで つかう）
+export function dailyPackRng(date) { return makeRng(hashStr(`arcanumber-daily-packs:${date}`)); }
 
 // ランキングに でる なまえ（ほんとうの なまえは つかわない）
 const ADJ = ['すばやい', 'つよい', 'かしこい', 'ひかる', 'げんきな', 'ふしぎな', 'ゆうかんな', 'やさしい', 'きらきら', 'もりもり', 'のんびり', 'ちいさな', 'おおきな', 'まほうの', 'ほしの', 'にじいろの'];

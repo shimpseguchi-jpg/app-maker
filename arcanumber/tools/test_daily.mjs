@@ -19,6 +19,13 @@ ok(hashStr('a') !== hashStr('b'), 'hash');
 const R = await import('../js/engine/run.js');
 const mk = () => R.newRun({ hero: 1, grade: 2, diff: 'normal', seed: dailySeed('2026-10-13'), mode: 'random', mods: dailyMods('2026-10-13') });
 ok(JSON.stringify(mk().map) === JSON.stringify(mk().map), 'おなじ ひ・おなじ しゅじんこうなら おなじ マップ');
+const { dailyHero, dailyPackTypes, dailyPackRng } = await import('../js/engine/daily.js');
+const { openPack, PACK_TYPES } = await import('../js/data/packs.js');
+const { HEROES } = await import('../js/data/heroes.js');
+ok(days.every((d) => dailyHero(d) === dailyHero(d) && dailyHero(d) >= 0 && dailyHero(d) < 3) && new Set(days.map(dailyHero)).size === 3, 'しゅじんこうは ひづけで きまる（3にん とも でる）');
+ok(days.every((d) => { const t = dailyPackTypes(d), els = HEROES[dailyHero(d)].els; return t.length === 3 && t[0] === els[0] && t[1] === els[1] && PACK_TYPES.includes(t[2]); }), 'パックは しゅじんこうの ぞくせい 2つ＋もう 1つ');
+const contents = (d) => { const rr = dailyPackRng(d); return dailyPackTypes(d).flatMap((t) => openPack(t, rr)).map((c) => `${c.id}:${c.el || ''}${c.v || ''}${c.enh || ''}`).join(','); };
+ok(contents('2026-10-13') === contents('2026-10-13') && contents('2026-10-13') !== contents('2026-10-14'), 'パックの なかみも おなじ ひは おなじ');
 const r = makeRng(1); ok(nameCandidates(r).length === 3 && /^[0-9a-z]{4}$/.test(newTag(r)), 'なまえと ばんごう');
 
 // ── GAS の サーバー（Code.gs）を にせものの Google で うごかす ──

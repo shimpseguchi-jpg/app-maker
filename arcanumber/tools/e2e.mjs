@@ -34,8 +34,8 @@ await page.reload(); await page.waitForTimeout(500);
 const MODE = process.env.MODE || 'normal';
 if (process.env.MODS) await page.evaluate((m) => { window.__forceMods = m.split(','); }, process.env.MODS);
 await page.click(MODE === 'random' ? '[data-sa]' : '[data-new]');
-if (MODE === 'random') { await page.waitForSelector('.modal [data-ok]'); await page.click('.modal [data-more]'); await page.click('.modal [data-ok]'); }
-await page.click(`[data-h="${hero}"]`); await page.click('[data-next]');
+if (MODE === 'random') { await page.waitForSelector('.modal [data-ok]'); await page.click('.modal [data-more]'); await page.click('.modal [data-ok]'); } // きょうの ちょうせんは しゅじんこうが きまっている
+else { await page.click(`[data-h="${hero}"]`); await page.click('[data-next]'); }
 let shots = 0, last = '', same = 0; const seen = new Set();
 for (let t = 0; t < MAXT; t++) {
   if (process.env.GOD) await page.evaluate(() => { if (window.AN.run) window.AN.run.hp = window.AN.run.maxHp; });
