@@ -511,3 +511,90 @@ canvas.swirl { position: absolute; inset: 0; width: 100%; height: 100%; z-index:
 .overlay .ov-head .ov-sub { font-size: 14px; }
 .overlay .ov-head > div:first-child { min-width: 0; }
 .overlay .ov-head .ov-title { white-space: nowrap; }
+
+/* ───── うでだめし ───── */
+.pt-dots { display: flex; gap: 8px; }
+.pt-dots .pd { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 18px; background: #1b1629; border: 2px solid var(--edge); color: var(--ink-dim); }
+.pt-dots .pd.now { border-color: var(--gold-hi); color: var(--gold-hi); box-shadow: 0 0 12px rgba(255,216,138,.5); }
+.pt-dots .pd.ok { border-color: var(--ok); background: #123222; }
+.pt-dots .pd.ng { border-color: var(--mult); background: #3a1420; color: #ffb3c0; }
+.pt-no { font-family: var(--display); font-size: 24px; color: var(--gold); }
+.pt-main { display: flex; align-items: center; gap: 56px; }
+.pt-q { display: flex; align-items: center; gap: 18px; font-family: var(--display); font-size: 64px; color: var(--ink); text-shadow: 0 4px 0 #000; }
+.pt-q .answer-box { min-width: 170px; height: 96px; font-size: 56px; }
+.pt-main .keypad { grid-template-columns: repeat(3, 92px); }
+.pt-main .keypad button { height: 72px; }
+.pt-res { display: flex; gap: 12px; }
+.pt-res .pr { width: 92px; padding: 8px; border-radius: 14px; text-align: center; background: #120e1d; border: 2px solid var(--edge); }
+.pt-res .pr.ok { border-color: var(--ok); } .pt-res .pr.ng { border-color: #5a2a3a; }
+.pt-res .pr-n { font-size: 13px; color: var(--ink-dim); } .pt-res .pr-m { font-size: 28px; } .pt-res .pr-s { font-size: 14px; }
+.pt-rec { padding: 14px 30px; border-radius: 18px; text-align: center; background: linear-gradient(170deg, #2d2347, #17121f); border: 2px solid var(--gold-dim); box-shadow: 0 0 30px rgba(227,181,91,.18); }
+.pt-rec .pr-lbl { font-size: 15px; color: var(--gold); }
+.pt-rec .pr-val { font-family: var(--display); font-size: 34px; color: var(--gold-hi); margin: 4px 0; }
+.pt-rec .pr-desc { font-size: 15px; color: var(--ink-dim); max-width: 700px; }
+.pt-adj { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+/* ───── スコアアタック ───── */
+.sa-btn { flex-direction: column; gap: 0; min-height: 66px; padding: 6px 30px; }
+.sa-btn small { font-size: 13px; font-family: inherit; opacity: .85; }
+.mod-row { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.modc { width: 300px; min-height: 300px; padding: 18px 16px; border-radius: 18px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; background: linear-gradient(170deg, #241d38, #15111f); border: 2px solid var(--edge); box-shadow: 0 10px 26px rgba(0,0,0,.55); animation: modIn .5s cubic-bezier(.2,1.4,.4,1) both; }
+.modc.k-good { border-color: #3f9e68; box-shadow: 0 0 0 1px #2c6b48, 0 10px 26px rgba(0,0,0,.55), inset 0 0 40px rgba(79,210,126,.08); }
+.modc.k-bad { border-color: #b8404f; box-shadow: 0 0 0 1px #7a2633, 0 10px 26px rgba(0,0,0,.55), inset 0 0 40px rgba(255,66,88,.08); }
+.modc.k-mix { border-color: #8a6ad6; box-shadow: 0 0 0 1px #573f95, 0 10px 26px rgba(0,0,0,.55), inset 0 0 40px rgba(160,120,255,.08); }
+.modc .mc-icon { font-size: 64px; line-height: 1.1; }
+.modc .mc-name { font-family: var(--display); font-size: 25px; color: var(--gold-hi); }
+.modc .mc-kind { font-size: 13px; padding: 2px 10px; border-radius: 10px; background: #0e0b18; }
+.modc.k-good .mc-kind { color: #9ff0bf; } .modc.k-bad .mc-kind { color: #ffb3c0; } .modc.k-mix .mc-kind { color: #d9c6ff; }
+.modc .mc-text { flex: 1; font-size: 16px; line-height: 1.55; color: var(--ink); }
+.modc .mc-score { font-family: var(--display); font-size: 17px; color: var(--ink-dim); }
+.modc .mc-score.up { color: var(--gold-hi); } .modc .mc-score.down { color: #8fb8ff; }
+.mod-row.small .modc { width: 250px; min-height: 0; animation: none; }
+.mod-row.small .modc .mc-icon { font-size: 44px; }
+.mod-total { font-size: 20px; color: var(--ink-dim); }
+.mod-total b { font-family: var(--display); font-weight: 400; font-size: 30px; color: var(--gold-hi); }
+@keyframes modIn { from { opacity: 0; transform: rotateY(90deg) scale(.8); } to { opacity: 1; transform: none; } }
+.chip.mods { cursor: pointer; border-color: var(--gold-dim); color: var(--gold-hi); font-size: 18px; }
+
+/* ───── スコア はっぴょう ───── */
+.end-screen { gap: 10px; }
+.score-wrap { display: grid; grid-template-columns: 1fr 330px; gap: 16px; width: 100%; max-width: 1120px; min-height: 0; }
+.score-list { border-radius: 16px; background: rgba(10,8,18,.78); border: 1px solid var(--edge); padding: 10px 14px; min-height: 380px; }
+.score-list .sl-head { font-family: var(--display); font-size: 18px; color: var(--gold); margin-bottom: 6px; }
+.score-list .mods-mini { font-family: inherit; font-size: 13px; color: var(--ink-dim); }
+.sc-items { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; }
+.sc-item { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 10px; background: #17121f; animation: popIn .3s ease both; }
+.sc-item .si-i { font-size: 20px; text-align: center; }
+.sc-item .si-n { font-size: 15px; line-height: 1.2; display: flex; flex-direction: column; min-width: 0; }
+.sc-item .si-n > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-item .si-n small { font-size: 11px; color: var(--ink-dim); }
+.sc-item .si-p { font-family: var(--display); font-size: 18px; color: var(--gold-hi); }
+.score-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; border-radius: 16px; background: rgba(10,8,18,.78); border: 1px solid var(--gold-dim); }
+.sc-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; color: var(--ink-dim); }
+.sc-row b { font-family: var(--display); font-weight: 400; font-size: 26px; color: var(--ink); }
+.sc-mult { min-height: 34px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.sc-mult .mchip { font-size: 12px; padding: 2px 8px; border-radius: 8px; background: #221b33; color: var(--ink-dim); }
+.sc-mult .mx { margin-left: auto; font-family: var(--display); font-size: 24px; color: var(--mult); }
+.sc-total { text-align: center; padding: 6px 0; border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.sc-total small { display: block; font-size: 15px; color: var(--gold); }
+.sc-total span { display: inline-block; font-family: var(--display); font-size: 58px; line-height: 1.1; color: var(--gold-hi); text-shadow: 0 0 20px rgba(255,200,90,.45), 0 4px 0 #000; }
+.sc-rank { min-height: 28px; text-align: center; font-family: var(--display); font-size: 19px; color: var(--ink); }
+.sc-rank.best { color: var(--gold-hi); animation: pulse 1s infinite; }
+.mini-stats { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--ink-dim); flex: 1; }
+.mini-stats div { display: flex; justify-content: space-between; gap: 8px; }
+.mini-stats b { color: var(--ink); font-weight: 800; }
+.bump { animation: bump .35s ease; }
+@keyframes popIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+#stage.short .score-list { min-height: 330px; }
+#stage.short .sc-item { padding: 2px 8px; }
+
+/* ハイスコア */
+.hs-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin: 6px 0 4px; }
+.hs-box { width: 500px; max-width: 100%; padding: 10px 14px; border-radius: 14px; background: #120e1d; border: 1px solid var(--edge); }
+.hs-box h3 { margin: 0 0 6px; font-family: var(--display); font-weight: 400; font-size: 20px; color: var(--gold); }
+.hs { width: 100%; border-collapse: collapse; font-size: 15px; }
+.hs td { padding: 4px 6px; border-bottom: 1px solid #221b33; }
+.hs .rk { width: 34px; text-align: center; font-family: var(--display); }
+.hs .sv { font-family: var(--display); font-size: 19px; color: var(--gold-hi); text-align: right; width: 80px; }
+.hs .mm { font-size: 17px; } .hs .dt { color: var(--ink-dim); font-size: 13px; text-align: right; }
+.hs tr.top .sv { font-size: 22px; }

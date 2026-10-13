@@ -1,6 +1,6 @@
 // アルカナンバー：はじまり
 import { setTextMode, T } from './text.js';
-import { el, $, $$, newSeed } from './util.js';
+import { el, $, $$, newSeed, sleep } from './util.js';
 import { unlockAudio, sfx, playBgm, stopBgm, setVolumes } from './audio.js';
 import { settings, saveSettings, meta, saveMeta, loadRun, saveRun, clearRun, resetAll, mark } from './save.js';
 import * as R from './engine/run.js';
@@ -10,17 +10,21 @@ import { HANDS, HAND_ORDER } from './data/hands.js';
 import { ENEMIES } from './data/enemies.js';
 import { HEROES } from './data/heroes.js';
 import { initFx, confetti } from './ui/fx.js';
-import { initModal, openModal, confirmBox, deckView, handsTable, arcanaDetail, cardDetail } from './ui/modal.js';
+import { initModal, openModal, confirmBox, deckView, handsTable, arcanaDetail, cardDetail, alertBox, arcanaHtml } from './ui/modal.js';
 import { bgHtml, updateTopbar } from './ui/common.js';
 import { cardHtml } from './ui/cardview.js';
 import { enemyArt } from './ui/art.js';
 import { swirl } from './ui/bg.js';
 import { battleScreen } from './ui/battle.js';
-import { mapScreen, rewardScreen, treasureScreen, restScreen, shopScreen, eventScreen, useScrollOutside } from './ui/screens.js';
+import { mapScreen, rewardScreen, treasureScreen, restScreen, shopScreen, eventScreen, useScrollOutside, cardChoice } from './ui/screens.js';
 import { packSelect, openPacks, deckBuilder } from './ui/deckbuild.js';
 import { DECK_MIN, DECK_MAX } from './data/packs.js';
+import { hasMod, MODS } from './data/mods.js';
+import { levelStep, levelLabel } from './ui/placement.js';
+import { modsScreen, modsModal } from './ui/modsui.js';
+import { playScore, highScoresHtml, bestScore, MODE_NAME } from './ui/scoreui.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const stage = $('#stage');
 initFx(stage); initModal(stage);
 setTextMode(settings.text || 'hira');
@@ -68,10 +72,17 @@ const app = {
     const d = $('[data-deck]', root); if (d && !d._w) { d._w = 1; d.addEventListener('click', () => { sfx('tap'); deckView(run.deck, { title: 'デッキ', sub: run.side && run.side.length ? `サイドの カード ${run.side.length}{枚|まい}（たきびで いれかえ できる）` : '' }); }); }
     const h = $('[data-hands]', root); if (h && !h._w) { h._w = 1; h.addEventListener('click', () => { sfx('tap'); handsTable(run.handLv); }); }
     const s = $('[data-settings]', root); if (s && !s._w) { s._w = 1; s.addEventListener('click', () => { sfx('tap'); openSettings({ inRun: true, refresh }); }); }
+    const md = $('[data-mods]', root); if (md && !md._w) { md._w = 1; md.addEventListener('click', () => { sfx('tap'); modsModal(run); }); }
   },
 };
 window.AN = app;
 function persist() { if (app.run) saveRun(app.run); }
+// プレイじかん（スコアの「スピードスター」よう）
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now(), dt = Math.min(5000, now - lastTick); lastTick = now;
+  if (app.run && app.run.stats && document.visibilityState === 'visible') app.run.stats.playMs = (app.run.stats.playMs || 0) + dt;
+}, 1000);
 
 // ───── せってい ─────
 function seg(name, options, cur) { return `<div class="seg" data-seg="${name}">${options.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(cur) ? 'on' : ''}">${T(l)}</button>`).join('')}</div>`; }
@@ -111,11 +122,13 @@ function titleScreen() {
     <div class="title-wrap">
       <div class="logo"><div class="en">ARCANUMBER</div><div class="jp">アルカ<b>ナンバー</b></div><div class="tag">${T('ルーンを くみあわせ、{数|かず}の まほうで たたかえ')}</div></div>
       <div class="menu"><button class="btn big" data-new>${T('はじめから')}</button>${saved ? `<button class="btn big blue" data-cont>${T('つづきから')}</button>` : ''}</div>
+      <div class="menu"><button class="btn gold sa-btn" data-sa>🏆 ${T('スコアアタック')}<small>${T('ランダムな とくしゅルール 3つで ちょうせん')}${bestScore('random') ? `　${T('ベスト')} ${bestScore('random')}` : ''}</small></button></div>
       <div class="menu" style="margin-top:4px"><button class="btn dark" data-zukan>📚 ${T('ずかん')}</button><button class="btn dark" data-howto>❓ ${T('あそびかた')}</button><button class="btn dark" data-settings>⚙️ ${T('せってい')}</button></div>
     </div><div class="version">v${VERSION}</div></div>`);
   app.mount(root);
   swirl($('canvas.swirl', root), 'title');
-  $('[data-new]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('あたらしく はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen(); });
+  $('[data-new]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('あたらしく はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen('normal'); });
+  $('[data-sa]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('スコアアタックを はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen('random'); });
   $('[data-cont]', root)?.addEventListener('click', () => { sfx('tap'); app.run = saved; runLoop(); });
   $('[data-zukan]', root).addEventListener('click', () => { sfx('tap'); zukanScreen(); });
   $('[data-howto]', root).addEventListener('click', () => { sfx('tap'); howTo(); });
@@ -128,6 +141,7 @@ function titleScreen() {
 
 function howTo() {
   const pages = [
+    ['🔮', 'まほうの うでだめし', 'ぼうけんの まえに けいさんを 5もん とくよ。<br>せいかい すると むずかしく、まちがえると やさしく なる。<br>とけた もんだいと はやさで、ノクスが がくねんと むずかしさを えらんで くれる。<br>（「じぶんで かえる」で えらびなおせる）'],
     ['📦', 'パックで デッキを つくる', 'ぼうけんの はじめに パックを 3つ えらんで あけよう。<br>はじめの カードと パックの カードから、10〜20{枚|まい}を えらんで デッキに する。<br>つかわなかった カードは「サイド」に のこって、🔥たきびで いれかえ られる。<br>おみせでも パックが かえるよ！'],
     ['🃏', 'ルーンで {役|やく}を つくる', '{手札|てふだ}の ルーンを じゅもんの わく（5{枚|まい}まで）に いれよう。<br>おなじ {数|かず}なら「ペア」、たして 10なら「じゅうの わ」、<br>2・3・6 なら「くくの わ」（2×3=6）！ {役|やく}が つよいほど {力|ちから}と {倍率|ばいりつ}が ふえる。'],
     ['💥', 'ダメージ ＝ {力|ちから} × {倍率|ばいりつ}', 'ルーンの {数|かず}は <b style="color:var(--power)">{力|ちから}</b>に たされる。<br>スペルや アルカナで <b style="color:var(--mult)">{倍率|ばいりつ}</b>が ふえる。<br>さいごに かけ{算|ざん}！ 20 × 8 ＝ 160 ダメージ！'],
@@ -136,6 +150,8 @@ function howTo() {
     ['🔮', 'アルカナ', 'アルカナは ずっと はたらく おまもり（5つまで）。<br>ひだりから じゅんばんに こうかが でる。<br>くみあわせ しだいで ダメージが なんばいにも！'],
     ['💀', 'のろい と ボス', 'つよい てきは「のろい」を もっている。<br>（{力|ちから}が はんぶん、ペアが できない など）<br>のろいに あわせて じゅもんを くふう しよう。'],
     ['🧮', 'けいさん チャレンジ', 'はなった あと、{力|ちから} × {倍率|ばいりつ} の こたえを えらぶ。<br>あたると ダメージ 1.5{倍|ばい}！<br>🔍みとおし を つかうと さきに ダメージが みえる（ボーナスは なし）。'],
+    ['🏅', 'スコア', 'ぼうけんが おわると スコアが でるよ。<br>すすんだ マス・たおした {敵|てき}・ボス・ノーダメージ・けいさんの せいかい などで ふえる。<br>むずかしさ「ふつう」なら +20%！ ずかんの「きろく」で ハイスコアが みられる。'],
+    ['🏆', 'スコアアタック', 'タイトルの「スコアアタック」では、とくしゅルールが 3つ ランダムに きまる。<br>（ガラスの からだ・ドラフト・ミダス など 26しゅるい）<br>たいへんな ルールほど スコアの ばいりつが あがる。1かいだけ ひきなおせるよ！'],
     ['🗺️', 'デッキを そだてる', 'かつと カードや アルカナが もらえる。ボスを たおすと パックも！<br>おなじ {数|かず}の ルーンを あつめる？ ひとつの ぞくせいに しぼる？<br>デッキの {枚|まい}すうを へらして つよい カードを なんども ひく？<br>じぶんだけの さいきょう デッキで 3しょうの ボスを たおそう！'],
   ];
   let i = 0;
@@ -146,53 +162,102 @@ function howTo() {
   render();
 }
 
-function setupScreen() {
-  let hero = meta.lastHero ?? 0, grade = meta.lastGrade || 2, diff = meta.lastDiff || 'normal';
+function setupScreen(mode = 'normal') {
+  let hero = meta.lastHero ?? 0;
   const root = el(`<div class="screen fade-in">${bgHtml()}
-    <div class="setup" data-s1><h1>${T('しゅじんこうを えらぼう')}</h1>
+    <div class="setup" data-s1><h1>${mode === 'random' ? `🏆 ${T('スコアアタック')}：` : ''}${T('しゅじんこうを えらぼう')}</h1>
       <div class="pick-row">${HEROES.map((h, i) => `<div class="pick" data-h="${i}"><div class="p-icon">${h.art}</div><div class="p-title">${h.name}</div><div class="p-sub">${T(h.title)}</div><div class="p-els">${h.els.map((e) => ELEMENTS[e].icon).join(' ')}</div><div class="p-desc">${T(h.desc)}<br>❤️ ${h.hp}　🔮 ${T(ARCANA[h.arcana].name)}</div></div>`).join('')}</div>
-      <div class="row"><button class="btn dark" data-back>◀ ${T('もどる')}</button><button class="btn green big" data-next>${T('つぎへ ▶')}</button></div></div>
-    <div class="setup" data-s2 style="display:none"><h1>${T('なんねんせい？')}</h1>
-      <div class="pick-row">${[[1, '🌱', 'たし{算|ざん}・ひき{算|ざん}'], [2, '🌿', 'かけ{算|ざん}（{九九|くく}）'], [3, '🌳', 'おおきな {数|かず}・わり{算|ざん}']].map(([g, ic, d]) => `<div class="pick mini" data-g="${g}"><div class="p-icon" style="font-size:52px">${ic}</div><div class="p-title">${T(`${g}ねんせい`)}</div><div class="p-desc">${T(d)}</div></div>`).join('')}</div>
-      <div class="sub" style="color:var(--ink-dim);font-size:15px">${T('けいさん チャレンジ と なぞときの むずかしさが かわるよ')}</div>
-      <h1 style="font-size:28px">${T('むずかしさ')}</h1>
-      <div class="pick-row"><div class="pick mini" data-d="easy" style="width:280px"><div class="p-title">🐣 ${T('かんたん')}</div><div class="p-desc">${T('{敵|てき}が よわめ。はじめての ひとに')}</div></div><div class="pick mini" data-d="normal" style="width:280px"><div class="p-title">🔥 ${T('ふつう')}</div><div class="p-desc">${T('ほんきの ぼうけん')}</div></div></div>
-      <div class="row"><button class="btn dark" data-back2>◀ ${T('もどる')}</button><button class="btn big" data-go>${T('ぼうけんへ！')}</button></div></div></div>`);
+      <div class="row"><button class="btn dark" data-back>◀ ${T('もどる')}</button><button class="btn green big" data-next>${T('つぎへ ▶')}</button></div></div></div>`);
   app.mount(root);
   swirl($('canvas.swirl', root), 'title');
-  const markSel = () => { $$('[data-h]', root).forEach((n) => n.classList.toggle('on', Number(n.dataset.h) === hero)); $$('[data-g]', root).forEach((n) => n.classList.toggle('on', Number(n.dataset.g) === grade)); $$('[data-d]', root).forEach((n) => n.classList.toggle('on', n.dataset.d === diff)); };
+  const markSel = () => { $$('[data-h]', root).forEach((n) => n.classList.toggle('on', Number(n.dataset.h) === hero)); };
   markSel();
   $$('[data-h]', root).forEach((n) => n.addEventListener('click', () => { sfx('select'); hero = Number(n.dataset.h); markSel(); }));
-  $$('[data-g]', root).forEach((n) => n.addEventListener('click', () => { sfx('tap'); grade = Number(n.dataset.g); markSel(); }));
-  $$('[data-d]', root).forEach((n) => n.addEventListener('click', () => { sfx('tap'); diff = n.dataset.d; markSel(); }));
   $('[data-back]', root).addEventListener('click', () => { sfx('tap'); titleScreen(); });
-  $('[data-next]', root).addEventListener('click', () => { sfx('tap'); $('[data-s1]', root).style.display = 'none'; $('[data-s2]', root).style.display = ''; });
-  $('[data-back2]', root).addEventListener('click', () => { sfx('tap'); $('[data-s2]', root).style.display = 'none'; $('[data-s1]', root).style.display = ''; });
-  $('[data-go]', root).addEventListener('click', async () => {
-    sfx('upgrade');
-    meta.lastHero = hero; meta.lastGrade = grade; meta.lastDiff = diff; meta.records.runs++; saveMeta();
-    app.run = R.newRun({ hero, grade, diff, seed: newSeed() });
-    mark('arcana', HEROES[hero].arcana);
-    await buildStartDeck();
-    persist();
-    await story();
-    runLoop();
+  $('[data-next]', root).addEventListener('click', async () => {
+    sfx('tap');
+    meta.lastHero = hero; saveMeta();
+    const lvl = await levelStep(app);
+    if (!lvl) { setupScreen(mode); return; }
+    let mods = [];
+    if (mode === 'random') { mods = await modsScreen(app, lvl); if (!mods) { setupScreen(mode); return; } }
+    startRun({ hero, ...lvl, mode, mods });
   });
 }
 
-// はじめの デッキづくり：パックを 3つ あけて、はじめの カードと まぜる
+async function startRun({ hero, grade, diff, mode, mods }) {
+  sfx('upgrade');
+  meta.lastGrade = grade; meta.lastDiff = diff; meta.records.runs++; saveMeta();
+  app.run = R.newRun({ hero, grade, diff, seed: newSeed(), mode, mods });
+  mark('arcana', HEROES[hero].arcana);
+  await buildStartDeck();
+  persist();
+  if (mode !== 'random') await story();
+  runLoop();
+}
+
+// はじめの デッキづくり：パックを 3つ あけて、はじめの カードと まぜる（スコアアタックでは とくしゅルールで かわる）
 async function buildStartDeck() {
   const run = app.run;
-  const els = HEROES[run.hero].els;
-  const types = await packSelect(app, { n: 3, els });
+  const els = R.heroEls(run);
+  const root = el(`<div class="screen fade-in">${bgHtml()}</div>`);
+  app.mount(root); swirl($('canvas.swirl', root), 'title');
   const { rng, save } = app.rng();
-  const opened = await openPacks(app, types, rng);
+  const arc0 = run.arcana.length;
+  const gifts = R.applyStartMods(run, rng);
   save();
-  const pool = [...run.deck, ...opened];
-  const chosen = await deckBuilder(app, { pool, selected: run.deck, min: DECK_MIN, max: DECK_MAX, title: 'じぶんの デッキを つくろう', newUids: opened.map((c) => c.uid), els });
-  const ids = new Set(chosen.map((c) => c.uid));
-  run.deck = pool.filter((c) => ids.has(c.uid));
-  run.side = pool.filter((c) => !ids.has(c.uid));
+  const sm = R.startMode(run);
+  if (sm === 'draft') {
+    run.deck = [];
+    for (let i = 0; i < 15; i++) {
+      const offer = R.draftOffer(run, rng); save();
+      const c = await cardChoice(app, offer, { title: `ドラフト（${i + 1} / 15）：1{枚|まい} えらぼう`, skip: false });
+      run.deck.push(c);
+    }
+  } else if (sm === 'sealed') {
+    const opened = await openPacks(app, R.sealedTypes(run, rng), rng); save();
+    const chosen = await deckBuilder(app, { pool: opened, selected: [], min: 10, max: 14, title: 'シールド：この カードだけで デッキを つくろう', newUids: [], els });
+    const ids = new Set(chosen.map((c) => c.uid));
+    run.deck = opened.filter((c) => ids.has(c.uid)); run.side = opened.filter((c) => !ids.has(c.uid));
+  } else if (sm === 'insanity') {
+    run.deck = R.insanityDeck(run, rng); save();
+    await showDeck('🌀 きょうきの さた', 'この ランダムな デッキで たたかう！', run.deck);
+  } else if (sm === 'starter') {
+    await showDeck('🎒 はじめの デッキだけ', 'カードの ほうしゅうは でないよ。アルカナで たたかおう！', run.deck);
+  } else {
+    const base = sm === 'chimera' ? [...run.deck, ...HEROES.flatMap((h, i) => (i === run.hero ? [] : R.starterDeck(i)))] : run.deck;
+    const types = await packSelect(app, { n: 3, els });
+    const opened = await openPacks(app, types, rng);
+    save();
+    const pool = [...base, ...opened];
+    const chosen = await deckBuilder(app, { pool, selected: run.deck, min: DECK_MIN, max: DECK_MAX, title: 'じぶんの デッキを つくろう', newUids: opened.map((c) => c.uid), els });
+    const ids = new Set(chosen.map((c) => c.uid));
+    run.deck = pool.filter((c) => ids.has(c.uid));
+    run.side = pool.filter((c) => !ids.has(c.uid));
+  }
+  const newArc = run.arcana.slice(arc0);
+  if (gifts.length || newArc.length) {
+    gifts.forEach((c) => mark('cards', c.id)); newArc.forEach((a) => mark('arcana', a.id));
+    run.deck.push(...gifts);
+    await new Promise((res) => {
+      const { m, close } = openModal(`<h2>🎁 ${T('とくしゅルールの おくりもの')}</h2>
+        ${newArc.length ? `<div class="row">${newArc.map((a) => arcanaHtml(a)).join('')}</div>` : ''}
+        ${gifts.length ? `<div class="scroll" style="max-height:420px;max-width:1000px"><div class="card-grid">${gifts.map((c) => cardHtml(c)).join('')}</div></div>` : ''}
+        <div class="sub">${T(gifts.length ? 'この カードは デッキに くわわったよ' : 'アルカナを てに いれた！')}</div><button class="btn green" data-ok>OK</button>`, { closable: false });
+      $('[data-ok]', m).addEventListener('click', () => { sfx('tap'); close(); res(); });
+    });
+  }
+}
+
+function showDeck(title, sub, cards) {
+  return new Promise((res) => {
+    cards.forEach((c) => mark('cards', c.id));
+    const { m, close } = openModal(`<h2>${T(title)}（${cards.length}{枚|まい}）</h2><div class="sub">${T(sub)}</div>
+      <div class="scroll" style="max-height:470px;width:1040px;max-width:100%"><div class="card-grid">${R.deckSorted(cards).map((c) => cardHtml(c)).join('')}</div></div>
+      <button class="btn green" data-ok>${T('この デッキで いく！')}</button>`, { closable: false });
+    $$('.card-grid .card', m).forEach((n) => n.addEventListener('click', () => { sfx('tap'); cardDetail(cards.find((c) => c.uid === n.dataset.uid)); }));
+    $('[data-ok]', m).addEventListener('click', () => { sfx('tap'); close(); res(); });
+  });
 }
 
 async function story() {
@@ -209,14 +274,22 @@ async function runLoop() {
     if (!nodeId) {
       nodeId = await mapScreen(app);
       run.pos = nodeId; if (!run.map.visited.includes(nodeId)) run.map.visited.push(nodeId);
+      R.enterNode(run, run.map.nodes[nodeId]);
       run.pending = nodeId; persist();
     }
     const node = run.map.nodes[nodeId];
-    if (['battle', 'elite', 'boss'].includes(node.type)) {
-      if (!node.enc) { const { rng, save } = app.rng(); node.enc = R.pickEncounter(run, node.type, rng); save(); }
-      const res = await battleScreen(app, node.enc, node.type);
+    let kind = node.type;
+    // いのちがけの なぞ：なぞの マスに つよい てき
+    if (kind === 'event' && hasMod(run, 'deadly')) {
+      if (node.deadly === undefined) { const { rng, save } = app.rng(); node.deadly = rng() < 0.3; save(); }
+      if (node.deadly) kind = 'elite';
+    }
+    if (['battle', 'elite', 'boss'].includes(kind)) {
+      if (!node.enc) { const { rng, save } = app.rng(); node.enc = R.pickEncounter(run, kind, rng); save(); }
+      if (node.deadly && !node.warned) { node.warned = true; persist(); await alertBox('☠️ いのちがけの なぞ', 'なぞの マスに つよい {敵|てき}が まちぶせ していた！'); }
+      const res = await battleScreen(app, node.enc, kind);
       if (res === 'lose') { clearRun(); await endScreen(false); return; }
-      await rewardScreen(app, node.type);
+      await rewardScreen(app, kind);
     } else if (node.type === 'rest') await restScreen(app);
     else if (node.type === 'shop') await shopScreen(app);
     else if (node.type === 'treasure') await treasureScreen(app);
@@ -233,9 +306,10 @@ async function actUp() {
   const run = app.run;
   run.act++;
   const healed = R.heal(run, Math.round((run.maxHp - run.hp) * 0.7));
-  const { rng, save } = app.rng(); run.map = R.genMap(rng); run.pos = null; save();
+  const curses = R.bossCurse(run);
+  const { rng, save } = app.rng(); run.map = R.genMap(rng, R.mapOpts(run)); run.pos = null; save();
   const A = R.ACTS[run.act];
-  const root = el(`<div class="screen fade-in">${bgHtml()}<div class="panel-screen"><div class="event-box"><div class="ev-art">${A.icon}</div><div class="ev-title">${run.act}${T('しょう')}　${T(A.name)}</div><div class="ev-text">${T(`HPが ${healed} かいふく した。\n{敵|てき}は どんどん つよく なる。アルカナと {役|やく}を そだてよう！`)}</div><button class="btn green big" data-n>${T('すすむ ▶')}</button></div></div></div>`);
+  const root = el(`<div class="screen fade-in">${bgHtml()}<div class="panel-screen"><div class="event-box"><div class="ev-art">${A.icon}</div><div class="ev-title">${run.act}${T('しょう')}　${T(A.name)}</div><div class="ev-text">${T(`HPが ${healed} かいふく した。\n{敵|てき}は どんどん つよく なる。アルカナと {役|やく}を そだてよう！${curses ? `\n⚫ のろわれた みち：のろいの カードが ${curses}{枚|まい} デッキに はいった…` : ''}`)}</div><button class="btn green big" data-n>${T('すすむ ▶')}</button></div></div></div>`);
   app.mount(root); swirl($('canvas.swirl', root), A.theme); sfx('upgrade');
   await new Promise((r) => $('[data-n]', root).addEventListener('click', () => { sfx('tap'); r(); }, { once: true }));
 }
@@ -247,15 +321,28 @@ async function endScreen(win) {
   saveMeta();
   stopBgm(); if (win) bgm('victory');
   const fav = Object.entries(s.hands).sort((a, b) => b[1] - a[1])[0];
-  const stats = [['💥', 'さいだい ダメージ', s.best], ['🔮', 'けいさん せいかい', `${s.challengeOk} / ${s.challengeTry}`], ['⚔️', 'かった たたかい', s.battles], ['🃏', 'よく つかった {役|やく}', fav ? T(HANDS[fav[0]].name) : '-'], ['📜', 'なぞとき せいかい', `${s.quizOk} / ${s.quizTry}`], ['🔮', 'アルカナ', run.arcana.map((a) => ARCANA[a.id].icon).join('') || '-']];
-  const root = el(`<div class="screen fade-in">${bgHtml()}<div class="panel-screen">
-    <h1 style="font-size:54px">${win ? T('ゼロの おうを たおした！') : T('ちからつきた…')}</h1>
+  const mins = Math.max(1, Math.round((s.playMs || 0) / 60000));
+  const stats = [['💥', 'さいだい ダメージ', s.best], ['🔮', 'けいさん せいかい', `${s.challengeOk} / ${s.challengeTry}`], ['🃏', 'よく つかった {役|やく}', fav ? T(HANDS[fav[0]].name) : '-'], ['⏱️', 'プレイ じかん', T(`${mins}ふん`)]];
+  const mode = run.mode === 'random' ? 'random' : 'normal';
+  const root = el(`<div class="screen fade-in">${bgHtml()}<div class="panel-screen end-screen">
+    <h1 style="font-size:44px">${win ? T('ゼロの おうを たおした！') : T('ちからつきた…')}</h1>
     <div class="lead">${win ? T('{数|かず}の ひかりが せかいに もどった。きみは いちにんまえの アルカナ つかいだ！') : T(`${run.act}しょうまで すすんだ。デッキと アルカナの くみあわせを かえて、また ちょうせん しよう！`)}</div>
-    <div class="stat-grid">${stats.map(([i, l, v]) => `<div class="stat"><div class="s-val">${v}</div><div class="s-lbl">${i} ${T(l)}</div></div>`).join('')}</div>
-    <button class="btn big" data-t>${T('タイトルへ')}</button></div></div>`);
+    <div class="score-wrap">
+      <div class="score-list"><div class="sl-head">${T(`${MODE_NAME[mode]}の スコア`)}${run.mods && run.mods.length ? `　<span class="mods-mini">${run.mods.map((id) => `${MODS[id].icon}${T(MODS[id].name)}`).join('　')}</span>` : ''}</div><div class="sc-items" data-items></div></div>
+      <div class="score-side">
+        <div class="sc-row"><span>${T('ごうけい')}</span><b class="num" data-sub>0</b></div>
+        <div class="sc-mult" data-mult></div>
+        <div class="sc-total"><small>${T('スコア')}</small><span class="num" data-total>0</span></div>
+        <div class="sc-rank" data-rank></div>
+        <div class="mini-stats">${stats.map(([i, l, v]) => `<div><span>${i} ${T(l)}</span><b>${v}</b></div>`).join('')}</div>
+        <button class="btn big" data-t>${T('タイトルへ')}</button>
+      </div>
+    </div></div></div>`);
   app.mount(root); swirl($('canvas.swirl', root), win ? 'title' : 'tower');
   if (win) { confetti(); setTimeout(confetti, 1500); } else sfx('lose');
   app.run = null;
+  await sleep(win ? 900 : 1200);
+  await playScore(root, run, win);
   await new Promise((r) => $('[data-t]', root).addEventListener('click', () => { sfx('tap'); r(); }, { once: true }));
   titleScreen();
 }
@@ -287,7 +374,8 @@ function zukanScreen(tab = 'hands') {
     $$('[data-e]', body).forEach((n) => n.addEventListener('click', () => { const e = ENEMIES[n.dataset.e]; if (!meta.enemies[e.id]) { sfx('wrong'); return; } sfx('tap'); openModal(`<div style="font-size:110px;height:150px;display:flex;align-items:center">${enemyArt(e.art).replace('<svg', '<svg style="width:160px;height:150px"')}</div><h2>${T(e.name)}</h2><div class="sub">HP ${e.hp}${e.rule ? `　💀 ${T('のろいを もつ')}` : ''}</div>${e.desc ? `<div class="sub" style="color:var(--ink)">${T(e.desc)}</div>` : ''}`); }));
   } else {
     const r = meta.records;
-    body.innerHTML = `<div class="stat-grid" style="margin:10px auto">${[['🚀', 'ぼうけん した かいすう', r.runs], ['🏆', 'クリア した かいすう', r.wins], ['🗺️', 'いちばん すすんだ しょう', r.bestAct || '-'], ['💥', 'さいだい ダメージ', r.best], ['🔮', 'けいさん せいかい', `${r.challengeOk} / ${r.challengeTry}`], ['📜', 'なぞとき せいかい', `${r.quizOk} / ${r.quizTry}`]].map(([i, l, v]) => `<div class="stat"><div class="s-val">${v}</div><div class="s-lbl">${i} ${T(l)}</div></div>`).join('')}</div>`;
+    const lt = meta.test;
+    body.innerHTML = `<div class="hs-row">${highScoresHtml('normal')}${highScoresHtml('random')}</div>${lt ? `<div class="sub" style="text-align:center">${T(`🔮 さいごの うでだめし：${levelLabel(lt.grade, lt.diff)}（せいかい ${lt.correct} / 5）`)}</div>` : ''}<div class="stat-grid" style="margin:10px auto">${[['🚀', 'ぼうけん した かいすう', r.runs], ['🏆', 'クリア した かいすう', r.wins], ['🗺️', 'いちばん すすんだ しょう', r.bestAct || '-'], ['💥', 'さいだい ダメージ', r.best], ['🔮', 'けいさん せいかい', `${r.challengeOk} / ${r.challengeTry}`], ['📜', 'なぞとき せいかい', `${r.quizOk} / ${r.quizTry}`]].map(([i, l, v]) => `<div class="stat"><div class="s-val">${v}</div><div class="s-lbl">${i} ${T(l)}</div></div>`).join('')}</div>`;
   }
 }
 

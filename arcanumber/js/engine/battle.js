@@ -4,6 +4,7 @@ import { ARCANA } from '../data/arcana.js';
 import { ENEMIES, DIFF } from '../data/enemies.js';
 import { scoreSpell } from './score.js';
 import { uid } from '../util.js';
+import { hasMod } from '../data/mods.js';
 
 export const SLOT_MAX = 5;
 export function passive(run, key) {
@@ -57,9 +58,12 @@ export function createBattle(run, enemyIds, kind, rng) {
     kind, rng, run, enemies: [], draw: [], hand: [], discard: [], exhaust: [], board: [],
     slots: Array(SLOT_MAX).fill(null), mana: 0, discardsLeft: 0, pBlock: 0, turn: 0, extraDraw: 0,
     drainMana: 0, drainHand: 0, buff: { power: 0, mult: 0 }, over: null, target: null, lastDamage: 0,
-    rule: null, stats: { casts: 0, best: 0, challengeTry: 0, challengeOk: 0, hands: {} },
+    rule: null, stats: { casts: 0, best: 0, challengeTry: 0, challengeOk: 0, hands: {} }, tookDamage: false,
   };
   for (const id of enemyIds) b.enemies.push(makeEnemy(b, id));
+  // じかんの おくれ / ちめいしょう
+  if (hasMod(run, 'slow')) b.enemies.forEach((e) => { e.weak = 2; });
+  if (hasMod(run, 'lethal')) b.enemies.forEach((e) => { e.str += 3; });
   const ruled = b.enemies.find((e) => ENEMIES[e.id].rule);
   b.ruleSrc = ruled ? ENEMIES[ruled.id] : null;
   b.draw = rng.shuffle(run.deck.map((c) => ({ ...c, uid: uid(), deckUid: c.uid })));
@@ -78,7 +82,7 @@ export function api(b, ev) {
     discards: (n) => { b.discardsLeft += n; ev.push({ t: 'discards', n }); },
     selfDamage: (n) => { b.run.hp = Math.max(1, b.run.hp - n); ev.push({ t: 'selfdmg', n }); },
     enemyStatus: (k, n) => { const e = target(b); if (e) { e[k] += n; ev.push({ t: 'estatus', uid: e.uid, k, n }); } },
-    coins: (n) => { b.run.coins += n; ev.push({ t: 'coins', n }); },
+    coins: (n) => { b.run.coins += n; if (n > 0 && b.run.stats) b.run.stats.coinsEarned = (b.run.stats.coinsEarned || 0) + n; ev.push({ t: 'coins', n }); },
     discardHand: () => { b.discard.push(...b.hand.filter((c) => !c.temp)); b.hand = []; ev.push({ t: 'discardHand' }); },
     glassCheck: (inst) => { if (b.rng() < 0.25) { inst.broken = true; ev.push({ t: 'glass', uid: inst.uid }); } },
     paintRune: () => ev.push({ t: 'need', what: 'paint' }),
@@ -94,6 +98,7 @@ export function drawCards(b, n) {
     if (b.hand.length >= 10) break;
     if (!b.draw.length) { if (!b.discard.length) break; b.draw = b.rng.shuffle(b.discard.splice(0)); out.push({ shuffle: true }); }
     const c = b.draw.pop();
+    if (hasMod(b.run, 'snecko') && ['spell', 'instant', 'aura'].includes(CARDS[c.id].type)) c.costR = b.rng.int(0, 3);
     b.hand.push(c); out.push(c);
   }
   return out;
@@ -104,13 +109,15 @@ export function startTurn(b) {
   const ev = [];
   if (!passive(b.run, 'keepBlock')) b.pBlock = 0;
   b.buff = { power: 0, mult: 0 };
+  if (hasMod(b.run, 'lethal')) b.buff.mult += 3;
+  if (hasMod(b.run, 'terminal')) b.pBlock += 3;
   if (b.ruleSrc) {
     b.rule = b.ruleSrc.rule === 'rotate' ? b.ruleSrc.rotate[(b.turn - 1) % b.ruleSrc.rotate.length] : b.ruleSrc.rule;
     if (!alive(b).some((e) => ENEMIES[e.id].rule)) b.rule = null;
   }
   b.mana = Math.max(0, 3 + passive(b.run, 'mana') - b.drainMana);
   b.discardsLeft = b.rule === 'noDiscard' ? 0 : 1 + passive(b.run, 'discards');
-  let n = 7 + passive(b.run, 'hand') + b.extraDraw - b.drainHand - (b.rule === 'smallHand' ? 2 : 0);
+  let n = 7 + passive(b.run, 'hand') + (hasMod(b.run, 'snecko') ? 1 : 0) + b.extraDraw - b.drainHand - (b.rule === 'smallHand' ? 2 : 0);
   b.extraDraw = 0; b.drainMana = 0; b.drainHand = 0;
   const A = api(b, ev);
   for (const a of b.board) { const d = CARDS[a.id]; if (d.onTurnStart) d.onTurnStart(b, a, !!a.up, A); }
@@ -264,6 +271,7 @@ function hitPlayer(b, dmg) {
   const blocked = Math.min(b.pBlock, dmg);
   b.pBlock -= blocked;
   b.run.hp = Math.max(0, b.run.hp - (dmg - blocked));
+  if (dmg - blocked > 0) b.tookDamage = true;
   return { t: 'phit', dmg: dmg - blocked, blocked, hp: b.run.hp, block: b.pBlock };
 }
 

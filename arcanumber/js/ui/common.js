@@ -4,6 +4,7 @@ import { $, $$ } from '../util.js';
 import { ACTS, MAX_SCROLLS } from '../engine/run.js';
 import { SCROLLS } from '../data/scrolls.js';
 import { HEROES } from '../data/heroes.js';
+import { MODS } from '../data/mods.js';
 
 export function bgHtml() { return '<canvas class="swirl"></canvas><div class="vignette"></div>'; }
 export function heroArt(run) { return HEROES[run.hero].art; }
@@ -15,6 +16,7 @@ export function topbarHtml(run) {
     <div class="chip coin">🪙 <span class="num" data-coins>${run.coins}</span></div>
     <div class="chip act">${A.icon} ${run.act}${T('しょう')} ${T(A.name)}</div>
     <div class="scroll-slots" data-scrolls></div>
+    ${run.mods && run.mods.length ? `<button class="chip mods" data-mods title="とくしゅルール">🏆 ${run.mods.map((id) => MODS[id]?.icon || '').join('')}</button>` : ''}
     <div class="spacer"></div>
     <button class="icon-btn" data-hands title="やく">🃏</button>
     <button class="icon-btn" data-deck title="デッキ">🎴</button>

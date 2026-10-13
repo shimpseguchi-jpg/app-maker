@@ -16,6 +16,7 @@ import { bgHtml, topbarHtml, updateTopbar, heroArt } from './common.js';
 import { cardDetail, arcanaHtml, arcanaDetail, handsTable, challengePrompt, guide, confirmBox, elementPicker, chooseBox, scrollDetail } from './modal.js';
 import * as FX from './fx.js';
 import { ACTS } from '../engine/run.js';
+import * as R from '../engine/run.js';
 
 export function battleScreen(app, enemyIds, kind) {
   return new Promise((resolve) => {
@@ -574,6 +575,7 @@ export function battleScreen(app, enemyIds, kind) {
       const st = run.stats;
       st.casts += b.stats.casts; st.best = Math.max(st.best, b.stats.best); st.challengeTry += b.stats.challengeTry; st.challengeOk += b.stats.challengeOk;
       for (const [h, n] of Object.entries(b.stats.hands)) st.hands[h] = (st.hands[h] || 0) + n;
+      if (b.over === 'win') R.recordBattle(run, kind, { kills: b.enemies.filter((e) => e.hp <= 0).length, tookDamage: b.tookDamage });
       save();
       if (b.over === 'win') { sfx('win'); FX.bigWord(T('しょうり！')); FX.confetti(); await FX.wait(1500); resolve('win'); }
       else { sfx('lose'); heroArtEl.style.transition = 'transform .8s, opacity .8s'; heroArtEl.style.transform = 'rotate(-90deg) translateY(30px)'; heroArtEl.style.opacity = '.4'; await FX.wait(1600); resolve('lose'); }

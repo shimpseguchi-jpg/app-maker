@@ -195,9 +195,11 @@ def({ id: 'manyMagic', name: 'たいぐんの まほう', type: 'spell', el: 'no
 def({ id: 'sleepy', name: 'ねむけ', type: 'curse', el: 'none', rar: 'x', icon: '💤', unplayable: true, text: () => 'つかえない。たたかいが おわると きえる' });
 def({ id: 'web', name: 'くもの いと', type: 'curse', el: 'none', rar: 'x', icon: '🕸️', unplayable: true, text: () => 'つかえない。たたかいが おわると きえる' });
 def({ id: 'void', name: 'ゼロの のろい', type: 'curse', el: 'none', rar: 'x', icon: '⚫', unplayable: true, text: () => 'つかえない。たたかいが おわると きえる' });
+def({ id: 'zeroMark', name: 'ゼロの しるし', type: 'curse', el: 'none', rar: 'x', icon: '🕳️', unplayable: true, perm: true, text: () => 'つかえない。たたかいが おわっても デッキから きえない（おみせで わすれられる）' });
 
 export function cardCost(inst) {
   const c = CARDS[inst.id];
+  if (inst.costR !== undefined) return inst.costR; // へびの め：ひいた ときに きまる
   if (inst.up && c.costUp !== undefined) return c.costUp;
   return c.cost || 0;
 }

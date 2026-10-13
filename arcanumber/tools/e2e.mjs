@@ -12,8 +12,9 @@ page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ text: 'ruby', speed: 'turbo', bgm: 0, sfx: 0, challenge: true })); });
 await page.reload(); await page.waitForTimeout(500);
-await page.click('[data-new]'); await page.click(`[data-h="${hero}"]`); await page.click('[data-next]');
-await page.click(`[data-g="${grade}"]`); await page.click(`[data-d="${diff}"]`); await page.click('[data-go]');
+const MODE = process.env.MODE || 'normal';
+if (process.env.MODS) await page.evaluate((m) => { window.__forceMods = m.split(','); }, process.env.MODS);
+await page.click(MODE === 'random' ? '[data-sa]' : '[data-new]'); await page.click(`[data-h="${hero}"]`); await page.click('[data-next]');
 let shots = 0, last = '', same = 0; const seen = new Set();
 for (let t = 0; t < MAXT; t++) {
   if (process.env.GOD) await page.evaluate(() => { if (window.AN.run) window.AN.run.hp = window.AN.run.maxHp; });
@@ -22,6 +23,12 @@ for (let t = 0; t < MAXT; t++) {
     const tap = (n) => { const o = { bubbles: true, pointerId: 1, isPrimary: true, button: 0 }; n.dispatchEvent(new PointerEvent('pointerdown', o)); n.dispatchEvent(new PointerEvent('pointerup', o)); };
     if (q('.guide-dim')) { q('.guide-dim').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); return 'guide'; }
     const ov = q('.overlay');
+    if (ov && ov.classList.contains('pt')) {
+      const go = ov.querySelector('[data-go]'); if (go) { const adj = ov.querySelector('[data-adjb]'); if (adj && adj.style.display !== 'none' && Math.random() < 0.3) { adj.click(); ov.querySelector('[data-d] button:last-child').click(); return 'pt-adj'; } go.click(); return 'pt-go'; }
+      const k = ov.querySelector('[data-k="ok"]'); if (!k || k.disabled) return 'pt-wait';
+      const ans = Math.random() < 0.75 ? window.__pt.a : window.__pt.a + 1;
+      for (const ch of String(ans)) ov.querySelector(`[data-k="${ch}"]`).click(); k.click(); return 'pt-ans';
+    }
     if (ov && !q('.modal')) {
       const open = ov.querySelector('[data-open]');
       if (open) { if (!open.disabled) { open.click(); return 'pk-open'; } const ps = ov.querySelectorAll('.pack-pick .pack'); ps[Math.floor(Math.random() * ps.length)].click(); return 'pk-pick'; }
@@ -69,6 +76,8 @@ for (let t = 0; t < MAXT; t++) {
       if (filled < lim && cand.length && Math.random() < 0.85) { tap(cand[Math.floor(Math.random() * cand.length)]); return 'place'; }
       q('.cast-btn').click(); return 'cast';
     }
+    if (q('[data-start]')) { (q('[data-last]') && Math.random() < 0.5 ? q('[data-last]') : q('[data-start]')).click(); return 'level'; }
+    if (q('[data-reroll]') && q('.mod-row')) { const rb = q('[data-reroll]'); if (!rb.disabled && Math.random() < 0.5) { rb.click(); return 'mods-reroll'; } q('[data-go]').click(); return 'mods-go'; }
     if (q('[data-chest]')) { q('[data-chest]').click(); return 'chest'; }
     if (q('.opt')) { const o = document.querySelectorAll('.opt'); o[Math.floor(Math.random() * o.length)].click(); return 'rest'; }
     if (q('[data-leave]')) { const pr = [...document.querySelectorAll('.shop-item:not(.sold) .price:not(.cant)')]; if (pr.length && Math.random() < 0.5) { pr[Math.floor(Math.random() * pr.length)].click(); return 'buy'; } q('[data-leave]').click(); return 'leave'; }
@@ -81,15 +90,19 @@ for (let t = 0; t < MAXT; t++) {
     if (q('[data-t]')) return 'END:' + q('.panel-screen h1').textContent;
     return 'idle';
   }).catch((e) => 'ERR ' + e.message);
-  if (st.startsWith('END')) { console.log(st); await page.screenshot({ path: `${out}/an_end_h${hero}.png` }); break; }
+  if (st.startsWith('END')) {
+    await page.waitForTimeout(7000);
+    console.log(st, '| score', await page.evaluate(() => `${document.querySelector('[data-total]')?.textContent} items=${document.querySelectorAll('.sc-item').length} rank=${document.querySelector('[data-rank]')?.textContent}`));
+    await page.screenshot({ path: `${out}/an_end_${MODE}_h${hero}.png` }); break;
+  }
   if (st.startsWith('ERR')) errors.push(st);
   const key = st.split(':')[0];
   if (process.env.SHOTS && !seen.has(key)) { seen.add(key); await page.screenshot({ path: `${out}/an_e2e_h${hero}_${String(shots++).padStart(2, '0')}_${key}.png` }); }
-  if (st === last && !['battle-wait', 'guide', 'overlay-wait', 'pk-flip', 'db-toggle', 'db-auto'].includes(st)) same++; else same = 0;
+  if (st === last && !['battle-wait', 'guide', 'overlay-wait', 'pk-flip', 'db-toggle', 'db-auto', 'pt-wait'].includes(st)) same++; else same = 0;
   last = st;
   if (same > 40) { console.log('STUCK at', st); await page.screenshot({ path: `${out}/an_stuck_h${hero}.png` }); break; }
   await page.waitForTimeout(st === 'battle-wait' ? 60 : 35);
-  if (t % 300 === 0) console.log(t, st, await page.evaluate(() => window.AN.run ? `A${window.AN.run.act} hp${window.AN.run.hp} deck${window.AN.run.deck.length} arc${window.AN.run.arcana.length}` : 'norun'));
+  if (t % 300 === 0) console.log(t, st, await page.evaluate(() => window.AN.run ? `A${window.AN.run.act} hp${window.AN.run.hp}/${window.AN.run.maxHp} deck${window.AN.run.deck.length} arc${window.AN.run.arcana.length} g${window.AN.run.grade}${window.AN.run.diff} mods=${window.AN.run.mods}` : 'norun'));
 }
 console.log('errors:', errors.length ? [...new Set(errors)].join('\n') : 'none');
 await browser.close();

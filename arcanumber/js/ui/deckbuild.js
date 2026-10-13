@@ -1,6 +1,6 @@
 // パックを えらぶ・あける・デッキを くむ
 import { CARDS, ELEMENTS, EL_LIST } from '../data/cards.js';
-import { PACKS, PACK_TYPES, openPack, cardRarity, DECK_MIN, DECK_MAX } from '../data/packs.js';
+import { PACKS, PACK_TYPES, openPack, cardRarity, DECK_MIN, DECK_MAX, REBUILD_MAX } from '../data/packs.js';
 import { deckSorted, autoBuild } from '../engine/run.js';
 import { T } from '../text.js';
 import { el, $, $$ } from '../util.js';
@@ -193,12 +193,15 @@ export function deckBuilder(app, { pool, selected, min = DECK_MIN, max = DECK_MA
 // ラン の デッキと サイドを くみなおす
 export async function rebuildRun(app, { newCards = [], title = 'デッキを くみなおそう', canCancel = true } = {}) {
   const run = app.run;
-  const pool = [...run.deck, ...run.side, ...newCards];
+  // のろいの カードは はずせない
+  const locked = run.deck.filter((c) => CARDS[c.id].type === 'curse');
+  const deck = run.deck.filter((c) => !locked.includes(c));
+  const pool = [...deck, ...run.side, ...newCards];
   run.side = [...run.side, ...newCards];
-  const chosen = await deckBuilder(app, { pool, selected: run.deck, min: DECK_MIN, max: 26, title, newUids: newCards.map((c) => c.uid), canCancel, els: HEROES[run.hero].els });
+  const chosen = await deckBuilder(app, { pool, selected: deck, min: DECK_MIN, max: Math.max(REBUILD_MAX, deck.length), title, newUids: newCards.map((c) => c.uid), canCancel, els: HEROES[run.hero].els });
   if (!chosen) return false;
   const ids = new Set(chosen.map((c) => c.uid));
-  run.deck = pool.filter((c) => ids.has(c.uid));
+  run.deck = [...pool.filter((c) => ids.has(c.uid)), ...locked];
   run.side = pool.filter((c) => !ids.has(c.uid));
   return true;
 }
