@@ -9,12 +9,33 @@ const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, has
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
+// FAKEGAS=1：GAS の サーバー（tools/gas_Code.gs）を ブラウザの なかで うごかして ランキングを ためす
+if (process.env.FAKEGAS) {
+  const { readFileSync } = await import('fs');
+  const code = readFileSync(new URL('../../tools/gas_Code.gs', import.meta.url), 'utf8');
+  await page.addInitScript((code) => {
+    const load = () => { try { return JSON.parse(localStorage.getItem('fakegas') || '{}'); } catch (e) { return {}; } };
+    const store = load();
+    const keep = () => localStorage.setItem('fakegas', JSON.stringify(store));
+    const props = { getProperty: (k) => (k in store ? store[k] : null), setProperty: (k, v) => { store[k] = String(v); keep(); }, deleteProperty: (k) => { delete store[k]; keep(); }, getKeys: () => Object.keys(store) };
+    const api = new Function('PropertiesService', 'LockService', 'Utilities', `${code}; return { getDaily, submitDaily };`)(
+      { getScriptProperties: () => props }, { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+      { formatDate: (d) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10) });
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    if (!store['daily:' + today]) [['すばやい ペンギン', 'pen1', 0, 1340, 1], ['かしこい フクロウ', 'fuku', 1, 980, 1], ['げんきな キツネ', 'kit2', 2, 610, 0]].forEach(([n, g, h, s, w]) => api.submitDaily({ d: today, n, g, h, s, w, a: w ? 3 : 2, df: 'normal' }));
+    const runner = (okf, ngf) => new Proxy({}, { get: (_, name) => (name === 'withSuccessHandler' ? (f) => runner(f, ngf) : name === 'withFailureHandler' ? (f) => runner(okf, f)
+      : (...args) => setTimeout(() => { try { const r = api[name](...JSON.parse(JSON.stringify(args))); okf && okf(JSON.parse(JSON.stringify(r))); } catch (e) { ngf && ngf(e); } }, 150)) });
+    window.google = { script: { get run() { return runner(null, null); } } };
+  }, code);
+}
 await page.goto(url);
 await page.evaluate(() => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ sv: 2, text: 'ruby', speed: 'turbo', bgm: 0, sfx: 0, challenge: true })); });
 await page.reload(); await page.waitForTimeout(500);
 const MODE = process.env.MODE || 'normal';
 if (process.env.MODS) await page.evaluate((m) => { window.__forceMods = m.split(','); }, process.env.MODS);
-await page.click(MODE === 'random' ? '[data-sa]' : '[data-new]'); await page.click(`[data-h="${hero}"]`); await page.click('[data-next]');
+await page.click(MODE === 'random' ? '[data-sa]' : '[data-new]');
+if (MODE === 'random') { await page.waitForSelector('.modal [data-ok]'); await page.click('.modal [data-more]'); await page.click('.modal [data-ok]'); }
+await page.click(`[data-h="${hero}"]`); await page.click('[data-next]');
 let shots = 0, last = '', same = 0; const seen = new Set();
 for (let t = 0; t < MAXT; t++) {
   if (process.env.GOD) await page.evaluate(() => { if (window.AN.run) window.AN.run.hp = window.AN.run.maxHp; });
@@ -78,7 +99,7 @@ for (let t = 0; t < MAXT; t++) {
       q('.cast-btn').click(); return 'cast';
     }
     if (q('[data-start]')) { (q('[data-last]') && Math.random() < 0.5 ? q('[data-last]') : q('[data-start]')).click(); return 'level'; }
-    if (q('[data-reroll]') && q('.mod-row')) { const rb = q('[data-reroll]'); if (!rb.disabled && Math.random() < 0.5) { rb.click(); return 'mods-reroll'; } q('[data-go]').click(); return 'mods-go'; }
+    if (q('.mod-row') && q('[data-board]') && q('[data-go]')) { q('[data-go]').click(); return 'daily-go'; }
     if (q('[data-chest]')) { q('[data-chest]').click(); return 'chest'; }
     if (q('.opt')) { const o = document.querySelectorAll('.opt'); o[Math.floor(Math.random() * o.length)].click(); return 'rest'; }
     if (q('[data-leave]')) { const pr = [...document.querySelectorAll('.shop-item:not(.sold) .price:not(.cant)')]; if (pr.length && Math.random() < 0.5) { pr[Math.floor(Math.random() * pr.length)].click(); return 'buy'; } q('[data-leave]').click(); return 'leave'; }
@@ -94,7 +115,14 @@ for (let t = 0; t < MAXT; t++) {
   if (st.startsWith('END')) {
     await page.waitForTimeout(7000);
     console.log(st, '| score', await page.evaluate(() => `${document.querySelector('[data-total]')?.textContent} items=${document.querySelectorAll('.sc-item').length} rank=${document.querySelector('[data-rank]')?.textContent}`));
-    await page.screenshot({ path: `${out}/an_end_${MODE}_h${hero}.png` }); break;
+    await page.screenshot({ path: `${out}/an_end_${MODE}_h${hero}.png` });
+    if (MODE === 'random') {
+      console.log('daily:', await page.evaluate(() => document.querySelector('[data-daily]')?.textContent));
+      await page.click('[data-see]'); await page.waitForTimeout(800);
+      console.log('board:', await page.evaluate(() => [...document.querySelectorAll('.hs.board tr')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()).join(' | ')));
+      await page.screenshot({ path: `${out}/an_board_h${hero}.png` });
+    }
+    break;
   }
   if (st.startsWith('ERR')) errors.push(st);
   const key = st.split(':')[0];

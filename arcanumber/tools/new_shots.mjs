@@ -16,7 +16,11 @@ await page.evaluate((text) => {
 await page.reload(); await page.waitForTimeout(700);
 const shot = async (n) => { await page.waitForTimeout(500); await page.screenshot({ path: `${out}/new_${n}.png` }); };
 await shot('01_title');
-await page.click('[data-sa]'); await page.click('[data-h="1"]'); await page.click('[data-next]');
+await page.click('[data-board]'); await shot('01b_board');
+await page.click('.modal [data-close]');
+await page.click('[data-sa]'); await page.waitForSelector('.name-list'); await shot('01c_name');
+await page.click('.modal [data-ok]');
+await page.click('[data-h="1"]'); await page.click('[data-next]');
 await shot('02_level');
 await page.click('[data-start]');
 await page.waitForTimeout(300);
@@ -34,6 +38,6 @@ for (let i = 2; i < 5; i++) {
 await shot('04_result');
 await page.click('[data-adjb]'); await shot('05_result_adj');
 await page.click('[data-go]');
-await page.waitForTimeout(1200); await shot('06_mods');
+await page.waitForTimeout(1200); await shot('06_daily');
 console.log('errors:', errors.length ? errors.join('\n') : 'none');
 await browser.close();

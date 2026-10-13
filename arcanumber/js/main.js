@@ -21,8 +21,10 @@ import { packSelect, openPacks, deckBuilder } from './ui/deckbuild.js';
 import { DECK_MIN, DECK_MAX } from './data/packs.js';
 import { hasMod, MODS } from './data/mods.js';
 import { levelStep, levelLabel } from './ui/placement.js';
-import { modsScreen, modsModal } from './ui/modsui.js';
-import { playScore, highScoresHtml, bestScore, MODE_NAME } from './ui/scoreui.js';
+import { dailyScreen, modsModal } from './ui/modsui.js';
+import { pickName, boardModal, submitDaily } from './ui/board.js';
+import { todayJST, dateShort, dailyMods, dailySeed } from './engine/daily.js';
+import { playScore, highScoresHtml, MODE_NAME } from './ui/scoreui.js';
 
 const VERSION = '1.1.0';
 const stage = $('#stage');
@@ -126,19 +128,22 @@ function titleScreen() {
   app.run = null;
   bgm('title');
   const saved = loadRun();
+  const today = todayJST();
+  const todayBest = ((meta.daily || {})[today] || []).reduce((mx, e) => Math.max(mx, e.s), 0);
   const deco = [[['fire', 7], 6, 18, -14], [['water', 3], 82, 14, 12], [['thunder', 5], 10, 60, 8], [['shadow', 9], 84, 58, -10], [['wood', 2], 18, 36, 18]];
   const root = el(`<div class="screen fade-in">${bgHtml()}
     <div class="title-cards">${deco.map(([[e, v], x, y, r]) => `<div style="position:absolute;left:${x}%;top:${y}%;transform:rotate(${r}deg) scale(1.1)">${cardHtml({ id: 'rune', el: e, v })}</div>`).join('')}</div>
     <div class="title-wrap">
       <div class="logo"><div class="en">ARCANUMBER</div><div class="jp">アルカ<b>ナンバー</b></div><div class="tag">${T('ルーンを くみあわせ、{数|かず}の まほうで たたかえ')}</div></div>
       <div class="menu"><button class="btn big" data-new>${T('はじめから')}</button>${saved ? `<button class="btn big blue" data-cont>${T('つづきから')}</button>` : ''}</div>
-      <div class="menu"><button class="btn gold sa-btn" data-sa>🏆 ${T('スコアアタック')}<small>${T('ランダムな とくしゅルール 3つで ちょうせん')}${bestScore('random') ? `　${T('ベスト')} ${bestScore('random')}` : ''}</small></button></div>
-      <div class="menu" style="margin-top:4px"><button class="btn dark" data-zukan>📚 ${T('ずかん')}</button><button class="btn dark" data-howto>❓ ${T('あそびかた')}</button><button class="btn dark" data-settings>⚙️ ${T('せってい')}</button></div>
+      <div class="menu"><button class="btn gold sa-btn" data-sa>🏆 ${T('きょうの ちょうせん')}<small>${T(`${dateShort(today)}の ルール ${dailyMods(today).map((id) => MODS[id].icon).join('')}　みんなで おなじ ルールで スコアを きそう`)}${todayBest ? `　${T('きょうの ベスト')} ${todayBest}` : ''}</small></button></div>
+      <div class="menu" style="margin-top:4px"><button class="btn dark" data-zukan>📚 ${T('ずかん')}</button><button class="btn dark" data-board>🏅 ${T('ランキング')}</button><button class="btn dark" data-howto>❓ ${T('あそびかた')}</button><button class="btn dark" data-settings>⚙️ ${T('せってい')}</button></div>
     </div><div class="version">v${VERSION}</div></div>`);
   app.mount(root);
   swirl($('canvas.swirl', root), 'title');
   $('[data-new]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('あたらしく はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen('normal'); });
-  $('[data-sa]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('スコアアタックを はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; setupScreen('random'); });
+  $('[data-sa]', root).addEventListener('click', async () => { sfx('tap'); if (saved && !(await confirmBox('きょうの ちょうせんを はじめる？', 'いまの ぼうけんの セーブは きえるよ。', 'はじめる', 'やめる'))) return; await pickName(); setupScreen('random'); });
+  $('[data-board]', root).addEventListener('click', () => { sfx('tap'); boardModal(); });
   $('[data-cont]', root)?.addEventListener('click', () => { sfx('tap'); app.run = saved; runLoop(); });
   $('[data-zukan]', root).addEventListener('click', () => { sfx('tap'); zukanScreen(); });
   $('[data-howto]', root).addEventListener('click', () => { sfx('tap'); howTo(); });
@@ -161,7 +166,7 @@ function howTo() {
     ['💀', 'のろい と ボス', 'つよい てきは「のろい」を もっている。<br>（{力|ちから}が はんぶん、ペアが できない など）<br>のろいに あわせて じゅもんを くふう しよう。'],
     ['🧮', 'けいさん チャレンジ', 'はなった あと、{力|ちから} × {倍率|ばいりつ} の こたえを えらぶ。<br>あたると ダメージ 1.5{倍|ばい}！<br>🔍みとおし を つかうと さきに ダメージが みえる（ボーナスは なし）。'],
     ['🏅', 'スコア', 'ぼうけんが おわると スコアが でるよ。<br>すすんだ マス・たおした {敵|てき}・ボス・ノーダメージ・けいさんの せいかい などで ふえる。<br>むずかしさ「ふつう」なら +20%！ ずかんの「きろく」で ハイスコアが みられる。'],
-    ['🏆', 'スコアアタック', 'タイトルの「スコアアタック」では、とくしゅルールが 3つ ランダムに きまる。<br>（ガラスの からだ・ドラフト・ミダス など 26しゅるい）<br>たいへんな ルールほど スコアの ばいりつが あがる。1かいだけ ひきなおせるよ！'],
+    ['🏆', 'きょうの ちょうせん', 'まいにち とくしゅルールが 3つ かわる（ガラスの からだ・ドラフト など 26しゅるい）。<br>その ひは だれが あそんでも おなじ ルール・おなじ マップ！<br>たいへんな ルールほど スコアの ばいりつが あがる。<br>🏅ランキングで みんなの スコアと くらべよう。'],
     ['🗺️', 'デッキを そだてる', 'かつと カードや アルカナが もらえる。ボスを たおすと パックも！<br>おなじ {数|かず}の ルーンを あつめる？ ひとつの ぞくせいに しぼる？<br>デッキの {枚|まい}すうを へらして つよい カードを なんども ひく？<br>じぶんだけの さいきょう デッキで 3しょうの ボスを たおそう！'],
   ];
   let i = 0;
@@ -175,7 +180,7 @@ function howTo() {
 function setupScreen(mode = 'normal') {
   let hero = meta.lastHero ?? 0;
   const root = el(`<div class="screen fade-in">${bgHtml()}
-    <div class="setup" data-s1><h1>${mode === 'random' ? `🏆 ${T('スコアアタック')}：` : ''}${T('しゅじんこうを えらぼう')}</h1>
+    <div class="setup" data-s1><h1>${mode === 'random' ? `🏆 ${T('きょうの ちょうせん')}：` : ''}${T('しゅじんこうを えらぼう')}</h1>
       <div class="pick-row">${HEROES.map((h, i) => `<div class="pick" data-h="${i}"><div class="p-icon">${h.art}</div><div class="p-title">${h.name}</div><div class="p-sub">${T(h.title)}</div><div class="p-els">${h.els.map((e) => ELEMENTS[e].icon).join(' ')}</div><div class="p-desc">${T(h.desc)}<br>❤️ ${h.hp}　🔮 ${T(ARCANA[h.arcana].name)}</div></div>`).join('')}</div>
       <div class="row"><button class="btn dark" data-back>◀ ${T('もどる')}</button><button class="btn green big" data-next>${T('つぎへ ▶')}</button></div></div></div>`);
   app.mount(root);
@@ -189,16 +194,23 @@ function setupScreen(mode = 'normal') {
     meta.lastHero = hero; saveMeta();
     const lvl = await levelStep(app);
     if (!lvl) { setupScreen(mode); return; }
-    let mods = [];
-    if (mode === 'random') { mods = await modsScreen(app, lvl); if (!mods) { setupScreen(mode); return; } }
-    startRun({ hero, ...lvl, mode, mods });
+    if (mode === 'random') {
+      // きょうの ちょうせん：ひづけで ルールと マップが きまる
+      const date = todayJST();
+      const mods = await dailyScreen(app, { ...lvl, date });
+      if (!mods) { setupScreen(mode); return; }
+      startRun({ hero, ...lvl, mode, mods, daily: date, seed: dailySeed(date) });
+      return;
+    }
+    startRun({ hero, ...lvl, mode, mods: [] });
   });
 }
 
-async function startRun({ hero, grade, diff, mode, mods }) {
+async function startRun({ hero, grade, diff, mode, mods, daily = null, seed = newSeed() }) {
   sfx('upgrade');
   meta.lastGrade = grade; meta.lastDiff = diff; meta.records.runs++; saveMeta();
-  app.run = R.newRun({ hero, grade, diff, seed: newSeed(), mode, mods });
+  app.run = R.newRun({ hero, grade, diff, seed, mode, mods });
+  if (daily) app.run.daily = daily;
   mark('arcana', HEROES[hero].arcana);
   await buildStartDeck();
   persist();
@@ -344,6 +356,7 @@ async function endScreen(win) {
         <div class="sc-mult" data-mult></div>
         <div class="sc-total"><small>${T('スコア')}</small><span class="num" data-total>0</span></div>
         <div class="sc-rank" data-rank></div>
+        ${run.daily ? `<div class="sc-daily" data-daily></div>` : ''}
         <div class="mini-stats">${stats.map(([i, l, v]) => `<div><span>${i} ${T(l)}</span><b>${v}</b></div>`).join('')}</div>
         <button class="btn big" data-t>${T('タイトルへ')}</button>
       </div>
@@ -352,7 +365,18 @@ async function endScreen(win) {
   if (win) { confetti(); setTimeout(confetti, 1500); } else sfx('lose');
   app.run = null;
   await sleep(win ? 900 : 1200);
-  await playScore(root, run, win);
+  const sc = await playScore(root, run, win);
+  if (run.daily) {
+    // きょうの ちょうせん：ランキングに のせる
+    const box = $('[data-daily]', root);
+    box.innerHTML = T('ランキングに のせています…');
+    const r = await submitDaily(run, sc.total, win);
+    const rankEl = $('[data-rank]', root);
+    if (r.online && r.rank) { rankEl.innerHTML = T(`🏅 きょうの ランキング ${r.rank}い！`); rankEl.classList.toggle('best', r.rank === 1); if (r.rank <= 3) confetti(); }
+    else if (r.online) rankEl.innerHTML = T('ランキング さんか！');
+    box.innerHTML = `${T(r.online ? `${r.total || 0}にんが ちょうせん ちゅう` : 'この たんまつの きろくに のこしたよ')}${r.error ? `<br><small>${String(r.error).replace(/[&<>]/g, '')}</small>` : ''}<button class="btn blue small" data-see>🏅 ${T('ランキングを みる')}</button>`;
+    $('[data-see]', box).addEventListener('click', () => { sfx('tap'); boardModal(run.daily); });
+  }
   await new Promise((r) => $('[data-t]', root).addEventListener('click', () => { sfx('tap'); r(); }, { once: true }));
   titleScreen();
 }

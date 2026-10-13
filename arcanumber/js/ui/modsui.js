@@ -1,8 +1,10 @@
-// スコアアタック（ランダムモード）：とくしゅルールの がめん
+// きょうの ちょうせん（日替わりスコアアタック）：とくしゅルールの がめん
 import { T } from '../text.js';
-import { el, $, $$, makeRng, newSeed } from '../util.js';
+import { el, $ } from '../util.js';
 import { sfx } from '../audio.js';
-import { MODS, pickMods, modScore } from '../data/mods.js';
+import { MODS, modScore } from '../data/mods.js';
+import { dailyMods, dateLabel } from '../engine/daily.js';
+import { boardModal } from './board.js';
 import { DIFF_BONUS } from '../engine/runscore.js';
 import { bgHtml } from './common.js';
 import { swirl } from './bg.js';
@@ -20,31 +22,21 @@ export function modCardHtml(id, i = 0) {
 }
 export function modsMult(mods, diff) { return Math.max(0.5, Math.round((1 + (DIFF_BONUS[diff] || 0) + modScore(mods)) * 100) / 100); }
 
-// 3つ ひいて きめる：mods か null（もどる）
-export function modsScreen(app, { grade, diff }) {
+// きょうの ちょうせん：その ひの ルールを みせる → 'go' か null（もどる）
+export function dailyScreen(app, { grade, diff, date }) {
   return new Promise((resolve) => {
-    const rng = makeRng(newSeed());
-    let mods = window.__forceMods || pickMods(rng); // __forceMods：テストよう
-    let rerolls = 1;
+    const mods = window.__forceMods || dailyMods(date); // __forceMods：テストよう
     const root = el(`<div class="screen fade-in">${bgHtml()}<div class="panel-screen">
-      <h1>🏆 ${T('スコアアタック')}</h1>
-      <div class="lead">${T('こんかいの とくしゅルールは… この 3つ！')}</div>
-      <div class="mod-row" data-mods></div>
-      <div class="mod-total" data-total></div>
-      <div class="row"><button class="btn dark small" data-back>◀ ${T('もどる')}</button><button class="btn blue" data-reroll></button><button class="btn big" data-go>${T('この ルールで ちょうせん！')}</button></div>
+      <h1>🏆 ${T('きょうの ちょうせん')}</h1>
+      <div class="lead">${T(`${dateLabel(date)}の とくしゅルールは… この 3つ！　きょうは みんな おなじ ルール・おなじ マップで ちょうせん`)}</div>
+      <div class="mod-row" data-mods>${mods.map((id, i) => modCardHtml(id, i)).join('')}</div>
+      <div class="mod-total">${T(`スコア ばいりつ <b>×${modsMult(mods, diff)}</b>　<span>（${levelLabel(grade, diff)}）</span>`)}</div>
+      <div class="row"><button class="btn dark small" data-back>◀ ${T('もどる')}</button><button class="btn blue" data-board>🏅 ${T('ランキング')}</button><button class="btn big" data-go>${T('ちょうせん する！')}</button></div>
     </div></div>`);
     app.mount(root);
     swirl($('canvas.swirl', root), 'tower');
-    const render = () => {
-      $('[data-mods]', root).innerHTML = mods.map((id, i) => modCardHtml(id, i)).join('');
-      $('[data-total]', root).innerHTML = T(`スコア ばいりつ <b>×${modsMult(mods, diff)}</b>　<span>（${levelLabel(grade, diff)}）</span>`);
-      const rb = $('[data-reroll]', root);
-      rb.innerHTML = T(`🎲 ひきなおす（のこり ${rerolls}かい）`);
-      rb.disabled = rerolls <= 0;
-      mods.forEach((_, i) => setTimeout(() => sfx('page'), i * 180));
-    };
-    render();
-    $('[data-reroll]', root).addEventListener('click', () => { if (rerolls <= 0) return; rerolls--; sfx('shuffle'); mods = window.__forceMods || pickMods(rng); render(); });
+    mods.forEach((_, i) => setTimeout(() => sfx('page'), i * 180));
+    $('[data-board]', root).addEventListener('click', () => { sfx('tap'); boardModal(date); });
     $('[data-back]', root).addEventListener('click', () => { sfx('tap'); resolve(null); });
     $('[data-go]', root).addEventListener('click', () => { sfx('upgrade'); FX.confetti(); resolve(mods); });
   });

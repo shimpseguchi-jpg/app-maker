@@ -606,3 +606,19 @@ canvas.swirl { position: absolute; inset: 0; width: 100%; height: 100%; z-index:
 .pt-ask { font-family: inherit; font-size: 30px; text-shadow: none; }
 .pt-dots .pd.idk { border-color: #5c8ad6; background: #17233d; }
 .answer-box.idk { border-color: #5c8ad6; }
+
+/* ───── きょうの ちょうせん ランキング ───── */
+.name-list { display: flex; flex-direction: column; gap: 10px; width: 420px; max-width: 100%; }
+.name-btn { min-height: 56px; border-radius: 14px; border: 2px solid var(--edge); background: var(--panel-hi); color: var(--ink); font-family: var(--display); font-size: 22px; cursor: pointer; }
+.name-btn.on { border-color: var(--gold-hi); background: linear-gradient(170deg, #3a2f58, #241d38); box-shadow: 0 0 0 4px rgba(227,181,91,.25); color: var(--gold-hi); }
+.board-modal { width: 760px; max-width: 96%; }
+.board-mods { font-size: 15px; color: var(--ink-dim); text-align: center; }
+.board-body { width: 100%; align-self: stretch; max-height: 430px; }
+#stage.short .board-body { max-height: 330px; }
+.hs.board td { padding: 6px 8px; font-size: 16px; }
+.hs.board .bn { text-align: left; font-weight: 800; }
+.hs.board .bn small { margin-left: 6px; font-size: 11px; color: var(--ink-dim); font-weight: 400; }
+.hs.board tr.me td { background: rgba(227,181,91,.16); }
+.hs.board tr.me .bn { color: var(--gold-hi); }
+.sc-daily { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-dim); text-align: center; }
+.sc-daily small { color: #ffb3c0; }

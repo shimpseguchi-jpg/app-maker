@@ -9,7 +9,7 @@ import { runScore } from '../engine/runscore.js';
 import * as FX from './fx.js';
 import { pct } from './modsui.js';
 
-export const MODE_NAME = { normal: 'ぼうけん', random: 'スコアアタック' };
+export const MODE_NAME = { normal: 'ぼうけん', random: 'きょうの ちょうせん' };
 const KEEP = 10;
 
 // ハイスコアに のせる：じゅんい（1〜10）か 0
@@ -65,6 +65,7 @@ export async function playScore(root, run, win) {
   totalEl.textContent = sc.total;
   sfx('total');
   FX.retrigger(totalEl, 'bump', 400);
+  if (run.daily) return sc; // ランキングは あとで サーバーの けっかを だす
   if (rank === 1) { rankEl.innerHTML = `🎉 ${T('ハイスコア こうしん！')}`; rankEl.classList.add('best'); FX.confetti(); }
   else if (rank) rankEl.innerHTML = T(`${MODE_NAME[run.mode === 'random' ? 'random' : 'normal']}の ランキング ${rank}い！`);
   else rankEl.innerHTML = T(`ベスト：${bestScore(run.mode === 'random' ? 'random' : 'normal')}`);
