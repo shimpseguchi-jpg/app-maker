@@ -28,7 +28,7 @@
     b.style.color = '#ff8a9a';
     b.textContent = 'うまく よみこめませんでした：' + msg;
   }
-  window.addEventListener('error', function (e) { show(e.message || 'error'); });
+  window.addEventListener('error', function (e) { show((e.message || 'error') + (e.lineno ? '（' + e.lineno + ':' + e.colno + '）' : '')); });
   window.addEventListener('unhandledrejection', function (e) { show(String(e.reason && (e.reason.message || e.reason))); });
   setTimeout(function () {
     var b = document.getElementById('boot');
