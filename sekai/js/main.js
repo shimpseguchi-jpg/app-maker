@@ -470,7 +470,9 @@ app.addEventListener('click', (e) => {
   else if (act === 'parents') parents();
   else if (act === 'mute') { save.muted = !isMuted(); setMuted(save.muted); store(save); b.textContent = isMuted() ? '🔇' : '🔊'; }
   else if (act === 'reset') {
-    if (confirm('ずかんの きろくを ぜんぶ けしますか？')) { save.met = {}; save.lives = 0; store(save); title(); }
+    // 2かい おすと けす（ダイアログが つかえない ばしょでも うごくように）
+    if (b.dataset.sure) { save.met = {}; save.lives = 0; store(save); title(); }
+    else { b.dataset.sure = '1'; b.textContent = 'ほんとうに けす？ もう いちど おしてね'; }
   }
 });
 
