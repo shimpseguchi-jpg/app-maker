@@ -25,6 +25,8 @@ const IND = {
   net: 'IT.NET.USER.ZS', // インターネットを つかう ひと %
   forest: 'AG.LND.FRST.ZS', // りくちの うち もりの %
   land: 'AG.LND.TOTL.K2', // りくちの ひろさ km2
+  lem: 'SP.DYN.LE00.MA.IN', // へいきん じゅみょう（おとこ）… としを とった ときの ねんれいの めやすに つかう
+  lef: 'SP.DYN.LE00.FE.IN', // へいきん じゅみょう（おんな）
 };
 
 // くにでは ない ちいき（ずかんに でると こどもが まよう）
@@ -104,6 +106,7 @@ for (const c of countries) {
     flag: flag(c.iso2Code),
     name: jaName(c.iso2Code),
     area: areaOf(c.iso2Code, c.region.value),
+    region: c.region.id,
     pop: Math.round(pop),
     births: Math.round((pop * cbr) / 1000),
     tfr: r1(g('tfr')),
@@ -117,6 +120,8 @@ for (const c of countries) {
     net: g('net') != null ? r1(g('net')) : null,
     forest: g('forest') != null ? r1(g('forest')) : null,
     land: g('land') != null ? Math.round(g('land')) : null,
+    lem: g('lem') != null ? Math.round(g('lem')) : null,
+    lef: g('lef') != null ? Math.round(g('lef')) : null,
   });
 }
 out.sort((a, b) => b.births - a.births);

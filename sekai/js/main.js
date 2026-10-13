@@ -1,7 +1,7 @@
 // せかいの どこかに うまれたら
 // いま うまれる あかちゃんの ひとりに なって、その くにの くらしを おとなに なるまで たいけんし、
 // その あとの しんがく・しごと・じんせいを みじかく よんで おわる。
-import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, PLAYS, JOBS_FARM, JOBS_TOWN } from './data.js';
+import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, PLAYS, JOBS_FARM, JOBS_TOWN, nameFor } from './data.js';
 import { sfx, setMuted, isMuted } from './audio.js';
 
 const app = document.getElementById('app');
@@ -14,7 +14,7 @@ function load() {
 function store(d) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(d)); } catch (e) { /* ほぞん できなくても あそべる */ }
 }
-const save = Object.assign({ met: {}, lives: 0, muted: false, mura: {} }, load());
+const save = Object.assign({ met: {}, lives: 0, muted: false, mura: {}, past: [], auto: false, speed: 1 }, load());
 setMuted(save.muted);
 
 // ───── てつだい ─────
@@ -63,6 +63,29 @@ function autoFact(c) {
   return f.slice(0, 2).join('<br>');
 }
 const factOf = (c) => c.fact || autoFact(c);
+
+const fmt = (n) => Math.round(n).toLocaleString('en-US');
+// ねんれいで かわる アイコン
+function avatar(age, g) {
+  if (age < 3) return '👶';
+  if (age < 13) return g === 'm' ? '👦' : '👧';
+  if (age < 20) return '🧑';
+  if (age < 60) return g === 'm' ? '👨' : '👩';
+  return g === 'm' ? '👴' : '👵';
+}
+const gname = (g) => (g === 'm' ? 'おとこのこ' : 'おんなのこ');
+const callName = () => (life.name ? `${life.name}` : 'あなた');
+// その くにに うまれる かくりつ（こどもに わかる いいかた）と めずらしさ
+function oddsText(c) {
+  const per1000 = (c.births / WORLD_BIRTHS) * 1000;
+  if (per1000 >= 1) return `<b class="num">1,000</b>にんに <b class="num">${Math.round(per1000)}</b>にん`;
+  return `<b class="num">${fmt(WORLD_BIRTHS / c.births)}</b>にんに <b class="num">1</b>にん`;
+}
+function rarity(c) {
+  const p = (c.births / WORLD_BIRTHS) * 100;
+  return p >= 5 ? 1 : p >= 1 ? 2 : p >= 0.3 ? 3 : p >= 0.05 ? 4 : 5;
+}
+const addLog = (age, text) => life.log.push([age, text]);
 
 function tenKids(n, on = '🧒', off = '🧒') {
   let s = '<div class="ten">';
@@ -123,7 +146,13 @@ function title() {
     <div class="row">
       <button class="btn" data-act="zukan">📖 ずかん <small>${met}/${COUNTRIES.length}</small></button>
       <button class="btn" data-act="mura">🏘️ せかい 100にんむら</button>
+      ${save.past.length ? '<button class="btn" data-act="past">📜 これまでの じんせい</button>' : ''}
     </div>
+    <div class="row settings">
+      <button class="mini ${save.auto ? 'on' : ''}" data-act="auto">🎲 おまかせ：${save.auto ? 'オン' : 'オフ'}</button>
+      <button class="mini" data-act="speed">⏩ はやさ：<b class="num">${save.speed}</b>ばい</button>
+    </div>
+    <p class="sub">えらべるのは「うまれる」ことだけ。どこの だれに なるかは わからない。<br>おまかせに すると、えらぶのも ぜんぶ おまかせで じんせいを ながめられるよ。</p>
     <button class="link" data-act="parents">おうちの かたへ</button>
   </div>`, 'bg-sky');
 }
@@ -132,12 +161,15 @@ function title() {
 function born() {
   const c = pickCountry();
   const kids = 1 + Math.min(8, poisson(Math.max(c.tfr - 1, 0)));
+  const g = Math.random() < 0.512 ? 'm' : 'f'; // うまれる あかちゃんは おとこのこが すこし おおい
   const me = life = {
-    c, stars: 0,
+    c, stars: 0, g, name: nameFor(c, g),
+    order: 1 + rnd(kids), // きょうだいの なんばんめ
+    rural: Math.random() * 100 >= c.urban,
     sibs: Array.from({ length: kids - 1 }, () => pick(['👦', '👧'])),
     elec: Math.random() * 100 < c.elec,
     water: Math.random() * 100 < c.water,
-    play: null, dream: null, subject: null,
+    play: null, dream: null, subject: null, log: [],
   };
   show(`${topbar()}
   <div class="hero">
@@ -165,31 +197,41 @@ function reveal() {
   const a = AREA[c.area];
   const isNew = !save.met[c.id];
   sfx('fanfare');
+  addLog(0, `${c.name}の ${life.rural ? 'いなか' : 'まち'}で、${gname(life.g)} として うまれた。${life.name ? `なまえは ${life.name}。` : ''}`);
   show(`${topbar()}
   <div class="card pop">
     <div class="flag-big">${c.flag}</div>
     <h2>おめでとう！<br>あなたは <span class="cname">${c.name}</span> で うまれたよ！</h2>
     ${isNew ? '<div class="newbadge">はじめての くに！</div>' : ''}
     <p class="area">${a.globe} ${a.name}の くに${c.capital ? ` ・ しゅと：${c.capital}` : ''}</p>
+    <div class="idcard">
+      <span class="idava">👶</span>
+      <div><p>${life.rural ? '🌾 いなか' : '🏙️ まち'}の いえに、<b>${gname(life.g)}</b> として うまれたよ。</p>
+      ${life.name ? `<p>なまえは <b class="pname">${life.name}</b>。</p>` : ''}</div>
+    </div>
     <div class="info">
-      <p>🍼 いま せかいで うまれる あかちゃんを <b class="num">100</b>にん あつめると、<br>${c.name}で うまれるのは ${babiesText(c)}。</p>
+      <p>🎲 ${c.name}に うまれる かくりつは ${oddsText(c)}</p>
+      <p class="rare">めずらしさ ${'★'.repeat(rarity(c))}<span>${'★'.repeat(5 - rarity(c))}</span></p>
+      <p>📅 きょう ${c.name}で うまれた あかちゃんは やく <b class="num">${fmt(c.births / 365)}</b>にん<br><small>（せかいでは やく <b class="num">${fmt(WORLD_BIRTHS / 365)}</b>にん）</small></p>
     </div>
     <button class="btn big" data-act="next" data-i="0">おおきく なる ▶</button>
   </div>`, `bg-${c.area}`);
+  autoStep();
 }
 
 function stage(i) {
   const s = STAGES[i];
   const c = life.c;
-  const head = `${topbar()}${ageBar(i)}`;
+  const head = `${topbar()}${ageBar(i)}<div class="who">${avatar(ageOf(s), life.g)} <b>${callName()}</b> <small>${c.flag} ${c.name}</small></div>`;
   const cls = `bg-${c.area}`;
   if (s.key === 'family') {
     const n = life.sibs.length;
+    addLog(0, n === 0 ? 'ひとりっこ。' : `${n + 1}にん きょうだいの ${life.order}ばんめ。`);
     show(`${head}<div class="card">
       <div class="agebig"><b class="num">0</b>さい</div>
       <h2>あなたの かぞく</h2>
       <div class="family">👨 👩 ${life.sibs.join(' ')} <span class="me">👶</span></div>
-      <p>${n === 0 ? 'あなたは ひとりっこ だよ。' : `きょうだいが <b class="num">${n}</b>にん いるよ！`}</p>
+      <p>${n === 0 ? 'あなたは ひとりっこ だよ。' : `<b class="num">${n + 1}</b>にん きょうだいの <b class="num">${life.order}</b>ばんめ だよ！`}</p>
       <div class="info">
         <p>${c.name}では、おかあさん <b class="num">10</b>にんに こどもが やく <b class="num">${Math.round(c.tfr * 10)}</b>にん うまれるよ。</p>
         ${c.id === 'jp' ? '' : `<p class="jp">🇯🇵 にほんは <b class="num">${Math.round(JAPAN.tfr * 10)}</b>にん</p>`}
@@ -206,16 +248,17 @@ function stage(i) {
     quiz(head, cls, i, '<b class="num">3</b>さい', 'たべもの クイズ',
       `${c.name}で よく たべられて いる りょうりは どれかな？`,
       choices.map((x) => ({ label: `${x.foodEmoji} ${x.food}`, ok: x === c })),
-      `${c.foodEmoji} <b>${c.food}</b> が だいすきに なったよ！`);
+      `${c.foodEmoji} <b>${c.food}</b> が だいすきに なったよ！`, [3, `${c.food}が だいすきに なった。`]);
   } else if (s.key === 'hello') {
     const others = shuffle(COUNTRIES.filter((x) => x.rich && x.hello !== c.hello)).slice(0, 2);
     const choices = shuffle([c, ...others]);
     quiz(head, cls, i, '<b class="num">5</b>さい', 'ことば クイズ',
       `${c.name}の ことばで「こんにちは」は どれかな？`,
       choices.map((x) => ({ label: `💬 ${x.hello}`, ok: x === c })),
-      `${c.lang}で「<b>${c.hello}</b>」！ ともだちに あいさつ できたよ。`);
+      `${c.lang}で「<b>${c.hello}</b>」！ ともだちに あいさつ できたよ。`, [5, `${c.lang}で「${c.hello}」と あいさつ できるように なった。`]);
   } else if (s.key === 'home') {
     const e = of10(c.elec), w = of10(c.water);
+    addLog(6, `${life.elec ? 'でんきの ある' : 'でんきの ない'} いえで くらした。${life.water ? '' : 'みずくみの おてつだいを した。'}`);
     show(`${head}<div class="card">
       <div class="agebig"><b class="num">6</b>さい</div>
       <h2>あなたの いえの くらし</h2>
@@ -250,7 +293,7 @@ function stage(i) {
     quiz(head, cls, i, '<b class="num">10</b>さい', 'ちず クイズ',
       `${c.name}は どこに ある くにかな？`,
       choices.map((k) => ({ label: `${AREA[k].globe} ${AREA[k].name}`, ok: k === c.area })),
-      `${c.name}は <b>${AREA[c.area].name}</b>の くに。<br>📝 ${factOf(c)}`);
+      `${c.name}は <b>${AREA[c.area].name}</b>の くに。<br>📝 ${factOf(c)}`, [10, `じぶんの くにが ${AREA[c.area].name}に ある ことを しった。`]);
   } else if (s.key === 'dream') {
     const opts = shuffle(DREAMS).slice(0, 4);
     show(`${head}<div class="card">
@@ -268,6 +311,7 @@ function stage(i) {
       <div id="after"></div>
     </div>`, cls);
   } else if (s.key === 'adult') {
+    addLog(c.adult, 'おとなの なかまいり。');
     show(`${head}<div class="card pop">
       <div class="agebig"><b class="num">${c.adult}</b>さい</div>
       <div class="flag-big">🎉</div>
@@ -294,10 +338,10 @@ function compareQuiz(head, cls, i, age, label, q, v, jp, win) {
   quiz(head, cls, i, `<b class="num">${age}</b>さい`, `${label} クイズ`,
     `${c.name}と にほん、${q} どっち？`,
     [{ label: `${c.flag} ${c.name}`, ok: v >= jp }, { label: '🇯🇵 にほん', ok: v < jp }],
-    win);
+    win, [age, `${label}を にほんと くらべて みた。`]);
 }
 
-function quiz(head, cls, i, age, label, q, choices, win) {
+function quiz(head, cls, i, age, label, q, choices, win, log) {
   show(`${head}<div class="card">
     <div class="agebig">${age}</div>
     <div class="qlabel">❓ ${label}</div>
@@ -305,7 +349,7 @@ function quiz(head, cls, i, age, label, q, choices, win) {
     <div class="choices">${choices.map((ch, k) => `<button class="btn choice" data-act="answer" data-k="${k}">${ch.label}</button>`).join('')}</div>
     <div id="after"></div>
   </div>`, cls);
-  life.quiz = { choices, win, i };
+  life.quiz = { choices, win, i, log };
 }
 
 function answer(k, btn) {
@@ -314,6 +358,7 @@ function answer(k, btn) {
   qz.done = true;
   const ok = qz.choices[k].ok;
   if (ok) life.stars++;
+  if (qz.log) addLog(...qz.log);
   sfx(ok ? 'ok' : 'ng');
   app.querySelectorAll('[data-act=answer]').forEach((b, j) => {
     b.disabled = true;
@@ -330,6 +375,7 @@ function play(v) {
   const c = life.c;
   if (life.play) return;
   life.play = v;
+  addLog(8, `ともだちと ${v}を して あそんだ。`);
   sfx('ok');
   app.querySelectorAll('[data-act=play]').forEach((b) => { b.disabled = true; if (b.dataset.v === v) b.classList.add('right'); });
   document.getElementById('after').innerHTML = `
@@ -339,55 +385,69 @@ function play(v) {
     <button class="btn big" data-act="next" data-i="${STAGES.findIndex((x) => x.key === 'play') + 1}">つぎへ ▶</button>`;
 }
 
-// おとなに なった あとの じんせい（しんがく → しごと → かぞく → おしまい）
+// おとなに なった あとの じんせい（しんがく → しごと → かぞく → まご → としを とる）
+// しを えがかず、「いまも くらして いる」で おわる。
 function grownUp() {
   const c = life.c;
   const d = DREAMS.find((x) => x.name === life.dream);
   const uni = Math.random() * 100 < c.uni;
   const hit = Math.random() < (d.uni ? (uni ? 0.8 : 0) : (uni ? 0.7 : 0.5));
   const job = hit ? d : pick(Math.random() * 100 < c.agri ? JOBS_FARM : JOBS_TOWN);
-  const kids = Math.min(9, poisson(c.tfr));
-  const story = [];
-  story.push(['🎉', `<b class="num">${c.adult}</b>さい`, 'おとなの なかまいりを したよ。']);
-  story.push(uni
-    ? ['🎓', 'しんがく', `だいがくに すすんで、${d.study}を べんきょうしたよ。`]
-    : ['💪', 'しんがく', 'がっこうを おえて、すぐに はたらきはじめたよ。']);
-  story.push(hit
-    ? [job.emoji, 'しごと', `ゆめだった <b>${job.name}</b>に なったよ！ ${job.end}`]
-    : [job.emoji, 'しごと', `<b>${job.name}</b>に なったよ。${job.end}<br>${d.name}の ゆめとは ちがう みちに なったけど、しごとを たいせつに して がんばったよ。`]);
-  story.push(Math.random() < 0.85
-    ? ['🏡', 'かぞく', kids > 0 ? `たいせつな ひとと かぞくに なって、こどもが <b class="num">${kids}</b>にん うまれたよ。` : 'たいせつな ひとと かぞくに なって、ふたりで なかよく くらしたよ。']
-    : ['🤝', 'なかま', 'ともだちや しごとの なかまに かこまれて、にぎやかに くらしたよ。']);
-  story.push(['🌅', 'それから', `としを とっても ${c.rich ? `${c.food}が だいすきな まま` : `${c.name}が だいすきな まま`}。たくさんの おもいでと いっしょに、ながい いっしょうを すごしたよ。`]);
-  return { job, hit, uni, story };
+  const a0 = c.adult;
+  if (uni) addLog(a0, `だいがくに すすんで、${d.study}を まなんだ。`);
+  else addLog(a0, 'がっこうを おえて、はたらきはじめた。');
+  const workAge = uni ? Math.max(a0 + 4, 22) : a0;
+  addLog(workAge, hit ? `ゆめだった ${job.name}に なった！ ${job.end}` : `${job.name}に なった。${job.end}`);
+  const family = Math.random() < 0.85;
+  const kids = family ? Math.min(9, poisson(c.tfr)) : 0;
+  let gkids = 0;
+  if (family) {
+    const wed = workAge + 2 + rnd(8);
+    addLog(wed, 'たいせつな ひとと かぞくに なった。');
+    if (kids > 0) addLog(wed + 1 + rnd(3), `こどもが うまれた。こどもは ぜんぶで ${kids}にん。`);
+    for (let k = 0; k < kids; k++) gkids += Math.random() < 0.85 ? poisson(c.tfr) : 0;
+    if (gkids > 0) addLog(wed + 28 + rnd(6), `まごが うまれた。${life.g === 'm' ? 'おじいちゃん' : 'おばあちゃん'}に なった！`);
+  } else {
+    addLog(workAge + 5 + rnd(10), 'ともだちや しごとの なかまに かこまれて、にぎやかに くらした。');
+  }
+  // としを とった ねんれい：その くにの へいきんじゅみょう ふきん（60さい いじょう）
+  const le = (life.g === 'm' ? life.c.lem : life.c.lef) || 72;
+  const old = Math.max(60, le - 5 + rnd(16));
+  const where = life.rural ? 'いなか' : 'まち';
+  addLog(old, `${old}さい。いまも ${c.name}の ${where}で、${gkids ? `まご ${gkids}にんと ` : kids ? `こども ${kids}にんと ` : ''}たのしく くらして いる。`);
+  life.log.sort((x, y) => x[0] - y[0]);
+  return { job, hit, uni, kids, gkids, old };
 }
 
+function lifeTitle(c, g) {
+  return `${c.name}の ${life.rural ? 'いなか' : 'まち'}で ${gname(life.g)} として うまれ、${g.job.name}として いきた${life.name ? ` ${life.name}の` : ''} じんせい`;
+}
+
+let lastShare = '';
 function ending() {
   const c = life.c;
   const g = grownUp();
   const isNew = !save.met[c.id];
   save.met[c.id] = (save.met[c.id] || 0) + 1;
   save.lives++;
+  const headline = lifeTitle(c, g);
+  save.past.unshift({ flag: c.flag, g: life.g, job: `${g.job.emoji} ${g.job.name}`, old: g.old, text: headline });
+  save.past = save.past.slice(0, 30);
   store(save);
   sfx('fanfare');
+  lastShare = `${c.flag} ${headline}\n` + life.log.map(([a, t]) => `${a}さい ${t}`).join('\n') + '\n#せかいのどこかにうまれたら';
   const row = (label, a, b, key) => `<tr><th>${label}</th><td>${a}${c.estimated.includes(key) ? '<small>※</small>' : ''}</td>${c.id === 'jp' ? '' : `<td>${b}</td>`}</tr>`;
   show(`${topbar()}<div class="card pop">
-    <div class="flag-big">${c.flag}</div>
-    <h2>${c.name}で うまれて、<br><span class="cname">${g.job.emoji} ${g.job.name}</span>として いきた じんせい</h2>
-    <ol class="story">${g.story.map(([e, t, x]) => `<li><span class="se">${e}</span><div><small>${t}</small><p>${x}</p></div></li>`).join('')}</ol>
-    <p class="owari">おしまい</p>
+    <div class="flag-big">${c.flag}<span class="oldava">${avatar(g.old, life.g)}</span></div>
+    <h2 class="headline">${headline}</h2>
     <div class="stars">${'⭐'.repeat(life.stars)}${'☆'.repeat(3 - life.stars)}</div>
     ${isNew ? `<div class="stamp">${c.flag}<span>ずかんに<br>スタンプ！</span></div>` : ''}
+    <h3 class="loghead">📖 じんせいの きろく</h3>
+    <ol class="lifelog">${life.log.map(([a, t], k) => `<li style="animation-delay:${Math.min(k * 0.08, 1.2)}s"><span class="age"><b class="num">${a}</b>さい</span><span class="ava">${avatar(a, life.g)}</span><p>${t}</p></li>`).join('')}</ol>
+    <p class="owari">おしまい</p>
+    <button class="btn" data-act="share">📋 きろくを コピー</button>
+    <p class="sub" id="shared" hidden>コピー したよ。おうちの ひとに みせてね。</p>
     <div class="summary">
-      <h3>あなたの こども じだい（<b class="num">0</b>〜<b class="num">${c.adult}</b>さい）</h3>
-      <ul>
-        <li>👪 きょうだい <b class="num">${life.sibs.length}</b>にん</li>
-        ${c.rich ? `<li>${c.foodEmoji} すきな たべもの：${c.food}</li>
-        <li>💬 あいさつ：${c.hello}</li>` : ''}
-        <li>${life.elec ? '💡 でんき あり' : '🕯️ でんき なし'} ・ ${life.water ? '🚰 みず ちかい' : '🪣 みず とおい'}</li>
-        <li>⚽ あそび：${life.play}</li>
-        <li>📖 すきな べんきょう：${life.subject}</li>
-      </ul>
       <h3>くらべて みよう</h3>
       <table class="cmp">
         <tr><th></th><td>${c.flag} ${c.name}</td>${c.id === 'jp' ? '' : `<td>🇯🇵 にほん</td>`}</tr>
@@ -397,16 +457,40 @@ function ending() {
         ${row('🧑‍🌾 のうぎょうで はたらく<br><small>（おとな 10にんの うち）</small>', n10(c.agri), n10(JAPAN.agri), 'agri')}
         ${row('🎉 おとなに なる ねんれい', `<b class="num">${c.adult}</b>さい`, `<b class="num">${JAPAN.adult}</b>さい`)}
         ${row('👶 うまれる こども<br><small>（おかあさん 10にんで）</small>', `<b class="num">${Math.round(c.tfr * 10)}</b>にん`, `<b class="num">${Math.round(JAPAN.tfr * 10)}</b>にん`)}
+        ${row('🎲 うまれる かくりつ', oddsText(c), oddsText(JAPAN))}
       </table>
       ${c.estimated.some((k) => k === 'uni' || k === 'agri') ? '<p class="sub">※ この くにの データが ないので、おなじ たいりくの へいきん</p>' : ''}
     </div>
     <button class="btn big" data-act="born">👶 もう いちど うまれる</button>
     <div class="row">
+      <button class="btn" data-act="past">📜 これまでの じんせい</button>
       <button class="btn" data-act="zukan">📖 ずかん</button>
       <button class="btn" data-act="title">🏠 はじめに もどる</button>
     </div>
   </div>`, `bg-${c.area}`);
   life = null;
+}
+
+// きろくを コピー（クリップボードが つかえない ときは テキストを えらぶ）
+function copyShare() {
+  const done = () => { const el = document.getElementById('shared'); if (el) el.hidden = false; };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = lastShare; document.body.appendChild(ta); ta.select();
+    try { if (document.execCommand('copy')) done(); } catch (e) { /* できなくても すすめる */ }
+    ta.remove();
+  };
+  try { navigator.clipboard.writeText(lastShare).then(done, fallback); } catch (e) { fallback(); }
+}
+
+// これまでの じんせい
+function past() {
+  show(`${topbar()}<div class="card wide">
+    <h2>📜 これまでの じんせい</h2>
+    <p class="sub">これまでに うまれた <b class="num">${save.lives}</b>かいの うち、あたらしい <b class="num">${save.past.length}</b>かい</p>
+    <ol class="past">${save.past.map((x) => `<li><span class="pf">${x.flag}</span><div><p>${x.text}</p><small>${x.job} ・ ${avatar(x.old, x.g)} <b class="num">${x.old}</b>さい</small></div></li>`).join('')}</ol>
+    <button class="btn big" data-act="born">👶 うまれる</button>
+  </div>`, 'bg-sky');
 }
 
 // ずかん
@@ -466,6 +550,8 @@ function parents() {
     <p>いま生まれてくる赤ちゃんの一人として、世界のどこかの国にランダムに生まれ、0歳からその国で成人する年齢までの暮らしを体験し、最後にその後の進学・仕事・人生をみじかく読んで終わるゲームです。
     生まれる国は、実際にその国で生まれる赤ちゃんの数に比例した確率で、世界の${COUNTRIES.length}か国から決まります。
     そのうち赤ちゃんの数が多い${COUNTRIES.filter((c) => c.rich).length}か国には、あいさつ・料理などの説明とクイズがあります。それ以外の国では、日本とくらべる数字のクイズになります。</p>
+    <p>Web ゲーム「80億分の1」（1in8b.life）の、統計どおりに世界のどこかに生まれて一生を見守るというアイデアへのオマージュです（元の作品は15歳以上向け。このゲームは別に作ったもので、文章や絵は使っていません）。
+    「おまかせ」をオンにすると、選択も自動で進み、人生を上から眺められます。年をとった後は描かず「いまも くらして いる」で終わります。</p>
     <p>「せかい 100にんむら」では、世界を100人の村にしたら何人が電気を使えるか、などを予想してから答え合わせします。</p>
     <p>きょうだいの数・家の電気・近くのきれいな水・大学などへの進学・農業の仕事につくかどうかは、その国の統計の割合にしたがってランダムに決まります。
     小学校低学年でも読めるよう、数は「10人のうち何人」「100人のうち何人」にまるめています。</p>
@@ -612,16 +698,22 @@ app.addEventListener('click', (e) => {
   else if (act === 'dream' && !life.dream) {
     life.dream = b.dataset.v;
     const d = DREAMS.find((x) => x.name === life.dream);
+    addLog(12, `しょうらいの ゆめは ${d.name}。`);
     choose('dream', life.dream, `${d.emoji} <b>${d.name}</b>に なりたいな！ ゆめに むかって がんばろう。`);
   } else if (act === 'subject' && !life.subject) {
     life.subject = b.dataset.v;
     const x = SUBJECTS.find((y) => y.name === life.subject);
+    addLog(15, `${x.name}が いちばん すきな べんきょうに なった。`);
     choose('subject', life.subject, `${x.emoji} <b>${x.name}</b>が いちばん すき！ ${x.msg}`);
   }
   else if (act === 'zukan') zukan();
   else if (act === 'zsel') zukan(b.dataset.v);
   else if (act === 'hundred') hundred();
   else if (act === 'mura') mura();
+  else if (act === 'past') past();
+  else if (act === 'share') copyShare();
+  else if (act === 'auto') { save.auto = !save.auto; store(save); title(); }
+  else if (act === 'speed') { save.speed = save.speed >= 4 ? 1 : save.speed * 2; store(save); title(); }
   else if (act === 'topic') topic(b.dataset.v);
   else if (act === 'g') setGuess(+b.dataset.v);
   else if (act === 'gstep') setGuess(Math.max(0, Math.min(100, (muraState?.guess || 0) + +b.dataset.v)));
@@ -633,7 +725,22 @@ app.addEventListener('click', (e) => {
     if (b.dataset.sure) { save.met = {}; save.lives = 0; store(save); title(); }
     else { b.dataset.sure = '1'; b.textContent = 'ほんとうに けす？ もう いちど おしてね'; }
   }
+  autoStep();
 });
+
+// おまかせ：えらぶのも すすむのも じどうで、じんせいを うえから ながめる
+let autoT = 0;
+function autoStep() {
+  clearTimeout(autoT);
+  if (!save.auto || !life) return;
+  const me = life;
+  autoT = setTimeout(() => {
+    if (life !== me) return;
+    const opts = [...app.querySelectorAll('[data-act=answer],[data-act=play],[data-act=dream],[data-act=subject]')].filter((x) => !x.disabled);
+    const t = opts.length ? pick(opts) : app.querySelector('[data-act=next]');
+    if (t) t.click();
+  }, 2400 / save.speed);
+}
 
 title();
 

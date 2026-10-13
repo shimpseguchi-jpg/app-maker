@@ -134,6 +134,33 @@ b { color: #1b5fa8; }
 #after { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 #after:empty { display: none; }
 
+/* うまれた ときの じぶん */
+.idcard { width: 100%; display: flex; align-items: center; gap: 14px; background: #fff3df; border-radius: 18px; padding: 10px 16px; text-align: left; }
+.idava { font-size: 3em; line-height: 1; }
+.pname { color: #e2541b; font-size: 1.2em; }
+.rare { color: var(--gold-d); letter-spacing: .1em; }
+.rare span { color: #e3e7ee; }
+.who { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .95em; }
+.who small { color: var(--ink-soft); }
+.settings { gap: 8px; }
+.mini.on { background: var(--green); color: #fff; }
+
+/* じんせいの きろく */
+.headline { font-size: 1.15em !important; }
+.oldava { font-size: .55em; margin-left: .1em; vertical-align: bottom; }
+.loghead { margin: 4px 0 0; align-self: flex-start; }
+.lifelog { list-style: none; margin: 0; padding: 0; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.lifelog li { display: grid; grid-template-columns: 4.2em 1.8em 1fr; gap: 8px; align-items: start; padding: 6px 10px; border-radius: 12px; background: #fff7e6; animation: pop .35s both; }
+.lifelog li:nth-child(even) { background: #fdf1d8; }
+.lifelog .age { color: #e2541b; font-size: .85em; text-align: right; white-space: nowrap; }
+.lifelog .ava { font-size: 1.2em; line-height: 1.4; }
+.lifelog p { font-size: .9em; min-width: 0; }
+.past { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.past li { display: flex; gap: 12px; align-items: center; background: #f4f8fc; border-radius: 14px; padding: 8px 12px; }
+.past .pf { font-size: 2em; }
+.past p { font-size: .88em; }
+.past small { color: var(--ink-soft); font-size: .75em; }
+
 /* おわり */
 .story { list-style: none; margin: 0; padding: 0; width: 100%; text-align: left; display: flex; flex-direction: column; gap: 8px; }
 .story li { display: flex; gap: 12px; align-items: flex-start; background: #fff7e6; border-radius: 16px; padding: 10px 14px; animation: pop .4s both; }
