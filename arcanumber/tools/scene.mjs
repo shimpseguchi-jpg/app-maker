@@ -10,7 +10,7 @@ page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 await page.goto('http://localhost:8123/arcanumber/');
 await page.evaluate(async ({ scene, text }) => {
   localStorage.clear();
-  localStorage.setItem('arcanumber.settings', JSON.stringify({ text, speed: 'normal', bgm: 0, sfx: 0, challenge: scene !== 'nochallenge' }));
+  localStorage.setItem('arcanumber.settings', JSON.stringify({ sv: 2, text, speed: 'normal', bgm: 0, sfx: 0, challenge: scene !== 'nochallenge' }));
   const tips = ['m_intro', 'bt_intro', 'bt_rune', 'bt_arcana', 'bt_rule', 'bt_aura', 'bt_instant', 'bt_cast', 'bt_mana', 'bt_order', 'bt_redraw', 'bt_challenge', 'bt_block', 'bt_curse', 'rw_interest', 'sh_intro', 'bt_aura2'];
   localStorage.setItem('arcanumber.meta', JSON.stringify({ tips: Object.fromEntries(tips.map((k) => [k, 1])) }));
   const R = await import('/arcanumber/js/engine/run.js');

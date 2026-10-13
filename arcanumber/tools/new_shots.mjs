@@ -10,7 +10,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto('http://localhost:8123/arcanumber/');
 await page.evaluate((text) => {
   localStorage.clear();
-  localStorage.setItem('arcanumber.settings', JSON.stringify({ text, speed: 'normal', bgm: 0, sfx: 0, challenge: true }));
+  localStorage.setItem('arcanumber.settings', JSON.stringify({ sv: 2, text, speed: 'normal', bgm: 0, sfx: 0, challenge: true }));
   localStorage.setItem('arcanumber.meta', JSON.stringify({ tips: { db_intro: 1, m_intro: 1 }, scores: { normal: [{ s: 812, h: 1, w: 1, a: 3, g: 2, d: 'normal', m: [], t: Date.now() - 86400000 }, { s: 455, h: 0, w: 0, a: 2, g: 2, d: 'easy', m: [], t: Date.now() }], random: [{ s: 1104, h: 2, w: 1, a: 3, g: 3, d: 'normal', m: ['glass', 'draft', 'midas'], t: Date.now() }] } }));
 }, process.env.TEXT || 'ruby');
 await page.reload(); await page.waitForTimeout(700);

@@ -10,7 +10,7 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 await page.goto(url);
-await page.evaluate(() => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ text: 'ruby', speed: 'turbo', bgm: 0, sfx: 0, challenge: true })); });
+await page.evaluate(() => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ sv: 2, text: 'ruby', speed: 'turbo', bgm: 0, sfx: 0, challenge: true })); });
 await page.reload(); await page.waitForTimeout(500);
 const MODE = process.env.MODE || 'normal';
 if (process.env.MODS) await page.evaluate((m) => { window.__forceMods = m.split(','); }, process.env.MODS);

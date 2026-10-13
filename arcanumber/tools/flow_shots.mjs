@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, dev
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 await page.goto('http://localhost:8123/arcanumber/');
-await page.evaluate((text) => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ text, bgm: 0, sfx: 0, challenge: true, speed: 'normal' })); }, process.env.TEXT || 'ruby');
+await page.evaluate((text) => { localStorage.clear(); localStorage.setItem('arcanumber.settings', JSON.stringify({ sv: 2, text, bgm: 0, sfx: 0, challenge: true, speed: 'normal' })); }, process.env.TEXT || 'ruby');
 await page.reload(); await page.waitForTimeout(500);
 const skip = async () => { for (let i = 0; i < 6; i++) { const has = await page.$('.guide-dim'); if (!has) break; await page.waitForTimeout(380); await page.evaluate(() => document.querySelector('.guide-dim')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))); await page.waitForTimeout(150); } };
 await page.click('[data-new]'); await page.click('[data-h="0"]'); await page.click('[data-next]'); await page.click('[data-go]');
