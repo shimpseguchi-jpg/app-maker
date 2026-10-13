@@ -32,8 +32,13 @@ setVolumes(settings.bgm, settings.sfx);
 
 // ───── がめんの おおきさ ─────
 const DW = 1180, MIN_H = 700, MAX_H = 900;
+let fitted = false;
 function fit() {
-  const vw = window.innerWidth, vh = window.innerHeight;
+  const de = document.documentElement;
+  const vw = window.innerWidth || de.clientWidth, vh = window.innerHeight || de.clientHeight;
+  // GAS（Google Apps Script）の わくの なかなどで、まだ おおきさが きまっていない ときは すこし まつ
+  if (!(vw > 50 && vh > 50)) { setTimeout(fit, 100); return; }
+  fitted = true;
   let s = vw / DW, w = DW, h = vh / s;
   if (h < MIN_H) { s = vh / MIN_H; h = MIN_H; w = Math.min(vw / s, 1500); } else if (h > MAX_H) h = MAX_H;
   stage.style.width = w + 'px'; stage.style.height = h + 'px'; stage.style.transform = `scale(${s})`;
@@ -42,11 +47,16 @@ function fit() {
 }
 window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+window.addEventListener('load', fit);
+window.addEventListener('pageshow', fit);
+// わくの おおきさが あとから かわっても resize が こない ブラウザが あるので みはる
+if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(document.documentElement);
+[50, 300, 1000, 2500].forEach((t) => setTimeout(fit, t));
 fit();
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 let audioReady = false, pendingBgm = null;
-document.addEventListener('pointerdown', () => { if (!audioReady) { unlockAudio(); audioReady = true; if (pendingBgm) playBgm(pendingBgm); } }, { capture: true });
+document.addEventListener('pointerdown', () => { if (!audioReady) { unlockAudio(); audioReady = true; fit(); if (pendingBgm) playBgm(pendingBgm); } }, { capture: true });
 function bgm(name) { pendingBgm = name; if (audioReady) playBgm(name); }
 $('[data-portrait]')?.addEventListener('click', () => document.body.classList.add('allow-portrait'));
 
@@ -380,5 +390,7 @@ function zukanScreen(tab = 'hands') {
 }
 
 window.addEventListener('error', (e) => console.error(e.error || e.message));
+// よみこみが おわったら「よみこみちゅう…」を けす（がめんの おおきさが きまってから）
+(function bootDone() { if (fitted) { window.__bootDone = true; document.getElementById('boot')?.remove(); } else setTimeout(bootDone, 200); })();
 window.addEventListener('unhandledrejection', (e) => console.error(e.reason));
 titleScreen();

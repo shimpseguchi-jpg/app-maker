@@ -18,6 +18,24 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<div id="boot" style="position:fixed;left:16px;right:16px;top:44%;z-index:999;text-align:center;color:#a99e88;font:700 18px/1.6 sans-serif">よみこみちゅう…</div>
+<script>
+// iPad には コンソールが ないので、よみこみに しっぱいしたら りゆうを がめんに だす
+(function () {
+  function show(msg) {
+    var b = document.getElementById('boot');
+    if (!b || window.__bootDone) return;
+    b.style.color = '#ff8a9a';
+    b.textContent = 'うまく よみこめませんでした：' + msg;
+  }
+  window.addEventListener('error', function (e) { show(e.message || 'error'); });
+  window.addEventListener('unhandledrejection', function (e) { show(String(e.reason && (e.reason.message || e.reason))); });
+  setTimeout(function () {
+    var b = document.getElementById('boot');
+    if (b && !window.__bootDone && b.textContent.indexOf('：') < 0) b.textContent += '（がめん ' + innerWidth + '×' + innerHeight + '）';
+  }, 6000);
+})();
+</script>
 <div id="stage"></div>
 <div class="rotate-hint"><div class="ph">📱</div><p>iPadを よこむきに してね</p><button data-portrait>このまま あそぶ</button></div>
 <script type="module" src="js/main.js"></script>
