@@ -1,0 +1,12 @@
+{
+  "name": "せかいの どこかに うまれたら",
+  "short_name": "せかいの こども",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#bfe6ff",
+  "theme_color": "#3fa9f5",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
