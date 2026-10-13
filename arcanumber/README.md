@@ -165,6 +165,7 @@ node arcanumber/tools/test_hands.mjs   # 役の判定
 node arcanumber/tools/test_score.mjs   # スコア計算（順番による違いなど）
 node arcanumber/tools/sim.mjs          # AI が何百回も冒険してバランスを確認（スコアの分布も表示）
 MODS=random node arcanumber/tools/sim.mjs   # スコアアタックの特殊ルールごとの勝率
+node tools/build_gas.mjs               # Google Apps Script 用の1ファイル版を gas/ に作る（手順は gas/README.md）
 node arcanumber/tools/e2e.mjs          # ブラウザでロボットが通しプレイ（Playwright が必要。MODE=random MODS=draft,glass,midas などで指定可）
 ```
 

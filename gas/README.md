@@ -1,0 +1,54 @@
+# Google Apps Script（GAS）で公開する
+
+GitHub Pages（github.io）がフィルターで開けない環境向けに、ゲームを **HTML 1ファイル** にまとめたものです。
+GAS の「ウェブアプリ」として公開すると、`https://script.google.com/...` のURLで遊べます。
+
+| ファイル | 中身 |
+|---|---|
+| `Code.gs` | ゲームを表示する短いプログラム |
+| `arcanumber.html` | アルカナンバー（JS・CSS をすべて中に入れた1ファイル） |
+| `kazumaho.html` | かずまほ（入れなくてもよい） |
+| `appsscript.json` | clasp を使う人むけの設定（手作業なら不要） |
+
+## 手順（パソコンで1回だけ）
+
+1. https://script.google.com を開いて「新しいプロジェクト」。左上の名前を「アルカナンバー」などに変える
+2. 最初からある `コード.gs` の中身を全部消して、[`Code.gs`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/Code.gs) の中身を貼る
+3. 左の「ファイル」の **＋** →「HTML」→ 名前を **`arcanumber`** にする（`.html` は自動でつく）
+   中身を全部消して、[`arcanumber.html`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/arcanumber.html) を開いて「すべて選択 → コピー」したものを貼る
+   - かずまほも入れるなら、同じように名前 **`kazumaho`** で [`kazumaho.html`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/kazumaho.html) を貼る
+4. 保存（💾 または Ctrl+S / ⌘+S）
+5. 右上の「デプロイ」→「新しいデプロイ」→ 種類の選択（⚙️）で「ウェブアプリ」
+   - 次のユーザーとして実行：**自分**
+   - アクセスできるユーザー：
+     - 学校の Google アカウントで作った場合 →「（学校・自治体名）内の全員」
+     - 個人の Gmail で作って、子どもは学校のアカウントで開く場合 →「全員」
+6. 「デプロイ」を押す。承認を求められたら自分のアカウントで許可する（このプログラムは Google ドライブやメールなどには一切アクセスしません）
+7. 表示された **ウェブアプリのURL**（`…/exec` で終わる）を iPad の Safari で開く
+   - かずまほは URL の最後に `?game=kazumaho` をつける
+   - 共有ボタン →「ホーム画面に追加」で、アイコンから開けるようになる
+
+## ゲームを新しくしたとき
+
+1. `arcanumber.html`（や `kazumaho.html`）の中身を新しいものに貼り替えて保存
+2. 「デプロイ」→「デプロイを管理」→ ✏️（編集）→ バージョンを「新バージョン」→「デプロイ」
+
+URL は変わりません。セーブデータもそのまま残ります。
+
+## Google サイトにのせる場合
+
+Google サイトの編集画面で「挿入」→「埋め込む」→「URL で埋め込む」に、上のウェブアプリのURLを貼ります（`Code.gs` で埋め込みを許可済み）。
+ゲームは横長（iPad 横向き）なので、埋め込みの枠はページの横幅いっぱい・高さも大きめに広げてください。
+「コードを埋め込む」に HTML を直接貼る方法は、ファイルが大きい（約260KB）ためおすすめしません。
+
+## 知っておくとよいこと
+
+- セーブは iPad のブラウザの中に残ります（GitHub Pages 版とは別々）
+- 個人の Gmail で公開すると、画面の上に「Google Apps Script のユーザーによって作成されました」という帯が出ることがあります
+- 文字の書体は Google Fonts から読み込みます。読み込めなくても iPad の書体で遊べます
+
+## 1ファイル版の作り方（開発者むけ）
+
+```sh
+node tools/build_gas.mjs   # リポジトリのルートで実行 → gas/ が作り直される（esbuild を npx で使う）
+```
