@@ -20,13 +20,16 @@ await page.click('[data-sa]'); await page.click('[data-h="1"]'); await page.clic
 await shot('02_level');
 await page.click('[data-start]');
 await page.waitForTimeout(300);
-for (let i = 0; i < 5; i++) {
+// 1もんめ・2もんめは「わからない」→ やさしい もんだい（え つき）へ
+await page.click('[data-idk]'); await shot('03a_idk');
+await page.waitForTimeout(1500); await shot('03b_lv2');
+await page.click('[data-idk]'); await page.waitForTimeout(1800); await shot('03c_lv1');
+for (let i = 2; i < 5; i++) {
   const a = await page.evaluate(() => window.__pt.a);
-  const ans = i === 2 ? a + 1 : a;
-  for (const ch of String(ans)) await page.click(`[data-k="${ch}"]`);
-  if (i === 1) await shot('03_question');
+  for (const ch of String(a)) await page.click(`[data-k="${ch}"]`);
+  if (i === 3) await shot('03d_question');
   await page.click('[data-k="ok"]');
-  await page.waitForTimeout(i === 2 ? 1700 : 900);
+  await page.waitForTimeout(900);
 }
 await shot('04_result');
 await page.click('[data-adjb]'); await shot('05_result_adj');

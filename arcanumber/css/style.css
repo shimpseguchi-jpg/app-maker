@@ -598,3 +598,11 @@ canvas.swirl { position: absolute; inset: 0; width: 100%; height: 100%; z-index:
 .hs .sv { font-family: var(--display); font-size: 19px; color: var(--gold-hi); text-align: right; width: 80px; }
 .hs .mm { font-size: 17px; } .hs .dt { color: var(--ink-dim); font-size: 13px; text-align: right; }
 .hs tr.top .sv { font-size: 22px; }
+.pt-left { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pt-vis { display: flex; align-items: center; gap: 14px; font-size: 46px; line-height: 1.15; padding: 10px 18px; border-radius: 16px; background: rgba(255,255,255,.05); border: 1px solid var(--edge); }
+.pt-vis.count { flex-direction: column; gap: 4px; font-size: 50px; letter-spacing: 6px; }
+.pt-vis b { font-family: var(--display); font-weight: 400; font-size: 40px; color: var(--gold-hi); }
+.pt-vis .gone { opacity: .3; filter: grayscale(1); text-decoration: line-through; text-decoration-color: var(--mult); }
+.pt-ask { font-family: inherit; font-size: 30px; text-shadow: none; }
+.pt-dots .pd.idk { border-color: #5c8ad6; background: #17233d; }
+.answer-box.idk { border-color: #5c8ad6; }

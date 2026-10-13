@@ -26,6 +26,7 @@ for (let t = 0; t < MAXT; t++) {
     if (ov && ov.classList.contains('pt')) {
       const go = ov.querySelector('[data-go]'); if (go) { const adj = ov.querySelector('[data-adjb]'); if (adj && adj.style.display !== 'none' && Math.random() < 0.3) { adj.click(); ov.querySelector('[data-d] button:last-child').click(); return 'pt-adj'; } go.click(); return 'pt-go'; }
       const k = ov.querySelector('[data-k="ok"]'); if (!k || k.disabled) return 'pt-wait';
+      if (Math.random() < 0.15) { ov.querySelector('[data-idk]').click(); return 'pt-idk'; }
       const ans = Math.random() < 0.75 ? window.__pt.a : window.__pt.a + 1;
       for (const ch of String(ans)) ov.querySelector(`[data-k="${ch}"]`).click(); k.click(); return 'pt-ans';
     }

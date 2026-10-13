@@ -61,12 +61,24 @@ const cu = mk(['cursed']); ok(R.bossCurse(cu) === 2 && cu.deck.filter((x) => x.i
 // うでだめし
 const pr = makeRng(2);
 let qok = true;
-for (let lv = 1; lv <= 6; lv++) for (let i = 0; i < 300; i++) { const q = placementQuestion(lv, pr); const e = q.q.replace('×', '*').replace('÷', '/').replace('−', '-'); if (eval(e) !== q.a || q.a < 0 || !Number.isInteger(q.a)) qok = false; }
-ok(qok, 'うでだめしの こたえが ただしい（せいの せいすう）');
-ok(nextLevel(6, true) === 6 && nextLevel(1, false) === 1, 'レベルは 1〜6');
-ok(judgePlacement([{ lv: 3, ok: true, sec: 4 }, { lv: 4, ok: true, sec: 5 }, { lv: 5, ok: true, sec: 7 }, { lv: 6, ok: false, sec: 30 }, { lv: 5, ok: true, sec: 6 }]).grade === 3, '3ねんせい はんてい');
-ok(judgePlacement([{ lv: 3, ok: false, sec: 20 }, { lv: 2, ok: false, sec: 20 }, { lv: 1, ok: true, sec: 9 }, { lv: 2, ok: false, sec: 20 }, { lv: 1, ok: true, sec: 8 }]).diff === 'easy', 'かんたん はんてい');
-ok(judgePlacement([{ lv: 3, ok: true, sec: 30 }, { lv: 4, ok: false, sec: 30 }, { lv: 3, ok: true, sec: 30 }, { lv: 4, ok: true, sec: 30 }, { lv: 5, ok: false, sec: 30 }]).grade === 2, '2ねんせい はんてい');
+for (let lv = 1; lv <= 8; lv++) for (let i = 0; i < 300; i++) {
+  const q = placementQuestion(lv, pr);
+  const v = q.q ? eval(q.q.replace('×', '*').replace('÷', '/').replace('−', '-')) : q.vis.n;
+  if (v !== q.a || q.a < 0 || !Number.isInteger(q.a)) qok = false;
+  if (lv <= 2 && q.a > 10) qok = false;
+}
+ok(qok, 'うでだめしの こたえが ただしい（せいの せいすう、レベル1〜2は 10まで）');
+ok(nextLevel(8, true) === 8 && nextLevel(1, false) === 1, 'レベルは 1〜8');
+ok(nextLevel(4, true, 0) === 6 && nextLevel(4, false, 1) === 2 && nextLevel(4, true, 2) === 5, 'さいしょの 2もんは 2だんずつ');
+// ちからの ちがう こどもを シミュレーション（レベル ability まで とける）
+const kid = (ability, sec = 5) => { let lv = 4; const res = []; for (let i = 0; i < 5; i++) { const o = lv <= ability; res.push({ lv, ok: o, sec, idk: !o }); lv = nextLevel(lv, o, i); } return judgePlacement(res); };
+const k0 = kid(0), k1 = kid(1), k2 = kid(2), k4 = kid(4), k5 = kid(5), k6 = kid(6), k7 = kid(7), k8 = kid(8);
+ok(k0.grade === 1 && k0.diff === 'easy' && k1.grade === 1 && k1.diff === 'easy' && k2.diff === 'easy', `ぜんぶ わからない／かぞえるだけ → 1ねん・かんたん（top ${k1.top}, ${k2.top}）`);
+ok(k4.grade === 1, `くりあがりまで → 1ねん（top ${k4.top}）`);
+ok(k5.grade === 2 && k6.grade === 2, `2けた・九九まで → 2ねん（top ${k5.top}, ${k6.top}）`);
+ok(k7.grade === 3 && k8.grade === 3 && k8.diff === 'normal', `わりざんいじょう → 3ねん・ふつう（top ${k7.top}, ${k8.top}）`);
+ok(judgePlacement([{ lv: 4, ok: false, sec: 9, idk: true }, { lv: 2, ok: false, sec: 9, idk: true }, { lv: 1, ok: true, sec: 1 }, { lv: 2, ok: true, sec: 1 }, { lv: 3, ok: true, sec: 1 }]).diff === 'easy', 'やさしい もんだいだけ はやく とけても かんたん');
+ok(judgePlacement([{ lv: 4, ok: true, sec: 30 }, { lv: 6, ok: false, sec: 30 }, { lv: 4, ok: true, sec: 30 }, { lv: 5, ok: true, sec: 30 }, { lv: 6, ok: false, sec: 30 }]).diff === 'easy', 'ゆっくり なら かんたん');
 
 // スコア
 const r = mk(['glass', 'draft', 'midas']);
