@@ -359,8 +359,12 @@ function fireEvent(g, ev, H) {
   const whoName = who ? C(g, who)?.name : '';
   const [evName, evText] = g.kid && KID_EVENT[ev.id] ? KID_EVENT[ev.id] : [ev.name, ev.text || ''];
   const entry = { k: 'event', id: ev.id, cat: ev.cat, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) };
+  // つながり：前のニュースがきっかけで起きやすくなっていたら、そのニュース（from）。このニュースで起きやすくなるもの（next）
+  const from = g.cause?.[ev.id];
+  if (from) { entry.from = from; delete g.cause[ev.id]; }
+  entry.next = (ev.next || []).filter((n) => EVENT_BY_ID[n]);
   g.feed.push(entry);
-  chron(g, `${evName}${whoName ? `（${whoName}）` : ''}`);
+  chron(g, `${evName}${whoName ? `（${whoName}）` : ''}${from ? J(g, `　←「${from.name}」から`, `　←「${from.name}」から`) : ''}`);
   // このニュースで動いた数値を集めて、ニュースの下に「→ どこの何が上下したか」を出す
   const evChanges = [];
   const HE = { ...H, fx: (list, ctx, f = 1) => applyFx(g, list, ctx, f, evChanges) };
@@ -371,7 +375,7 @@ function fireEvent(g, ev, H) {
   // ニュースへの反応（左右の2択）。自国が動いていて、核・投票など別の決定があるニュースでなければ
   const me = g.majors[g.player];
   if (me?.panel && !ev.special && REACTIONS[ev.cat]) { entry.react = who === g.player ? 'self' : ev.cat; entry.opts = newsOptions(g, entry); }
-  for (const n of ev.next || []) g.boost[n] = (g.boost[n] || 0) + 3;
+  for (const n of ev.next || []) { g.boost[n] = (g.boost[n] || 0) + 3; (g.cause ||= {})[n] = { id: ev.id, name: evName, year: yearLabel(g) }; }
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
     g.coop.push(ev.id);

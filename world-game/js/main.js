@@ -273,11 +273,12 @@ function isDanger(c, k) {
 // ───── ダッシュボード ─────
 let ui = { sel: null, tgt: {}, busy: false, open: {} };
 function dashScreen() {
+  feedFollow = true;
   mount(el(`<div class="screen dash">
     <div class="top"></div>
     <div class="mid">
       <div class="pane"><h3 class="hz">${K('自国', 'きみの くに')}${zbtn('data-zme')}</h3><div class="me"></div></div>
-      <div class="center"><div class="mapwrap"></div><div class="pane"><div class="feed"></div></div></div>
+      <div class="center"><div class="mapwrap"></div><div class="pane"><div class="feed"></div><button class="newpill">${K('▼ 新しいできごと', '▼ あたらしい できごと')}</button></div></div>
       <div class="pane"><h3>${K('各国の元首', 'ほかの くに')}</h3><div class="rivals"></div></div>
     </div>
     <div class="bottom"><div class="gmbox"></div><div class="actions"></div></div>
@@ -291,6 +292,12 @@ function renderDash() {
   if (d && !d._zoom) {
     d._zoom = true;
     // ニュースと GM の吹き出しは、タップすると大きく読める
+    $('.newpill', d).addEventListener('click', () => renderFeed(true));
+    $('.feed', d).addEventListener('scroll', onFeedScroll);
+    for (const ev of ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'keydown']) $('.feed', d).addEventListener(ev, () => { feedTouch = performance.now(); }, { passive: true });
+    // 上に戻そうとした時点で、新しいできごとに合わせて送るのをやめる（スクロールが終わるのを待たない）
+    $('.feed', d).addEventListener('wheel', (e) => { if (e.deltaY < 0) { feedFollow = false; feedUp = performance.now(); } }, { passive: true });
+    $('.feed', d).addEventListener('touchmove', () => { feedFollow = false; feedUp = performance.now(); }, { passive: true });
     $('.feed', d).addEventListener('click', (e) => { const it = e.target.closest('.ev, .act, .vote, .sys, .gmline, .ailine'); if (it) zoomView(`<div class="feed">${it.outerHTML}</div>`, 'text'); });
     $('.gmbox', d).addEventListener('click', () => zoomView($('.gmbox', d).innerHTML, 'text'));
     $('[data-zme]', d).addEventListener('click', () => zoomView(`<div class="me">${$('.me', d).innerHTML}</div>`, 'me'));
@@ -405,11 +412,19 @@ function resHtml(res) {
   return `<div class="evres">→ ${[...groups].map(([w, ls]) => `<span>${esc(w)}：${ls.join(' ')}</span>`).join('　')}</div>`;
 }
 
+// ニュースのつながり：きっかけになったニュースと、このあと起きやすくなるニュース
+function linkHtml(f) {
+  const out = [];
+  if (f.from) out.push(`<div class="evfrom">🔗 ${K('きっかけ', 'きっかけ')}：${f.from.year}${K('年', 'ねん')}の「${esc(f.from.name)}」</div>`);
+  const nx = (f.next || []).map(evName).filter(Boolean);
+  if (nx.length) out.push(`<div class="evnext">➜ ${K('このあと起きやすくなる', 'このあと おきやすく なる')}：${nx.map((n) => `「${esc(n)}」`).join('')}</div>`);
+  return out.join('');
+}
 function feedHtml(f) {
   const pri = GM_PRI[settings.gm];
   switch (f.k) {
     case 'gm': return f.pri <= pri ? `<div class="gmline">${esc(f.text)}</div>` : '';
-    case 'event': return `<div class="ev"><b>${NEWS_ICON[f.cat] || '📰'} ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}${resHtml(f.res)}${sitHtml(f.id)}${reactLine(f)}</div>`;
+    case 'event': return `<div class="ev"><b>${NEWS_ICON[f.cat] || '📰'} ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}${resHtml(f.res)}${sitHtml(f.id)}${reactLine(f)}${linkHtml(f)}</div>`;
     case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
@@ -419,10 +434,26 @@ function feedHtml(f) {
     default: return '';
   }
 }
-function renderFeed() {
+// 下まで見ているときだけ、新しいできごとに合わせて下へ送る。読み返しているときは動かさず「▼ 新しいできごと」を出す
+// （高さで判断すると、文字の読みこみで高さが変わったときに「読み返している」とまちがえるので、プレイヤーがスクロールしたかで決める）
+let feedFollow = true, feedTouch = 0, feedUp = 0;
+function renderFeed(force = false) {
   const box = $('.feed', stage);
+  if (force) feedFollow = true;
+  const before = box.childElementCount;
   box.innerHTML = g.feed.map(feedHtml).join('');
-  box.scrollTop = box.scrollHeight;
+  const pill = $('.newpill', stage);
+  if (feedFollow) { box.scrollTop = box.scrollHeight; pill?.classList.remove('on'); }
+  else if (box.childElementCount > before) pill?.classList.add('on');
+}
+function onFeedScroll(e) {
+  const now = performance.now();
+  if (now - feedTouch > 1500) return; // プレイヤーが動かしたスクロールだけを見る（ホイール・指・バー）
+  const b = e.target;
+  const near = b.scrollHeight - b.scrollTop - b.clientHeight < 40;
+  // 上へ戻している最中は、まだ下の近くにいても「読み返し中」のまま（スクロールの途中で送り直さない）
+  if (near && now - feedUp > 500) { feedFollow = true; $('.newpill', stage)?.classList.remove('on'); }
+  else if (!near) feedFollow = false;
 }
 
 function renderRivals() {
@@ -498,7 +529,18 @@ function renderBottom() {
   if (g.phase === 'player') return renderChoices(box);
   if (g.phase === 'yearEnd') return renderYearEnd(box);
   const me = g.majors[g.player];
-  box.innerHTML = `<div class="waiting">${me.panel ? K('各国が政策を選んでいます……', 'ほかの くにが かんがえて いるよ……') : K('あなたの国のパネルはオフです。世界の動きを見守っています……', 'きみの くには おやすみ ちゅう。せかいを みまもろう……')}</div>`;
+  const head = me.panel ? K('各国が政策を選んでいます……', 'ほかの くにが かんがえて いるよ……') : K('あなたの国のパネルはオフです。世界の動きを見守っています……', 'きみの くには おやすみ ちゅう。せかいを みまもろう……');
+  const acts = g.yearActs || [];
+  box.innerHTML = `<div class="turnlog"><div class="tlhead">${head}</div><div class="tlrows">${acts.map((r, i) => actRow(r, i === acts.length - 1)).join('') || `<div class="muted">${K('（まだ動きはありません）', '（まだ なにも ない）')}</div>`}</div></div>`;
+}
+// 今年の各国の動き（1行）
+function actRow(r, isNew = false) {
+  return `<div class="tlrow ${isNew ? 'new' : ''} ${r.id === g.player ? 'mine' : ''}"><span class="who" style="color:${seatColor(g, r.id)}">${esc(nameOf(r.id).replace(/の くに$|の しま$/, ''))}</span><span class="pol">${esc(polName(r.pol))}${r.tgt ? `<span class="muted"> → ${esc(nameOf(r.tgt).replace(/の くに$|の しま$/, ''))}</span>` : ''}</span><span class="tier ${r.tier}">${tierName(r.tier)}</span></div>`;
+}
+// 今年のふりかえり（ニュースと、きみの こたえ）
+function newsRow(f) {
+  const o = f.choice ? OPTION_BY_ID[f.choice] : f.react && f.chosen != null ? REACTIONS[f.react]?.[f.chosen] : null;
+  return `<div class="tlrow news"><span class="who">${NEWS_ICON[f.cat] || '📰'}</span><span class="pol">${esc(f.name)}${f.who ? `<span class="muted">（${esc(nameOf(f.who).replace(/の くに$|の しま$/, ''))}）</span>` : ''}${f.from ? `<span class="muted"> ← 「${esc(f.from.name)}」</span>` : ''}${o ? `<span class="mychoice">✋ ${esc(reactName(o))}</span>` : ''}</span></div>`;
 }
 
 function renderChoices(box) {
@@ -631,10 +673,14 @@ function renderYearEnd(box) {
   const sum = kid()
     ? `<b style="color:var(--text);font-size:17px">${g.year}かいめが おわった（${G.yearLabel(g)}ねん）</b><br>🌏 ちきゅうの げんき ${h.env}（${sign(diff('env'))}）　⚔ せかいの けんか ${h.conflicts}（${sign(diff('conflicts'), true)}）`
     : `<b style="color:var(--text);font-size:15px">${G.yearLabel(g)}年が終わった</b><br>自国の国力 ${me.power}（${sign(diff('power'))}）　GNP成長率 ${fmt(me.growth || 0, 1)}%　地球環境 ${h.env}（${sign(diff('env'))}）　紛争 ${h.conflicts}カ所（${sign(diff('conflicts'), true)}）`;
-  box.innerHTML = `<div class="yearend"><div class="sum">${sum}</div><button class="btn primary" data-next>${K('次の年へ ▶', 'つぎへ ▶')}</button></div>`;
+  // ふりかえり：今年のニュース（きみの こたえ・きっかけ）と、各国の動き。ここで落ち着いて読み返せる
+  const news = g.feed.filter((f) => f.k === 'event');
+  const review = `<div class="review"><div class="rvcol"><h5>📰 ${K('今年のニュース', 'ことしの ニュース')}</h5>${news.map(newsRow).join('') || '<div class="muted">—</div>'}</div>
+    <div class="rvcol"><h5>🗳 ${K('各国の動き', 'みんなの くにの うごき')}</h5>${(g.yearActs || []).map((r) => actRow(r)).join('') || '<div class="muted">—</div>'}</div></div>`;
+  box.innerHTML = `<div class="yearend"><div class="sum">${sum}<div class="row"><button class="btn primary" data-next>${K('次の年へ ▶', 'つぎへ ▶')}</button></div></div>${review}</div>`;
   // 自国が崩壊中は自動で進むので、ボタンは出さない（二重に年が進まないように）
   if (!me.panel) { box.innerHTML = `<div class="waiting">${K('世界の動きを見守っています……', 'せかいを みまもろう……')}</div>`; return; }
-  $('[data-next]', box).addEventListener('click', () => { if (g.phase !== 'yearEnd') return; G.beginYear(g); persist(); renderDash(); run(); });
+  $('[data-next]', box).addEventListener('click', () => { if (g.phase !== 'yearEnd') return; feedFollow = true; G.beginYear(g); persist(); renderDash(); run(); });
 }
 
 // ───── ニュースのカード（Reigns のように めくって、左右に ふって 自国の態度を決める） ─────
@@ -687,9 +733,11 @@ function newsDeck() {
           <div class="nface nfront">
             <div class="ncat"><span>${head}</span><span>${n + 1} / ${total}</span></div>
             <h3>${esc(f.name)}${f.who ? `<small>${esc(nameOf(f.who))}</small>` : ''}</h3>
+            ${f.from ? `<div class="nfrom">🔗 ${K('きっかけ', 'きっかけ')}：${f.from.year}${K('年', 'ねん')}の「${esc(f.from.name)}」</div>` : ''}
             <p class="ntext">${esc(f.text)}</p>
             <div class="nby">— ${esc(K(GM_NAME, KID_GM_NAME))}</div>
             ${resHtml(f.res)}${sitHtml(f.id)}
+            ${(f.next || []).length ? `<div class="nnext">➜ ${K('このあと起きやすくなる', 'このあと おきやすく なる')}：${f.next.map(evName).filter(Boolean).map((n) => `「${esc(n)}」`).join('')}</div>` : ''}
             <div class="nlabel l"></div><div class="nlabel r"></div><div class="nlabel u"></div>
           </div>
         </div></div>`);
@@ -793,8 +841,7 @@ async function run() {
       if (g.phase === 'player') { renderDash(); persist(); return; }
       const r = G.step(g);
       if (r.type === 'ai') {
-        renderFeed(); renderRivals(); renderMap(); renderTop(); renderMe();
-        $('.gmbox', stage).innerHTML = gmBubble(lastGmLine());
+        renderFeed(); renderRivals(); renderMap(); renderTop(); renderMe(); renderBottom();
         await wait(SPEED[settings.speed]);
       } else if (r.type === 'yearEnd') {
         renderDash();
