@@ -331,3 +331,32 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .feed .ev .evreact { margin-top: 4px; font-size: 12.5px; color: #bfe3ff; }
 .feed .ev .evreact b { display: inline; color: #fff; font-size: inherit; }
 .feed .ev .evreact .evres { display: inline-flex; margin: 0 0 0 8px; }
+
+/* ───── 補佐官（国民の気持ち） ───── */
+.moodrow { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 6px 0 2px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.moodrow .mface { font-size: 22px; }
+.moodrow b { color: var(--text); font-size: 14px; }
+.kid .moodrow { font-size: 15px; } .kid .moodrow b { font-size: 16px; }
+.secnote { font-size: 12.5px; line-height: 1.55; color: #f3d9e6; background: #2a1f2c; border: 1px solid #5a3a55; border-radius: 8px; padding: 6px 9px; margin: 4px 0 8px; }
+.kid .secnote { font-size: 14px; }
+.feed .secline { font-size: 12.5px; color: #f3d9e6; background: #2a1f2c; border-left: 3px solid #d07ab0; border-radius: 6px; padding: 5px 9px; }
+.feed .secline b { margin-right: 6px; color: #f0a8d4; }
+.gm.sec .face { background: #4a2a44; border-color: #d07ab0; font-size: 22px; }
+.gm.sec .bubble { background: #f6e3ef; }
+.news-last .gm.sec { max-width: 620px; margin: 6px auto 0; text-align: left; }
+
+/* ───── 世界議会の議題 ───── */
+.modal.vote { width: 860px; }
+.agendas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.agenda { text-align: left; background: var(--panel2); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; transition: border-color .15s, transform .08s; }
+.agenda:hover { border-color: var(--gold); } .agenda:active { transform: scale(.98); }
+.agenda b { font-size: 16.5px; line-height: 1.4; }
+.agenda .from { font-size: 12.5px; color: #ffcc80; }
+.agenda .lose { font-size: 12.5px; color: var(--muted); }
+.agenda .mine { font-size: 13px; font-weight: 700; }
+.agenda .mine.lose { color: var(--red); } .agenda .mine.gain { color: var(--green); }
+.agenda .est { font-size: 13px; color: var(--text); }
+.kid .agenda b { font-size: 18px; } .kid .agenda .from, .kid .agenda .lose, .kid .agenda .mine, .kid .agenda .est { font-size: 14.5px; }
+.voteest { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0; font-size: 13.5px; }
+.voteest span { background: var(--panel2); border-radius: 999px; padding: 4px 12px; }
+.moodrow > * { white-space: nowrap; }

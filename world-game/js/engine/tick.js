@@ -1,4 +1,5 @@
 // 年末の処理：経済・社会・資源・環境の変化（数値は仮置き。tools/sim.mjs で調整する）
+import { getMood } from './secretary.js';
 import { clamp } from '../util.js';
 import { power, rel } from './core.js';
 import { BASE } from '../data/policies.js';
@@ -6,6 +7,8 @@ import { BASE } from '../data/policies.js';
 const rev = (v, to, k) => v + (to - v) * k;
 export const KID_TUNE = { co2: 0.15, forest: 0.2, stab: 5 };
 
+// 国民の気持ちが政情の落ち着く先に効く強さ（気持ち 80 で +3.6、20 で −3.6）
+export const MOOD_STAB = 0.12;
 export function tickMajor(g, c, H) {
   const s = c.stats, w = g.world;
   const off = !c.panel;
@@ -42,7 +45,8 @@ export function tickMajor(g, c, H) {
   if (s.water < 20) { short += (20 - s.water) / 2; popShort += (20 - s.water) / 10; }
   short *= imp; popShort *= imp;
   const natural = (g.kid ? -KID_TUNE.stab : 0) + 50 + (s.security - 50) * 0.35 - (s.inequality - 50) * 0.3 - (s.ethnic - 50) * 0.25 - s.guerrilla * 0.2
-    + growth * 1.5 - short + (s.rep - 50) * 0.05 + 18;
+    + growth * 1.5 - short + (s.rep - 50) * 0.05 + 18
+    + (getMood(c) - 50) * MOOD_STAB; // 国民の気持ち（短絡的で自国優先）
   s.stability = clamp(rev(s.stability, natural, 0.2), 0, 100);
 
   const pg = (100 - s.literacy) / 25 + 0.3 - popShort;

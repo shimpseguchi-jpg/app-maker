@@ -1,7 +1,7 @@
 // バランス調整：AI が自国も操作して何百回も遊び、結末の割合や国ごとの成績を出す
 // 使い方：node tools/sim.mjs [回数]   （V=1 で1ゲームの年表を表示）
 import * as G from '../js/engine/game.js';
-import { choosePolicy } from '../js/engine/ai.js';
+import { choosePolicy, voteChance } from '../js/engine/ai.js';
 import { BASE } from '../js/data/policies.js';
 import { makeRng } from '../js/util.js';
 
@@ -12,6 +12,8 @@ const KID = !!process.env.KID; // 1ねんせいモード（20かい）
 const rng = makeRng(12345);
 const PERS = ['tech', 'edu', 'trade', 'order', 'finance', 'ambition'];
 
+// 世界議会：賛成の見込みがいちばん高い議題を出す（ふつうのプレイヤーのつもり）
+const bestAgenda = (g, opts) => opts.map((a) => [a, g.seats.filter((id) => id !== g.player && g.majors[id].panel).reduce((m, id) => Math.min(m, voteChance(g, g.majors[id], a)), 100)]).sort((x, y) => y[1] - x[1])[0][0];
 function playOne(i) {
   const seed = 'SIM' + i;
   const g = G.newGame(seed, { diceSeed: 1000 + i, kid: KID });
@@ -23,7 +25,7 @@ function playOne(i) {
   while (!g.result && guard++ < 5000) {
     if (g.pending) {
       const p = g.pending;
-      G.resolvePending(g, p.type === 'nuke' ? (rng() < 0.05 ? 'fire' : 'hold') : p.type === 'vote' ? p.options[0] : p.options[0]);
+      G.resolvePending(g, p.type === 'nuke' ? (rng() < 0.05 ? 'fire' : 'hold') : p.type === 'vote' ? bestAgenda(g, p.options) : p.options[0]);
       continue;
     }
     if (g.phase === 'yearEnd') { G.beginYear(g); g.feed.forEach((f, i) => { if (f.react) G.reactNews(g, i, rng() < 0.5 ? 0 : 1); }); continue; }

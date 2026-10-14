@@ -71,5 +71,24 @@ for (const [k, pair] of Object.entries(REACTIONS)) {
   for (const o of pair) { const kt = KID.kidFx(o.fx).join(' '); ok(/↑/.test(kt) && /↓/.test(kt), `反応 ${k}「${o.k}」は 1ねんせいの ひょうじでも とくと そんが ある：${kt}`); ok(o.n && o.k && !/[一-龯々ァ-ヺ]/.test(o.k), `反応 ${k} の名前`); for (const f of o.fx) ok(/^(self|who|world|poorBg|rel)\.\w+[+-][sml]$/.test(f), `反応 ${k} の効果 ${f}`); }
 }
 
+// 補佐官のせりふ：おとな・1ねんせいがそろっているか、1ねんせいは ひらがなで かいて あるか
+const SEC = await import('../js/data/secretary.js');
+for (const tbl of ['SEC_REACT', 'SEC_DANGER', 'SEC_MOOD']) for (const [k, v] of Object.entries(SEC[tbl])) ok(v.length === 2 && v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 ${tbl}.${k}`);
+for (const [k, list] of Object.entries(SEC.SEC_POP)) for (const v of list) ok(v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 SEC_POP.${k}`);
+for (const k of SEC.SEC_DANGER_ORDER) ok(SEC.SEC_DANGER[k], `補佐官 注意 ${k}`);
+for (const pair of Object.values(REACTIONS)) for (const o of pair) ok(Number.isInteger(o.pop), `反応「${o.n}」に国民の気持ち（pop）`);
+// 世界議会の議題
+const { AGENDAS: AG } = await import('../js/data/agendas.js');
+const cats = new Set(EVENTS.map((e) => e.cat));
+for (const [k, a] of Object.entries(AG)) {
+  ok(a.name && a.kid && !/[一-龯々ァ-ヺ]/.test(a.kid) && a.who?.length === 2 && typeof a.lose === 'function' && typeof a.gain === 'function', `議題 ${k}`);
+  ok(a.cats.every((c) => cats.has(c)), `議題 ${k} のニュースの種類`);
+}
+const gv = newGame('VOTE1');
+for (let y = 0; y < 30; y++) gv.fired['E' + String(y + 1).padStart(2, '0')] = y;
+gv.year = 30;
+const ao = (await import('../js/engine/game.js')).agendaOptions(gv);
+ok(ao.options.length === 3 && new Set(ao.options).size === 3, '議題の候補は3つ（重なりなし）');
+
 console.log(fail ? `${fail} 件の問題` : 'すべて OK');
 process.exit(fail ? 1 : 0);

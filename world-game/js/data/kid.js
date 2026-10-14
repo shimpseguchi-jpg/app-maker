@@ -70,7 +70,7 @@ export const KID_COUNTRY = {
 export const KID_PERSONA = { tech: 'ぎじゅつの くに', edu: 'べんきょうの くに', trade: 'ぼうえきの くに', order: 'つよい ぐんたいの くに', finance: 'おかねもちの くに', ambition: 'やるきまんまんの くに' };
 export const KID_CATS = { eco: 'おかね', edu: 'べんきょう', res: 'しげん', fw: 'たべもの・みず', dom: 'くらし', dip: 'ほかの くに', mil: 'ぐんたい', intl: 'せかいの あつまり' };
 export const KID_STAGES = ['こくれん', 'こくれんが なくなる', 'せかいせいふの じゅんび', 'せかいの せんきょ', 'せかいの ぎかい'];
-export const KID_AGENDAS = { water: 'みずを だれでも のめるように する', nukes: 'かくへいきを ぜんぶ なくす', trade: 'くにの あいだの ぜいきんを なくす', climate: 'ちきゅうを あたためる けむりを みんなで へらす', refugees: 'にげてきた ひとを みんなで うけいれる' };
+export { KID_AGENDAS } from './agendas.js';
 export const KID_ENDINGS = { clear: 'せかいが ひとつに なった', nuke: 'かくせんそう', env: 'ちきゅうが こわれた', conquest: 'ひとつの くにが せかいを のっとった', annexed: 'じぶんの くにが なくなった', timeup: 'じかん ぎれ' };
 export const KID_TIERS = { crit: 'だいせいこう', ok: 'せいこう', partial: 'すこし せいこう', ng: 'しっぱい', fumble: 'だいしっぱい' };
 
@@ -304,6 +304,7 @@ export const KID_GM = {
   'spark.outbreak': ['{name}の {what}は、もう ひとつの くにの もんだいでは なく なった。ちいさな ひを ほうって おくと、こう なる。'],
   'nuke.hold': ['うたなかったか。それが ほんとうの つよさだ。'],
   'vote.fail': ['ぜんいんの さんせいには とどかなかった。でも ここまで きた ことに いみが ある。また つぎだ。'],
+  'vote.reject': ['じぶんで だした ぎだいに、じぶんで はんたい したね。くにの みんなの かおが うかんだのかな。また つぎに えらびなおせるぞ。'],
   'rename': ['{old}は きょうから {name}だ。なまえが かわっても、くにの ひとは おなじだがね。'],
   'annex': ['{who}が {name}に とられて しまった。'],
   'clear': ['おめでとう。せかいが ひとつに なった。これは ほんとうに おこりうる ことなんだ。'],

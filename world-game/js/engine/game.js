@@ -1,5 +1,6 @@
 // ゲームの進行：世界の生成 → 基本政策 → 毎年（イベント → 各国の手番 → 年末処理）→ 終了
 import { REACTIONS } from '../data/reactions.js';
+import { secAfterReact, secYearEnd, secBack, addMood, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
 import { MAJORS, BACKS, REGIONS } from '../data/countries.js';
 import { POLICIES, POLICY_LIST, BASE, targetsFor } from '../data/policies.js';
@@ -8,6 +9,7 @@ import { GM, AI_LINES } from '../data/gm.js';
 import { registerBases, neighbors, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active } from './core.js';
 import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
+import { AGENDA_BASE, AGENDA_LOSE_FX, AGENDA_GAIN_FX } from '../data/agendas.js';
 import { tickMajor, tickBack, tickWorld, envIndex, bankruptCount } from './tick.js';
 import { SPARKS, startSpark, sparkEffect, tickSparks } from './sparks.js';
 import { SITUATIONS } from '../data/situations.js';
@@ -121,6 +123,8 @@ export function say(g, tag, vars = {}, extra = {}) {
   g.feed.push({ k: 'gm', pri: def.pri, text: fill(def.lines[i], { year: yearLabel(g), ...vars }), ...extra });
 }
 const gmText = (g, text, pri = 1) => g.feed.push({ k: 'gm', pri, text });
+// 補佐官のせりふ（ニュースの欄に出し、自国の欄にいちばん新しいものを出す）
+const secSay = (g, text) => { if (!text) return; g.feed.push({ k: 'sec', text }); g.lastSec = { text, year: g.year }; };
 const chron = (g, text) => g.chron.push({ year: yearLabel(g), text });
 // sparks.js が年なしで積んだ年表に年を入れる
 function fixChronYears(g) { for (const c of g.chron) if (c.year == null) c.year = yearLabel(g); }
@@ -334,6 +338,10 @@ export function reactNews(g, i, side) {
   applyFx(g, opt.fx, { self: g.player, who: e.who, tgt: e.who }, evScale(g), changes);
   e.chosen = side;
   e.rres = summarizeChanges(g, changes);
+  // 補佐官が「街の声」を伝える
+  if (opt.pop) addMood(g.majors[g.player], opt.pop * 2);
+  e.sec = secAfterReact(g, e.rres, opt.pop);
+  g.lastSec = { text: e.sec, year: g.year };
   return e;
 }
 
@@ -405,36 +413,66 @@ function nukeCrisis(g, H) {
 }
 
 // ───── 世界議会の投票 ─────
-function agendaOptions(g) {
-  const list = [];
-  if (g.flags.waterLawWorld != null || Object.values(g.majors).some((c) => c.laws?.water)) list.push('water');
-  list.push('climate', 'nukes', 'trade', 'refugees');
-  return list.slice(0, 3);
+// 世界議会の議題の候補：それまでに起きたニュースの種類に関係するものほど上に（最近のものほど重い）。前に否決された議題は出にくい
+export function agendaOptions(g) {
+  const rng = rngOf(g);
+  const fired = Object.entries(g.fired).sort((a, b) => b[1] - a[1]);
+  const score = {}, why = {};
+  for (const [k, a] of Object.entries(AGENDAS)) {
+    let sc = AGENDA_BASE.includes(k) ? 0.5 : 0;
+    const evs = [];
+    for (const [eid, yr] of fired) {
+      const e = EVENT_BY_ID[eid];
+      if (!e || !a.cats.includes(e.cat)) continue;
+      sc += 1 + Math.max(0, 10 - (g.year - yr)) / 5;
+      if (evs.length < 2) evs.push(eid);
+    }
+    if (k === 'water' && (g.flags.waterLawWorld != null || Object.values(g.majors).some((c) => c.laws?.water))) sc += 3;
+    if (k === 'climate' && g.world.co2 >= 65) sc += 2;
+    if (k === 'nukes' && g.seats.some((id) => g.majors[id].stats.nuke >= 4)) sc += 2;
+    if (k === 'polar' && g.flags.polarOil != null) sc += 2;
+    sc -= 3 * (g.agendaTried || []).filter((x) => x === k).length;
+    score[k] = sc + rng() * 1.5;
+    why[k] = evs;
+  }
+  const options = Object.keys(AGENDAS).sort((a, b) => score[b] - score[a]).slice(0, 3);
+  return { options, why: Object.fromEntries(options.map((k) => [k, why[k]])) };
 }
 function startVote(g, H) {
   const pl = g.majors[g.player];
-  const options = agendaOptions(g);
-  if (pl.panel) { queuePending(g, { type: 'vote', options }); return; }
+  const { options, why } = agendaOptions(g);
+  if (pl.panel) { queuePending(g, { type: 'vote', options, why }); return; }
   runVote(g, options[0]);
 }
-export function runVote(g, agenda) {
+// playerYes：プレイヤーの票（反対すると否決。議題は来年また選び直し）
+export function runVote(g, agenda, playerYes = true) {
   const rng = rngOf(g);
   const votes = [];
   for (const id of g.seats) {
     const c = g.majors[id];
     if (!c.panel) continue;
-    if (c.player) { votes.push({ id, yes: true, p: 100 }); continue; }
+    if (c.player) { votes.push({ id, yes: !!playerYes, p: 100 }); continue; }
     votes.push({ id, ...voteYes(g, c, agenda, rng) });
   }
   const all = votes.every((v) => v.yes);
-  g.feed.push({ k: 'vote', agenda, name: g.kid ? KID_AGENDAS[agenda] : AGENDAS[agenda].name, votes });
+  const a = AGENDAS[agenda];
+  g.feed.push({ k: 'vote', agenda, name: g.kid ? a.kid : a.name, votes });
   if (all) {
-    chron(g, J(g, `世界議会、最初の議題「${AGENDAS[agenda].name}」を全会一致で可決`, `せかいの ぎかいで「${KID_AGENDAS[agenda]}」が ぜんいん さんせいで きまった`));
+    // 可決：損をする国・得をする国の国力が動く（点数に響く）
+    for (const id of g.seats) {
+      const c = g.majors[id];
+      if (!c.panel) continue;
+      if (a.lose(c)) applyFx(g, AGENDA_LOSE_FX, { self: id });
+      else if (a.gain(c)) applyFx(g, AGENDA_GAIN_FX, { self: id });
+      c.power = power(c);
+    }
+    chron(g, J(g, `世界議会、最初の議題「${a.name}」を全会一致で可決`, `せかいの ぎかいで「${a.kid}」が ぜんいん さんせいで きまった`));
     g.clearAgenda = agenda;
     endGame(g, 'clear');
   } else {
     g.voteTries = (g.voteTries || 0) + 1;
-    say(g, 'vote.fail');
+    (g.agendaTried ||= []).push(agenda);
+    say(g, playerYes ? 'vote.fail' : 'vote.reject');
   }
 }
 
@@ -459,7 +497,10 @@ export function resolvePending(g, choice) {
       const pUse = (foe.persona === 'ambition' ? 0.15 : 0.04);
       if (rng() < pUse) { g.feed.push({ k: 'sys', cls: 'bad', text: J(g, `だが、${foe.name}が核のボタンを押した。`, `でも、${foe.name}が ぼたんを おして しまった。`) }); endGame(g, 'nuke'); }
     }
-  } else if (p.type === 'vote') runVote(g, choice);
+  } else if (p.type === 'vote') {
+    if (choice && typeof choice === 'object') runVote(g, choice.agenda, choice.yes);
+    else runVote(g, choice || p.options[0]);
+  }
   else if (p.type === 'rename') { if (choice) doRename(g, p.id, choice); }
   if (g.pendingQueue?.length && !g.result) g.pending = g.pendingQueue.shift();
   g.phase = g.result ? 'over' : g.pending ? 'pending' : g.phase === 'pending' ? (g.resumePhase || 'turns') : g.phase;
@@ -539,6 +580,7 @@ export function playerAct(g, polId, tgt) {
   else if (polId === 'P63') say(g, 'player.war');
   else if ((pol.tags || []).includes('selfish')) say(g, 'player.selfish');
   else if ((pol.tags || []).includes('coop')) say(g, 'player.coop');
+  secSay(g, secPolicy(g, rec.moodD));
   if (g.pending && !g.result) { g.resumePhase = 'turns'; g.phase = 'pending'; }
   else g.phase = g.result ? 'over' : 'turns';
   return rec;
@@ -570,7 +612,8 @@ export function act(g, id, polId, tgt) {
   if (succ && polId === 'P54') g.counters.sanction = (g.counters.sanction || 0) + 1;
   if (c.stats.nuke >= 4 && changes.some((x) => x.stat === 'nuke')) { g.flags.newNuke = g.year; g.newNukeId = id; chron(g, J(g, `${c.name}、核兵器を保有`, `${c.name}が かくへいきを もった`)); }
   c.power = power(c);
-  const rec = { k: 'act', id, pol: polId, tgt, p: pr.p, crit: pr.crit, roll, tier, changes, spark: spk, year: g.year };
+  const moodD = moodFromPolicy(c, pol.tags);
+  const rec = { k: 'act', id, pol: polId, tgt, p: pr.p, crit: pr.crit, roll, tier, changes, spark: spk, year: g.year, moodD };
   c.lastAct = rec;
   g.feed.push(rec);
   g.yearActs.push(rec);
@@ -625,6 +668,8 @@ export function endYear(g) {
   if (g.world.tension >= 75 && !g.flags.tensionWarned) { say(g, 'world.tension'); g.flags.tensionWarned = g.year; }
   if (g.world.tension < 60) delete g.flags.tensionWarned;
   g.cal = (g.cal ?? g.year - 1) + n;
+  for (const id of g.seats) if (g.majors[id].panel) moodYearEnd(g.majors[id]);
+  secSay(g, secYearEnd(g));
   checkEnd(g);
   if (!g.result) g.phase = 'yearEnd';
 }
@@ -636,6 +681,7 @@ function recover(g, id) {
   c.stats.guerrilla = Math.max(0, c.stats.guerrilla - 15);
   chron(g, J(g, `${c.name}に新元首、国政に復帰`, `${c.name}に あたらしい だいひょうが きまった`));
   say(g, 'recovered', { name: c.name });
+  if (id === g.player) { secSay(g, secBack(g)); c.secSkip = g.year; }
   if (rngOf(g)() < 0.5) rename(g, id, 'recover');
 }
 

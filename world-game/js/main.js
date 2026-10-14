@@ -8,12 +8,17 @@ import { STAT_INFO, STAT_CATS, NUKE_STAGES } from './data/countries.js';
 import { GM_NAME } from './data/gm.js';
 import { describeFx, STAT_JA } from './engine/effects.js';
 import { probability, TIER, rel, allied, C, isSeat, activeSituations } from './engine/core.js';
-import { PERSONAS, AGENDAS } from './engine/ai.js';
+import { PERSONAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
 import { SPARKS } from './engine/sparks.js';
 import { REACTIONS, NEWS_ICON, NEWS_CAT } from './data/reactions.js';
+import { EVENT_BY_ID } from './data/events.js';
+import { SEC_NAME, moodFace, MOOD_WORD } from './data/secretary.js';
+import { AGENDAS } from './data/agendas.js';
+import { getMood } from './engine/secretary.js';
+import { voteChance } from './engine/ai.js';
 import {
-  KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
+  KID_EVENT, KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
   KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF, KID_WORLD, KID_BAD,
 } from './data/kid.js';
 
@@ -76,7 +81,23 @@ const personaName = (p) => (kid() ? KID_PERSONA[p] : PERSONAS[p].name);
 const baseName = (b) => (kid() ? KID_BASE[b][0] : BASE[b].name);
 const sparkName = (t) => (kid() ? KID_SPARK[t][0] : SPARKS[t].name);
 const stageNames = () => (kid() ? KID_STAGES : G.STAGES);
-const agendaName = (a) => (kid() ? KID_AGENDAS[a] : AGENDAS[a].name);
+const agendaName = (a) => (kid() ? AGENDAS[a].kid : AGENDAS[a].name);
+// 補佐官（国民の気持ちを伝える）
+const secName = () => SEC_NAME[kid() ? 1 : 0];
+const secBubble = (text) => `<div class="gm sec"><div class="face">👩‍💼</div><div class="bubble"><b class="name">${esc(secName())}</b>${esc(text)}</div></div>`;
+const moodWord = (m) => MOOD_WORD.find(([v]) => m >= v)[1][kid() ? 1 : 0];
+function moodHelp() {
+  const c = g.majors[g.player];
+  modal(`<h2>${moodFace(getMood(c))} ${K('国民の気持ち', 'みんなの きもち')}</h2>
+    ${secBubble(K('国民はわかりやすいんです。自分の国を優先すれば喜び、よその国を助ければ、たとえ正しくても文句を言います。気持ちが沈むと政情が不安定になり、明るいと落ち着きます。暮らし（政情・治安・食べもの・水・貧富の差）がよければ、少しずつ機嫌も直ります。', 'くにの みんなは とても わかりやすいの。じぶんの くにを たいせつに すると よろこんで、よその くにを たすけると、いい ことでも ぷんぷん するの。きもちが くらいと くにが ぐらぐら して、あかるいと おちつくよ。くらしが よく なると、すこしずつ きげんも なおるよ。'))}
+    <div class="row"><button class="btn primary" data-close>${K('とじる', 'とじる')}</button></div>`);
+}
+function moodRow(c) {
+  const m = getMood(c);
+  const last = g.lastSec?.text;
+  return `<div class="moodrow" data-mood><span class="mface">${moodFace(m)}</span><span>${K('国民の気持ち', 'みんなの きもち')}</span><b>${esc(moodWord(m))}</b>${K(`<small class="muted">${m}</small>`, '')}</div>
+    ${last ? `<div class="secnote">👩‍💼 ${esc(last)}</div>` : ''}`;
+}
 
 // ───── タイトル ─────
 function titleScreen() {
@@ -119,6 +140,7 @@ function howTo() {
     <div class="howto">
     <p>きみは ある くにの だいひょうです。まいかい、した に でる かーどから ひとつ えらびます。</p>
     <p>かーどには「でめが 〇〇 いかなら せいこう」と かいて あります。1から100の だいすを ふって、でめが その かず いかなら せいこう。とても ちいさい かずが でたら だいせいこう です。</p>
+    <p>👩‍💼 <b>ひしょの リンさん</b>：くにの みんなの きもちを おしえて くれます。みんなは じぶんの くにが だいすき。よその くにを たすけると ぷんぷん します。</p>
     <p>📰 <b>にゅーす</b>：まいかい はじめに、せかいの にゅーすが かーどで でて きます。さわって めくって よもう。かーどを みぎか ひだりに うごかして、きみの くにの こたえを えらびます。どちらにも いい ことと こまる ことが あります。</p>
     <p>ほかの 5つの くにも、それぞれ かーどを えらびます。ある くにが とくを すると、べつの くにが こまる ことも あります。</p>
     <p>🔥 <b>ひだね</b>：ときどき、ある くにで びょうきや けんかの「ひだね」が おきます。みんなで ただしく たすければ おさまります。まちがえたり ほうって おくと、せかいじゅうに ひろがります。どれが ただしいかは かいて ありません。みったーまいやーの ことばを よく きこう。</p>
@@ -131,10 +153,11 @@ function howTo() {
   <div style="font-size:14px;line-height:1.8">
   <p>あなたは架空の国の元首です。1年に1回、パネルに出た政策から1つを選びます。どの政策にも<b>成功確率</b>が表示され、<b>100面ダイス</b>で判定します。出目が確率以下なら成功、確率の1/10以下なら大成功です。</p>
   <p>ほかの5カ国は性格の違うAI元首です。ある国の成功が、別の国の破綻を生むこともあります。毎年、世界にはイベントが起き、GM（${GM_NAME}）が「さて、どうする？」と迫ります。</p>
+  <p><b>補佐官と国民の気持ち</b>：補佐官のリンが、自国の国民の気持ちを伝えます。国民は短絡的で自国優先です。よその国を助けると、たとえ正しくても不満が出て、気持ちが沈むと政情が揺らぎます。</p>
   <p><b>ニュースのカード</b>：毎年のはじめ、世界のニュースがカードで1枚ずつ届きます。タップしてめくり、多くのニュースではカードを左右にスワイプして自国の態度を2択で決めます。どちらにも得と損があります。</p>
   <p><b>火種</b>：ときどき、ある一国で感染症・銀行破綻・飢饉・内戦などの「火種」が起きます。右上の欄に場所と種類が出ますが、深刻度と、いつ世界に広がるか（期限）は知らされません。様子は毎年の GM の言葉から推し量ってください。各国が正しい支援をすれば封じ込められ（協調の成功例になります）、まちがった対応や放置だと世界規模に広がります。どの支援が正しいかはカードに書かれていません。GM のヒントと、現実の知識で見抜いてください。</p>
   <p><b>ゲームオーバー</b>：核戦争／地球環境の破綻（環境が${G.ENV_LIMIT}以下）／一国による世界征服。自国が崩壊するとパネルがオフになり、数年後に復帰できることがあります。</p>
-  <p><b>クリア</b>：国際機関を「国連 → 国連の解体 → 世界政府準備委員会 → 世界総選挙 → 世界議会」と進め、世界議会の最初の議題を全会一致で可決すること。協調の成功例を3つ積み重ねれば、国連の解体を経ずに準備委員会へ進めます。50年でタイムアップです。</p>
+  <p><b>クリア</b>：国際機関を「国連 → 国連の解体 → 世界政府準備委員会 → 世界総選挙 → 世界議会」と進め、世界議会の最初の議題を全会一致で可決すること。議題は、それまでに起きたニュースに関係する3つの候補から選びます。協調の成功例を3つ積み重ねれば、国連の解体を経ずに準備委員会へ進めます。50年でタイムアップです。</p>
   </div><div class="row"><button class="btn primary" data-close>とじる</button></div>`);
 }
 
@@ -310,8 +333,9 @@ function renderMe() {
       <div class="name">${flagSvg(c.flag, 30, 20)}<span>${esc(c.name)}</span></div>
       <div class="sub">やりかた：${c.bases.map((b) => esc(baseName(b))).join('、')}</div>
       <div class="sub">てを くんだ くに：${allies.length ? allies.map((x) => esc(nameOf(x))).join('、') : 'まだ ない'}</div>
-      ${c.panel ? '' : '<div class="offline">きみの くには たおれて しまった。しばらく おやすみ。ほかの くにが たすけて くれると、はやく もどれる。</div>'}
+      ${c.panel ? moodRow(c) : '<div class="offline">きみの くには たおれて しまった。しばらく おやすみ。ほかの くにが たすけて くれると、はやく もどれる。</div>'}
       ${kidBars(c)}`;
+    $('[data-mood]', stage)?.addEventListener('click', moodHelp);
     return;
   }
   const groups = {};
@@ -321,6 +345,7 @@ function renderMe() {
     <div class="sub">基本政策：${c.bases.map((b) => BASE[b].name).join('・')}</div>
     <div class="sub">国力 <b style="color:var(--gold)">${c.power}</b>　提携 ${allies.length ? allies.map(nameOf).join('・') : 'なし'}${g.bloc.includes(c.id) ? '　経済圏' : ''}</div>
     <div class="powerbar"><i style="width:${c.power}%"></i></div>
+    ${c.panel ? moodRow(c) : ''}
     ${c.panel ? '' : `<div class="offline">パネルがオフです（${G.START_YEAR + c.collapsedYear - 1}年に崩壊）。3年たつと毎年、新政権が立つかを判定します。他国の支援で早まります。</div>`}
     <div class="stats">${STAT_CATS.filter((cat) => groups[cat]).map((cat) => {
       const ks = groups[cat];
@@ -330,6 +355,7 @@ function renderMe() {
         ${ks.map((k) => `<div class="stat ${isDanger(c, k) ? 'danger' : ''}"><span>${STAT_INFO[k].name}</span><b>${statText(c, k)}${STAT_INFO[k].unit && k !== 'nuke' ? `<small class="muted"> ${STAT_INFO[k].unit}</small>` : ''}</b></div>`).join('')}</details>`;
     }).join('')}</div>`;
   $$('details', $('.me', stage)).forEach((d) => d.addEventListener('toggle', () => { ui.open[d.dataset.cat] = d.open; }));
+  $('[data-mood]', stage)?.addEventListener('click', moodHelp);
 }
 
 function renderMap() {
@@ -379,6 +405,7 @@ function feedHtml(f) {
     case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
+    case 'sec': return `<div class="secline">👩‍💼 <b>${esc(secName())}</b>${esc(f.text)}</div>`;
     case 'spark': return `<div class="ev spark"><b>${SPARKS[f.type].icon} ${K('火種', 'ひだね')}：${esc(nameOf(f.where))}${K('で', 'で ')}${esc(sparkName(f.type))}</b>${esc(kid() ? KID_SPARK[f.type][1] : SPARKS[f.type].hint)}</div>`;
     case 'vote': return `<div class="vote"><b>${K('世界議会の投票', 'せかいの ぎかいの きめごと')}：「${esc(f.name)}」</b><br>${f.votes.map((v) => `${esc(nameOf(v.id))} ${v.yes ? `<span class="good">${K('賛成', 'さんせい')}</span>` : `<span class="bad">${K('反対', 'はんたい')}</span>`}`).join('　')}</div>`;
     default: return '';
@@ -686,7 +713,7 @@ function newsDeck() {
       f.seen = true;
       if (side >= 0 && f.react) {
         G.reactNews(g, i, side);
-        last.innerHTML = reactLine(f);
+        last.innerHTML = reactLine(f) + (f.sec ? secBubble(f.sec) : '');
       }
       card.classList.add(side === 0 ? 'out-l' : 'out-r');
       ctl.innerHTML = '';
@@ -774,10 +801,7 @@ function handlePending() {
       $('[data-fire]', m).addEventListener('click', () => { m.remove(); G.resolvePending(g, 'fire'); resolve(); });
       $('[data-hold]', m).addEventListener('click', () => { m.remove(); G.resolvePending(g, 'hold'); resolve(); });
     } else if (p.type === 'vote') {
-      const m = modal(`<h2>${K('世界議会：最初の議題', 'せかいの ぎかい：はじめての きめごと')}</h2>
-        ${gmBubble(K('こぎ着けたな。世界議会の最初の議題を選びたまえ。全会一致で可決されれば、世界は統一的に運営される。', 'ここまで きたな。せかいの ぎかいで きめる ことを えらびなさい。ぜんいんが さんせいしたら、せかいは ひとつに なる。'))}
-        <div class="opts">${p.options.map((a) => `<button class="opt" data-a="${a}">${esc(agendaName(a))}</button>`).join('')}</div>`);
-      $$('[data-a]', m).forEach((b) => b.addEventListener('click', () => { m.remove(); G.resolvePending(g, b.dataset.a); renderFeed(); resolve(); }));
+      voteFlow(p).then((choice) => { G.resolvePending(g, choice); renderFeed(); resolve(); });
     } else if (p.type === 'rename') {
       const c = g.majors[p.id];
       const m = modal(`<h2>${K('国号を改める', 'くにの なまえを かえる')}</h2>
@@ -785,6 +809,57 @@ function handlePending() {
         <div class="opts">${p.options.map((n) => `<button class="opt" data-n="${esc(n)}">${esc(n)}</button>`).join('')}<button class="opt" data-n="">${K('いまの国名のままにする', 'いまの なまえの まま')}</button></div>`);
       $$('[data-n]', m).forEach((b) => b.addEventListener('click', () => { m.remove(); G.resolvePending(g, b.dataset.n || null); resolve(); }));
     } else { G.resolvePending(g, null); resolve(); }
+  });
+}
+
+// 世界議会：3つの候補から議題を選ぶ → 自国の賛成・反対を決める
+const evName = (id) => (kid() ? KID_EVENT[id]?.[0] : EVENT_BY_ID[id]?.name) || '';
+function agendaInfo(a) {
+  const ag = AGENDAS[a];
+  const me = g.majors[g.player];
+  const others = g.seats.filter((id) => id !== g.player && g.majors[id].panel);
+  const est = others.map((id) => ({ id, p: voteChance(g, g.majors[id], a) }));
+  const losers = g.seats.filter((id) => g.majors[id].panel && ag.lose(g.majors[id]));
+  const mine = ag.lose(me) ? 'lose' : ag.gain(me) ? 'gain' : 'even';
+  return { ag, est, likely: est.filter((x) => x.p >= 50).length, n: others.length, losers, mine };
+}
+const MINE_TXT = { lose: ['損をする（国力↓）', 'そんを する'], gain: ['得をする（国力↑）', 'とくを する'], even: ['ほとんど変わらない', 'あまり かわらない'] };
+function voteFlow(p) {
+  return new Promise((done) => {
+    const pickStep = () => {
+      const cards = p.options.map((a) => {
+        const x = agendaInfo(a);
+        const why = (p.why?.[a] || []).map(evName).filter(Boolean);
+        return `<button class="agenda" data-a="${a}">
+          <b>${esc(agendaName(a))}</b>
+          ${why.length ? `<div class="from">📰 ${K('きっかけ', 'きっかけ')}：${why.map((w) => `「${esc(w)}」`).join('')}</div>` : ''}
+          <div class="lose">${K('損をする国', 'そんを する くに')}：${esc(x.ag.who[kid() ? 1 : 0])}${x.losers.length ? `（${x.losers.map((id) => esc(nameOf(id).replace(/の くに$|の しま$/, ''))).join(K('・', '、'))}）` : K('（いまは なし）', '（いまは ない）')}</div>
+          <div class="mine ${x.mine}">${K('あなたの国', 'きみの くに')}：${MINE_TXT[x.mine][kid() ? 1 : 0]}</div>
+          <div class="est">${K('賛成しそうな国', 'さんせい しそうな くに')}：${x.likely} / ${x.n}</div>
+        </button>`;
+      }).join('');
+      const m = modal(`<h2>${K('世界議会：最初の議題を選ぶ', 'せかいの ぎかい：はじめの ぎだいを えらぶ')}</h2>
+        ${gmBubble(K('こぎ着けたな。これまでに世界で起きたことから、議題の候補が3つ挙がっている。どれを議会に出す？ 全会一致で可決されれば、世界は統一的に運営される。', 'ここまで きたな。これまで せかいで おきた ことから、ぎだいの こうほが 3つ ある。どれを だす？ ぜんいんが さんせい したら、せかいは ひとつに なる。'))}
+        <div class="agendas">${cards}</div>`, 'vote');
+      $$('[data-a]', m).forEach((b) => b.addEventListener('click', () => { m.remove(); voteStep(b.dataset.a); }));
+    };
+    const voteStep = (a) => {
+      const x = agendaInfo(a);
+      const secTxt = {
+        lose: K('国民は反対しています。「自分たちが損をする約束なんて、とんでもない」と。', 'みんな はんたい して います。「わたしたちが そんを するのは いやだ」って。'),
+        gain: K('国民は賛成です。「うちが得をするなら大歓迎だ」と。', 'みんな さんせい です。「とくを するなら いいね」って。'),
+        even: K('国民の関心は薄いようです。「うちに関係あるの？」と。', 'みんな あまり きょうみが ない みたい です。'),
+      }[x.mine];
+      const m = modal(`<h2>${K('投票', 'とうひょう')}：「${esc(agendaName(a))}」</h2>
+        ${gmBubble(K('議題は出た。あとは各国の票だ。一国でも反対すれば否決になる。あなたの国は、賛成か、反対か。', 'ぎだいが でた。あとは みんなの とうひょうだ。ひとつでも はんたいが あれば だめに なる。きみの くには、さんせい？ はんたい？'))}
+        ${secBubble(secTxt)}
+        <div class="voteest">${x.est.map((e) => `<span>${esc(nameOf(e.id).replace(/の くに$|の しま$/, ''))} <b class="${e.p >= 60 ? 'good' : e.p < 45 ? 'bad' : ''}">${kid() ? (e.p >= 60 ? 'さんせい しそう' : e.p < 45 ? 'はんたい しそう' : 'わからない') : `賛成 ${e.p}%`}</b></span>`).join('')}</div>
+        <div class="row"><button class="btn" data-back>${K('← 議題を選び直す', '← えらびなおす')}</button><button class="btn danger" data-no>${K('反対する', 'はんたい')}</button><button class="btn primary" data-yes>${K('賛成する', 'さんせい')}</button></div>`, 'vote');
+      $('[data-back]', m).addEventListener('click', () => { m.remove(); pickStep(); });
+      $('[data-yes]', m).addEventListener('click', () => { m.remove(); done({ agenda: a, yes: true }); });
+      $('[data-no]', m).addEventListener('click', () => { m.remove(); done({ agenda: a, yes: false }); });
+    };
+    pickStep();
   });
 }
 

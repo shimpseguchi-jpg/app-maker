@@ -69,6 +69,7 @@ for (; t < 4000; t++) {
     if (!shot.has(st)) { shot.add(st); await page.screenshot({ path: `${out}/wg-modal-${shot.size}.png` }); }
     if (await page.$('[data-hold]')) await page.click('[data-hold]');
     else if (await page.$('.modal [data-a]')) await page.click('.modal [data-a]');
+    else if (await page.$('.modal [data-yes]')) await page.click(Math.random() < 0.8 ? '.modal [data-yes]' : '.modal [data-no]');
     else if (await page.$('.modal [data-n]')) await page.click('.modal [data-n]');
     else await page.click('.modal [data-close]');
   } else if (st === 'player') {

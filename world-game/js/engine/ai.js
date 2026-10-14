@@ -1,4 +1,5 @@
 // AI 元首：性格ごとの重みで政策と対象を選ぶ（POLICIES_EVENTS.md 5 章）
+import { AGENDAS } from '../data/agendas.js';
 import { POLICIES } from '../data/policies.js';
 import { probability, rel, isSeat, C } from './core.js';
 import { SPARKS } from './sparks.js';
@@ -110,23 +111,22 @@ export function choosePolicy(g, c, offers, rng) {
 }
 
 // 世界議会の議題に賛成するか
-export const AGENDAS = {
-  water: { name: '水管理法の世界同時撤廃', likes: ['edu', 'trade'], dislikes: ['finance'] },
-  nukes: { name: '核兵器の全廃', likes: ['edu', 'tech'], dislikes: ['ambition', 'order'] },
-  trade: { name: '関税の世界的撤廃', likes: ['trade', 'finance'], dislikes: ['order'] },
-  climate: { name: '温室効果ガスの一律削減', likes: ['edu', 'tech'], dislikes: ['ambition'] },
-  refugees: { name: '難民の共同受け入れ', likes: ['edu', 'trade'], dislikes: ['order'] },
-};
-export function voteYes(g, c, agenda, rng) {
+export { AGENDAS };
+// 世界議会の議題に賛成する見込み（％）。可決されると損をする国は反対しやすく、得をする国は賛成しやすい
+export function voteChance(g, c, agenda) {
   const a = AGENDAS[agenda];
   const act = g.seats.filter((id) => id !== c.id && g.majors[id].panel);
   const avgRel = act.length ? act.reduce((s, id) => s + rel(g, c.id, id), 0) / act.length : 50;
-  let p = 46 + (avgRel - 50) * 0.6 + (g.world.trust - 50) * 0.3 + (g.voteTries || 0) * 6;
+  let p = 50 + (avgRel - 50) * 0.6 + (g.world.trust - 50) * 0.3 + (g.voteTries || 0) * 6;
   if (a.likes.includes(c.persona)) p += 15;
   if (a.dislikes.includes(c.persona)) p -= 15;
+  if (a.lose(c)) p -= 22;
+  if (a.gain(c)) p += 10;
   if (agenda === 'water' && g.flags.waterLawWorld != null) p += 10;
   if (agenda === 'climate' && g.world.co2 >= 65) p += 10;
-  if (agenda === 'nukes' && c.stats.nuke >= 4) p -= 10;
-  p = Math.max(10, Math.min(97, p));
-  return { yes: rng() * 100 < p, p: Math.round(p) };
+  return Math.round(Math.max(10, Math.min(97, p)));
+}
+export function voteYes(g, c, agenda, rng) {
+  const p = voteChance(g, c, agenda);
+  return { yes: rng() * 100 < p, p };
 }
