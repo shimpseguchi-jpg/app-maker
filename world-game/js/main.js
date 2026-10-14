@@ -63,11 +63,18 @@ function titleScreen() {
     <div class="note">原作：冲方丁『スプライトシュピーゲルIV テンペスト』の作中ゲームをもとにした個人制作のファン作品です。国名・事件名は架空です。</div>
   </div>`);
   mount(node);
-  $('[data-cont]', node)?.addEventListener('click', () => { g = saved; resume(); });
+  $('[data-cont]', node)?.addEventListener('click', () => { g = migrate(saved); resume(); });
   $('[data-new]', node).addEventListener('click', () => startSetup(newSeed()));
   $('[data-seedgo]', node).addEventListener('click', () => { const s = normSeed($('[data-seed]', node).value); if (s) startSetup(s); });
   $('[data-how]', node).addEventListener('click', howTo);
   $('[data-set]', node).addEventListener('click', openSettings);
+}
+
+// 古い版のセーブを今の形にそろえる
+function migrate(sv) {
+  sv.world.biodiv ??= 70;
+  sv.sparks ||= [];
+  return sv;
 }
 
 function howTo() {
