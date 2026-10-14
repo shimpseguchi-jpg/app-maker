@@ -1,4 +1,5 @@
 // 世界統一ゲーム（仮）：画面と進行（おとなモード／1ねんせいモード）
+import { watchKid } from './ui/kidify.js';
 import { $, $$, el, esc, fmt, newSeed, normSeed, wait } from './util.js';
 import * as G from './engine/game.js';
 import { POLICIES, BASE, CATS } from './data/policies.js';
@@ -49,6 +50,7 @@ const persist = () => { if (g) { if (g.result) store.del(KEY); else store.set(KE
 const kid = () => (g ? !!g.kid : settings.mode === 'kid');
 const K = (adult, k) => (kid() ? k : adult);
 const setKidClass = () => stage.classList.toggle('kid', kid());
+watchKid(stage, kid); // 1ねんせいモード：カタカナ語と1年生の漢字に置きかえる
 
 const SPEED = { slow: 1100, normal: 550, fast: 180 };
 const GM_PRI = { few: 1, normal: 2, many: 3 };

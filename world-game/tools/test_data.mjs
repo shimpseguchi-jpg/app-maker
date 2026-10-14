@@ -47,7 +47,7 @@ ok(JSON.stringify(a) === JSON.stringify(b), 'シード値の再現性');
 const g = newGame('SAME42');
 ok(Object.keys(g.majors).length === 6 && Object.keys(g.backs).length === 40, '席6・背景国40');
 
-// 1ねんせいモードの ことばに かんじ・かたかなが ないか
+// 1ねんせいモードの ことばは ひらがなで かき、ひょうじの ときに カタカナ・1年生の かん字へ おきかえる
 const KID = await import('../js/data/kid.js');
 const walk = (v, path) => { if (typeof v === 'string') { if (/[一-龯々ァ-ヺ]/.test(v)) ok(false, `1ねんせい ${path}: ${v}`); } else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`); };
 for (const k of ['KID_STATS', 'KID_FX_NAME', 'KID_COUNTRY', 'KID_PERSONA', 'KID_CATS', 'KID_STAGES', 'KID_AGENDAS', 'KID_ENDINGS', 'KID_TIERS', 'KID_BASE', 'KID_SPARK', 'KID_POLICY', 'KID_EVENT', 'KID_GM_NAME', 'KID_GM', 'KID_AI_LINES']) walk(KID[k], k);
@@ -56,6 +56,12 @@ for (const p of POLICY_LIST) ok(KID.KID_POLICY[p.id], `1ねんせいの せい�
 for (const e of EVENTS) ok(KID.KID_EVENT[e.id], `1ねんせいの できごと ${e.id}`);
 for (const k of Object.keys(GM)) ok(KID.KID_GM[k], `1ねんせいの せりふ ${k}`);
 for (const k of Object.keys(SPARKS)) ok(KID.KID_SPARK[k], `1ねんせいの ひだね ${k}`);
+
+const { kidify, KIDIFY_DICT, GRADE1_KANJI } = await import('../js/ui/kidify.js');
+for (const [k, v] of Object.entries(KIDIFY_DICT)) for (const ch of v.match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `1年生で ならわない かん字 ${ch}（${k}）`);
+const expect = { 'すてらの くに': 'ステラの くに', 'みったーまいやー': 'ミッターマイヤー', 'おおきな ひとが みずを のむ': '大きな 人が 水を のむ', 'ひとつの くに': '一つの くに', '2031ねん': '2031年', 'みずうみが ひあがった': 'みずうみが ひあがった', 'ほしを そらす': 'ほしを そらす', 'まちがえたり': 'まちがえたり', 'でめが 3': '出目が 3', 'にゅーすの かーど': 'ニュースの カード' };
+for (const [a, b] of Object.entries(expect)) ok(kidify(a) === b, `kidify「${a}」→「${kidify(a)}」（よそう「${b}」）`);
+for (const k of ['KID_COUNTRY', 'KID_POLICY', 'KID_EVENT', 'KID_GM', 'KID_SPARK']) { const w = (v) => { if (typeof v === 'string') { for (const ch of kidify(v).match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `${k}: ${kidify(v)}`); } else if (v && typeof v === 'object') Object.values(v).forEach(w); }; w(KID[k]); }
 
 console.log(fail ? `${fail} 件の問題` : 'すべて OK');
 process.exit(fail ? 1 : 0);

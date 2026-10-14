@@ -4,7 +4,8 @@ import { chromium } from 'playwright';
 const url = process.env.URL || 'http://localhost:8124/';
 const out = process.env.OUT || (await import('os')).tmpdir();
 const SEED = process.env.SEED || 'TEST01';
-const KID = !!process.env.KID; // 1ねんせいモード：画面に かんじ・かたかなが ないか しらべる
+const KID = !!process.env.KID; // 1ねんせいモード：画面に 1年生で ならわない かん字が ないか しらべる
+const G1 = '一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六';
 const exe = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, hasTouch: true });
@@ -28,7 +29,8 @@ const badText = new Map();
 async function checkKana() {
   if (!KID) return;
   const t = await page.evaluate(() => document.querySelector('#stage').innerText);
-  for (const m of t.matchAll(/[^\s]{0,8}[一-龯々〆ァ-ヺ][^\s]{0,8}/g)) if (!/SEED|GM/.test(m[0])) badText.set(m[0], (badText.get(m[0]) || 0) + 1);
+  for (const m of t.matchAll(/[^\s]{0,8}[一-龯々〆][^\s]{0,8}/g)) if ([...m[0]].some((ch) => /[一-龯々〆]/.test(ch) && !G1.includes(ch))) badText.set(m[0], (badText.get(m[0]) || 0) + 1);
+  for (const m of t.matchAll(/(?<![ァ-ヺー])[ぁ-ゖ]*ー[ぁ-ゖー]*/g)) if (m[0] !== 'やったー') badText.set('かなのまま:' + m[0], (badText.get('かなのまま:' + m[0]) || 0) + 1);
 }
 let t = 0;
 for (; t < 4000; t++) {
@@ -75,7 +77,7 @@ await page.screenshot({ path: `${out}/wg-07-ending.png` });
 await checkKana();
 const res = await page.evaluate(() => window.WG.g?.result);
 if (process.env.DEBUG) console.log(await page.evaluate(() => JSON.stringify({ kid: window.WG.g.kid, max: window.WG.g.maxYears, hist: window.WG.g.hist.map((h) => h.year) })));
-if (KID) { console.log(badText.size ? 'かんじ・かたかな:\n' + [...badText.keys()].slice(0, 60).join('\n') : 'ひらがなのみ OK'); }
+if (KID) { console.log(badText.size ? '1年生で ならわない かん字・カタカナに なって いない ことば:\n' + [...badText.keys()].slice(0, 60).join('\n') : '1年生の かん字・カタカナ OK'); }
 console.log('steps', t, 'result', JSON.stringify(res));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no errors');
 await browser.close();
