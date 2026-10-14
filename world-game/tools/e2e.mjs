@@ -30,7 +30,7 @@ async function checkKana() {
   if (!KID) return;
   const t = await page.evaluate(() => document.querySelector('#stage').innerText);
   for (const m of t.matchAll(/[^\s]{0,8}[一-龯々〆][^\s]{0,8}/g)) if ([...m[0]].some((ch) => /[一-龯々〆]/.test(ch) && !G1.includes(ch))) badText.set(m[0], (badText.get(m[0]) || 0) + 1);
-  for (const m of t.matchAll(/(?<![ァ-ヺー])[ぁ-ゖ]*ー[ぁ-ゖー]*/g)) if (m[0] !== 'やったー') badText.set('かなのまま:' + m[0], (badText.get('かなのまま:' + m[0]) || 0) + 1);
+  for (const m of t.matchAll(/(?<![ァ-ヺー])[ぁ-ゖ]*ー[ぁ-ゖー]*/g)) if (!['やったー', 'ふーん'].includes(m[0])) badText.set('かなのまま:' + m[0], (badText.get('かなのまま:' + m[0]) || 0) + 1);
 }
 let t = 0;
 for (; t < 4000; t++) {
@@ -57,7 +57,13 @@ for (; t < 4000; t++) {
     if (!shot.has('news2')) { shot.add('news2'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-11-news-front.png` }); }
     const opts = await page.$$('.news-back [data-side]');
     // ときどきスワイプで選ぶ
-    if (opts.length === 2 && Math.random() < 0.4) {
+    if (opts.length === 3 && Math.random() < 0.5) {
+      // 3つめ（↑）：上にスワイプ
+      if (!shot.has('news3')) { shot.add('news3'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-12-news-three.png` }); }
+      const b = await page.$('.ncard'); const r = await b.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down();
+      await page.mouse.move(r.x + r.width / 2 + 10, r.y + r.height / 2 - 200, { steps: 6 }); await page.mouse.up();
+    } else if (opts.length >= 2 && Math.random() < 0.4) {
       const b = await page.$('.ncard'); const r = await b.boundingBox();
       await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down();
       await page.mouse.move(r.x + r.width / 2 + (Math.random() < 0.5 ? -200 : 200), r.y + r.height / 2, { steps: 6 }); await page.mouse.up();

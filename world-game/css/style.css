@@ -360,3 +360,10 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .voteest { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0; font-size: 13.5px; }
 .voteest span { background: var(--panel2); border-radius: 999px; padding: 4px 12px; }
 .moodrow > * { white-space: nowrap; }
+/* 3つめ（↑ 前にふる） */
+.ncard.out-u { transform: translateY(-640px) !important; opacity: 0; }
+.nlabel.u { top: auto; bottom: 14px; left: 50%; transform: translateX(-50%); background: #8a5ab0; max-width: 80%; text-align: center; }
+.ncard.lean-u .nlabel.u { opacity: 1; }
+.news-ctl { width: 900px; }
+.news-ctl .nopts.three { grid-template-columns: 1fr 1fr 1fr; }
+.nopt.u { border-color: #8a5ab0; text-align: center; background: #241c30; }

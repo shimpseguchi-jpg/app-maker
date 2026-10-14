@@ -11,7 +11,7 @@ import { probability, TIER, rel, allied, C, isSeat, activeSituations } from './e
 import { PERSONAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
 import { SPARKS } from './engine/sparks.js';
-import { REACTIONS, NEWS_ICON, NEWS_CAT } from './data/reactions.js';
+import { REACTIONS, OPTION_BY_ID, NEWS_ICON, NEWS_CAT } from './data/reactions.js';
 import { EVENT_BY_ID } from './data/events.js';
 import { SEC_NAME, moodFace, MOOD_WORD } from './data/secretary.js';
 import { AGENDAS } from './data/agendas.js';
@@ -642,7 +642,9 @@ function reactFxText(f, o) {
 }
 function reactLine(f) {
   if (f.chosen == null) return '';
-  return `<div class="evreact">✋ ${K('自国の反応', 'きみの こたえ')}：<b>${esc(reactName(REACTIONS[f.react][f.chosen]))}</b>${resHtml(f.rres)}</div>`;
+  const o = OPTION_BY_ID[f.choice] || REACTIONS[f.react]?.[f.chosen];
+  if (!o) return '';
+  return `<div class="evreact">✋ ${K('自国の反応', 'きみの こたえ')}：<b>${esc(reactName(o))}</b>${resHtml(f.rres)}</div>`;
 }
 const unseenNews = () => g.feed.map((f, i) => [f, i]).filter(([f]) => f.k === 'event' && !f.seen);
 
@@ -661,6 +663,7 @@ function newsDeck() {
       const f = list[n][0];
       if (e.key === 'ArrowLeft') pick(f.react ? 0 : -1);
       else if (e.key === 'ArrowRight' || (!f.react && e.key === 'Enter')) pick(f.react ? 1 : -1);
+      else if (e.key === 'ArrowUp' && f.react && G.newsOpts(f)[2]) pick(2);
     };
     addEventListener('keydown', onKey);
     const finish = () => { removeEventListener('keydown', onKey); back.remove(); persist(); renderDash(); resolve(); };
@@ -679,7 +682,7 @@ function newsDeck() {
             <p class="ntext">${esc(f.text)}</p>
             <div class="nby">— ${esc(K(GM_NAME, KID_GM_NAME))}</div>
             ${resHtml(f.res)}${sitHtml(f.id)}
-            <div class="nlabel l"></div><div class="nlabel r"></div>
+            <div class="nlabel l"></div><div class="nlabel r"></div><div class="nlabel u"></div>
           </div>
         </div></div>`);
       deck.innerHTML = '';
@@ -694,13 +697,14 @@ function newsDeck() {
       card.classList.add('flipped');
       const [f] = list[n];
       if (f.react) {
-        const [a, b] = REACTIONS[f.react];
+        const [a, b, c] = G.newsOpts(f).map((id) => OPTION_BY_ID[id]);
+        const btn = (o, side, cls, label) => `<button class="nopt ${cls}" data-side="${side}"><b>${label}</b><small>${reactFxText(f, o)}</small></button>`;
         ctl.innerHTML = `<div class="nq">${K('あなたの国は、どうする？', 'きみの くには、どうする？')}</div>
-          <div class="nopts"><button class="nopt l" data-side="0"><b>◀ ${esc(reactName(a))}</b><small>${reactFxText(f, a)}</small></button>
-          <button class="nopt r" data-side="1"><b>${esc(reactName(b))} ▶</b><small>${reactFxText(f, b)}</small></button></div>
-          <div class="nhint">${K('カードを左右にスワイプしても選べます', 'カードを みぎか ひだりに うごかしても えらべるよ')}</div>`;
+          <div class="nopts ${c ? 'three' : ''}">${btn(a, 0, 'l', `◀ ${esc(reactName(a))}`)}${c ? btn(c, 2, 'u', `▲ ${esc(reactName(c))}`) : ''}${btn(b, 1, 'r', `${esc(reactName(b))} ▶`)}</div>
+          <div class="nhint">${c ? K('カードを左・右・上にスワイプしても選べます（上は、いまの状況だから出た選択肢）', 'カードを ひだり・みぎ・うえに うごかしても えらべるよ（うえは とくべつな こたえ）') : K('カードを左右にスワイプしても選べます', 'カードを みぎか ひだりに うごかしても えらべるよ')}</div>`;
         $('.nlabel.l', card).textContent = reactName(a);
         $('.nlabel.r', card).textContent = reactName(b);
+        $('.nlabel.u', card).textContent = c ? reactName(c) : '';
       } else {
         ctl.innerHTML = `<div class="nopts one"><button class="nopt next" data-side="-1"><b>${n + 1 < list.length ? K('次のニュース ▶', 'つぎの ニュース ▶') : K('とじる ▶', 'とじる ▶')}</b></button></div>`;
       }
@@ -715,33 +719,40 @@ function newsDeck() {
         G.reactNews(g, i, side);
         last.innerHTML = reactLine(f) + (f.sec ? secBubble(f.sec) : '');
       }
-      card.classList.add(side === 0 ? 'out-l' : 'out-r');
+      card.classList.add(side === 0 ? 'out-l' : side === 2 ? 'out-u' : 'out-r');
       ctl.innerHTML = '';
       renderMe(); renderTop(); renderRivals(); renderFeed();
       setTimeout(() => { n++; show(); }, 380);
     }
-    // ドラッグ（スワイプ）：めくる前はめくるだけ、めくった後は左右に出しきると選ぶ
+    // ドラッグ（スワイプ）：めくる前はめくるだけ、めくった後は左右（3つめがあれば上も）に出しきると選ぶ
     function drag() {
-      let x0 = null, dx = 0, moved = false;
+      let x0 = null, y0 = 0, dx = 0, dy = 0, moved = false;
       const scale = () => stage.getBoundingClientRect().width / stage.offsetWidth || 1;
-      card.addEventListener('pointerdown', (e) => { x0 = e.clientX; dx = 0; moved = false; card.setPointerCapture?.(e.pointerId); });
+      const hasUp = () => { const f = list[n][0]; return !!(f.react && G.newsOpts(f)[2]); };
+      // 上にふった：上向きの動きが横より大きく、3つめがあるとき
+      const isUp = () => hasUp() && dy < 0 && -dy > Math.abs(dx);
+      card.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; dx = 0; dy = 0; moved = false; card.setPointerCapture?.(e.pointerId); });
       card.addEventListener('pointermove', (e) => {
         if (x0 == null || !flipped || done) return;
         dx = (e.clientX - x0) / scale();
-        if (Math.abs(dx) > 6) moved = true;
-        card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+        dy = (e.clientY - y0) / scale();
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
         const f = list[n][0];
-        card.classList.toggle('lean-l', dx < -50 && !!f.react);
-        card.classList.toggle('lean-r', dx > 50 && !!f.react);
+        if (isUp()) card.style.transform = `translateY(${dy}px)`;
+        else card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+        card.classList.toggle('lean-u', isUp() && dy < -50);
+        card.classList.toggle('lean-l', !isUp() && dx < -50 && !!f.react);
+        card.classList.toggle('lean-r', !isUp() && dx > 50 && !!f.react);
       });
       const up = () => {
         if (x0 == null) return;
         x0 = null;
         if (!flipped || done) return;
         const f = list[n][0];
-        if (Math.abs(dx) > 110) { card.style.transform = ''; pick(f.react ? (dx < 0 ? 0 : 1) : -1); return; }
+        if (isUp() && dy < -100) { card.style.transform = ''; pick(2); return; }
+        if (!isUp() && Math.abs(dx) > 110) { card.style.transform = ''; pick(f.react ? (dx < 0 ? 0 : 1) : -1); return; }
         card.style.transform = '';
-        card.classList.remove('lean-l', 'lean-r');
+        card.classList.remove('lean-l', 'lean-r', 'lean-u');
         if (moved) card.addEventListener('click', (e) => e.stopPropagation(), { once: true, capture: true });
       };
       card.addEventListener('pointerup', up);

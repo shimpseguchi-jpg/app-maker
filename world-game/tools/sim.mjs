@@ -28,7 +28,7 @@ function playOne(i) {
       G.resolvePending(g, p.type === 'nuke' ? (rng() < 0.05 ? 'fire' : 'hold') : p.type === 'vote' ? bestAgenda(g, p.options) : p.options[0]);
       continue;
     }
-    if (g.phase === 'yearEnd') { G.beginYear(g); g.feed.forEach((f, i) => { if (f.react) G.reactNews(g, i, rng() < 0.5 ? 0 : 1); }); continue; }
+    if (g.phase === 'yearEnd') { G.beginYear(g); g.feed.forEach((f, i) => { if (f.react) G.reactNews(g, i, Math.floor(rng() * G.newsOpts(f).length)); }); continue; }
     const r = G.step(g);
     if (r.type === 'player') {
       const ch = choosePolicy(g, g.majors[g.player], g.offers.list, rng);

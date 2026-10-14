@@ -1,12 +1,12 @@
 // ゲームの進行：世界の生成 → 基本政策 → 毎年（イベント → 各国の手番 → 年末処理）→ 終了
-import { REACTIONS } from '../data/reactions.js';
+import { REACTIONS, SPECIAL, OPTION_BY_ID } from '../data/reactions.js';
 import { secAfterReact, secYearEnd, secBack, addMood, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
 import { MAJORS, BACKS, REGIONS } from '../data/countries.js';
 import { POLICIES, POLICY_LIST, BASE, targetsFor } from '../data/policies.js';
 import { EVENTS, EVENT_BY_ID, nukePair } from '../data/events.js';
 import { GM, AI_LINES } from '../data/gm.js';
-import { registerBases, neighbors, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active } from './core.js';
+import { registerBases, neighbors, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active, allied } from './core.js';
 import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { AGENDA_BASE, AGENDA_LOSE_FX, AGENDA_GAIN_FX } from '../data/agendas.js';
@@ -318,7 +318,7 @@ function fireEvent(g, ev, H) {
   addSituations(g, ev, who, evName);
   // ニュースへの反応（左右の2択）。自国が動いていて、核・投票など別の決定があるニュースでなければ
   const me = g.majors[g.player];
-  if (me?.panel && !ev.special && REACTIONS[ev.cat]) entry.react = who === g.player ? 'self' : ev.cat;
+  if (me?.panel && !ev.special && REACTIONS[ev.cat]) { entry.react = who === g.player ? 'self' : ev.cat; entry.opts = newsOptions(g, entry); }
   for (const n of ev.next || []) g.boost[n] = (g.boost[n] || 0) + 3;
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
@@ -329,14 +329,31 @@ function fireEvent(g, ev, H) {
   if (ev.special === 'vote') startVote(g, H);
 }
 
-// プレイヤーがニュースのカードで左右を選んだ（side：0＝左、1＝右）
+// ニュースのカードの選択肢：自国優先から1つ、よその国を助ける・がまんするから1つ（左右はランダム）。状況しだいで3つめ（↑）
+function newsOptions(g, e) {
+  const me = g.majors[g.player];
+  const rng = rngOf(g);
+  const pool = REACTIONS[e.react];
+  const a = pick(rng, pool.filter((o) => o.pop > 0)), b = pick(rng, pool.filter((o) => o.pop <= 0));
+  const opts = rng() < 0.5 ? [a.id, b.id] : [b.id, a.id];
+  const sp = SPECIAL.find((x) => { try { return x.when(g, me, e, { allied, rel, isSeat }) && (x.chance == null || rng() < x.chance); } catch (err) { return false; } });
+  if (sp) opts.push(sp.id);
+  return opts;
+}
+// カードの選択肢（前の版のセーブは山の最初の2つ）
+export const newsOpts = (e) => e.opts || REACTIONS[e.react].slice(0, 2).map((o) => o.id);
+
+// プレイヤーがニュースのカードで選んだ（side：0＝左、1＝右、2＝↑前）
 export function reactNews(g, i, side) {
   const e = g.feed[i];
   if (!e || !e.react || e.chosen != null) return null;
-  const opt = REACTIONS[e.react][side];
+  const id = newsOpts(e)[side];
+  const opt = OPTION_BY_ID[id];
+  if (!opt) return null;
   const changes = [];
   applyFx(g, opt.fx, { self: g.player, who: e.who, tgt: e.who }, evScale(g), changes);
   e.chosen = side;
+  e.choice = id;
   e.rres = summarizeChanges(g, changes);
   // 補佐官が「街の声」を伝える
   if (opt.pop) addMood(g.majors[g.player], opt.pop * 2);

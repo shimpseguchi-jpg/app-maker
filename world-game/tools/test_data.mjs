@@ -64,10 +64,13 @@ for (const [a, b] of Object.entries(expect)) ok(kidify(a) === b, `kidify「${a}�
 for (const k of ['KID_COUNTRY', 'KID_POLICY', 'KID_EVENT', 'KID_GM', 'KID_SPARK']) { const w = (v) => { if (typeof v === 'string') { for (const ch of kidify(v).match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `${k}: ${kidify(v)}`); } else if (v && typeof v === 'object') Object.values(v).forEach(w); }; w(KID[k]); }
 
 // ニュースへの反応：ニュースの種類ごとに左右2つ、効果の書き方が正しいか
-const { REACTIONS, NEWS_ICON, NEWS_CAT } = await import('../js/data/reactions.js');
+const { REACTIONS, NEWS_ICON, NEWS_CAT, SPECIAL, OPTION_BY_ID } = await import('../js/data/reactions.js');
+const allOpts = [...new Set(Object.values(REACTIONS).flat()), ...SPECIAL];
+ok(Object.keys(OPTION_BY_ID).length === allOpts.length, `選択肢の id が重ならない（${allOpts.length}こ）`);
+for (const o of SPECIAL) { const kt = KID.kidFx(o.fx).join(' '); ok(typeof o.when === 'function' && /↑/.test(kt) && /↓/.test(kt) && o.k && !/[一-龯々ァ-ヺ]/.test(o.k) && o.fx.every((f) => /^(self|who|world|rel)\.\w+[+-][sml]$/.test(f)), `3つめ ${o.id}：${kt}`); }
 for (const e of EVENTS) ok(NEWS_ICON[e.cat] && NEWS_CAT[e.cat], `ニュースの種類 ${e.id} ${e.cat}`);
 for (const [k, pair] of Object.entries(REACTIONS)) {
-  ok(pair.length === 2, `反応 ${k} は2つ`);
+  ok(pair.filter((o) => o.pop > 0).length >= 2 && pair.filter((o) => o.pop <= 0).length >= 2, `反応 ${k}：自国優先と、そうでないものが2つ以上ずつ`);
   for (const o of pair) { const kt = KID.kidFx(o.fx).join(' '); ok(/↑/.test(kt) && /↓/.test(kt), `反応 ${k}「${o.k}」は 1ねんせいの ひょうじでも とくと そんが ある：${kt}`); ok(o.n && o.k && !/[一-龯々ァ-ヺ]/.test(o.k), `反応 ${k} の名前`); for (const f of o.fx) ok(/^(self|who|world|poorBg|rel)\.\w+[+-][sml]$/.test(f), `反応 ${k} の効果 ${f}`); }
 }
 
@@ -76,7 +79,7 @@ const SEC = await import('../js/data/secretary.js');
 for (const tbl of ['SEC_REACT', 'SEC_DANGER', 'SEC_MOOD']) for (const [k, v] of Object.entries(SEC[tbl])) ok(v.length === 2 && v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 ${tbl}.${k}`);
 for (const [k, list] of Object.entries(SEC.SEC_POP)) for (const v of list) ok(v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 SEC_POP.${k}`);
 for (const k of SEC.SEC_DANGER_ORDER) ok(SEC.SEC_DANGER[k], `補佐官 注意 ${k}`);
-for (const pair of Object.values(REACTIONS)) for (const o of pair) ok(Number.isInteger(o.pop), `反応「${o.n}」に国民の気持ち（pop）`);
+for (const o of allOpts) ok(Number.isInteger(o.pop), `反応「${o.n}」に国民の気持ち（pop）`);
 // 世界議会の議題
 const { AGENDAS: AG } = await import('../js/data/agendas.js');
 const cats = new Set(EVENTS.map((e) => e.cat));
