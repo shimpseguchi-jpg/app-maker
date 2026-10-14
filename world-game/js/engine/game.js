@@ -9,6 +9,8 @@ import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { tickMajor, tickBack, tickWorld, envIndex, bankruptCount } from './tick.js';
 import { SPARKS, startSpark, sparkEffect, tickSparks } from './sparks.js';
+import { KID_COUNTRY, KID_GM, KID_AI_LINES, KID_EVENT, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS, KID_BASE, KID_POLICY, KID_SPARK } from '../data/kid.js';
+const KID_SPARK_NAME = (t) => KID_SPARK[t][0];
 
 registerBases(BASE);
 export const START_YEAR = 2005;
@@ -16,7 +18,17 @@ export const MAX_YEARS = 50;
 export const STAGES = ['国連', '国連の解体', '世界政府準備委員会', '世界総選挙', '世界議会'];
 export const ENV_LIMIT = 10;
 const clone = (o) => JSON.parse(JSON.stringify(o));
-export const yearLabel = (g) => START_YEAR + g.year - 1;
+// 暦の年。1ねんせいモードは 1かいで 2〜3年すすむ（g.cal は経過した年数）
+export const yearLabel = (g) => START_YEAR + (g.cal ?? g.year - 1);
+export const maxYears = (g) => g.maxYears || MAX_YEARS;
+// 1ねんせいモードでは ひらがなの ほうを使う
+export const J = (g, adult, kid) => (g.kid ? kid : adult);
+const KID_WHY = { 政権崩壊: 'せいふが たおれた', 軍事クーデター: 'ぐんたいが せいふを のっとった', 敗戦: 'せんそうに まけた', 宗教革命: 'かくめいが おきた' };
+// 1ねんせいモードは手番が少ないぶん、1回の政策・できごとの効き目を大きくする（難しさをおとなと同じにするため）
+export const fxScale = (g) => (g.kid ? 2.5 : 1);
+// できごとは1かいに2〜3こ起きるので、効き目の倍率は小さめ
+export const evScale = (g) => (g.kid ? 1.6 : 1);
+export const stageName = (g, n) => (g.kid ? KID_STAGES : STAGES)[n];
 
 // ───── 世界の生成（シード値で 6 カ国・自国・AI の性格が決まる） ─────
 const OIL = ['M01', 'M02', 'M07', 'M08', 'M09'];
@@ -44,7 +56,7 @@ export function drawWorld(seed) {
   return { seats, player, persona };
 }
 
-export function newGame(seed, { rerolled = false, diceSeed } = {}) {
+export function newGame(seed, { rerolled = false, diceSeed, kid = false } = {}) {
   const d = drawWorld(seed);
   const majors = {}, backs = {};
   for (const m of MAJORS) {
@@ -60,8 +72,16 @@ export function newGame(seed, { rerolled = false, diceSeed } = {}) {
     }
   }
   for (const b of BACKS) backs[b.id] = { ...clone(b), owner: null };
+  if (kid) {
+    for (const c of [...Object.values(majors), ...Object.values(backs)]) {
+      const k = KID_COUNTRY[c.id];
+      c.name = k[0]; if (c.origName) c.origName = k[0];
+      if (k[1]) c.renames = k[1];
+      if (c.role) c.role = '';
+    }
+  }
   const g = {
-    v: 1, seed, rerolled, year: 0, phase: 'setup', seats: d.seats, player: d.player, majors, backs,
+    v: 1, seed, rerolled, kid, maxYears: kid ? 20 : MAX_YEARS, cal: 0, year: 0, phase: 'setup', seats: d.seats, player: d.player, majors, backs,
     world: { biodiv: 70, conflicts: 70, treaty: 40, wrate: 5, tension: 35, co2: 40, ice: 80, rain: 60, oilRes: 70, forestRes: 70, waterRes: 70, foodPrice: 50, refugees: 30, trust: 50, stage: 0, temp: 0 },
     bgStatic: Object.fromEntries(Object.values(backs).filter((b) => b.big).map((b) => [b.id, b.co2])),
     rel: {}, allies: [], bloc: [], laws: {}, flags: {}, counters: { deaths: 0 }, boost: {}, fired: {}, coop: [],
@@ -88,8 +108,9 @@ function rngOf(g) {
 }
 export function fill(t, vars) { return t.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? '')); }
 export function say(g, tag, vars = {}, extra = {}) {
-  const def = GM[tag];
-  if (!def) return;
+  const def0 = GM[tag];
+  if (!def0) return;
+  const def = g.kid && KID_GM[tag] ? { pri: def0.pri, lines: KID_GM[tag] } : def0;
   const rng = rngOf(g);
   g.lastLine = g.lastLine || {};
   let i = Math.floor(rng() * def.lines.length);
@@ -99,6 +120,8 @@ export function say(g, tag, vars = {}, extra = {}) {
 }
 const gmText = (g, text, pri = 1) => g.feed.push({ k: 'gm', pri, text });
 const chron = (g, text) => g.chron.push({ year: yearLabel(g), text });
+// sparks.js が年なしで積んだ年表に年を入れる
+function fixChronYears(g) { for (const c of g.chron) if (c.year == null) c.year = yearLabel(g); }
 
 // ───── 効果のための道具（イベント・政策から呼ぶ） ─────
 function helpers(g) {
@@ -107,14 +130,14 @@ function helpers(g) {
     rng, pick: (a) => pick(rng, a),
     fx: (list, ctx, f = 1) => applyFx(g, list, ctx, f),
     addRel: (a, b, d) => addRel(g, a, b, d),
-    say: (text) => gmText(g, text, 2),
-    chron: (text) => chron(g, text),
+    say: (text) => { if (!g.kid) gmText(g, text, 2); },
+    chron: (text) => { if (!g.kid) chron(g, text); },
     deaths: (m) => { g.counters.deaths += m; },
     stage: (n) => setStage(g, n),
     rename: (id, why) => rename(g, id, why),
     collapse: (id, why) => collapse(g, id, why),
     war: (a, b, tier) => war(g, a, b, tier, H),
-    spark: (type, where) => startSpark(g, H, type, where),
+    spark: (type, where) => { const s = startSpark(g, H, type, where); fixChronYears(g); return s; },
   };
   return H;
 }
@@ -122,8 +145,8 @@ function helpers(g) {
 function setStage(g, n) {
   if (n <= g.world.stage) return;
   g.world.stage = n;
-  chron(g, `国際機関の段階が「${STAGES[n]}」に進む`);
-  say(g, 'stage.up', { stage: STAGES[n] });
+  chron(g, J(g, `国際機関の段階が「${STAGES[n]}」に進む`, `「${KID_STAGES[n]}」まで すすんだ`));
+  say(g, 'stage.up', { stage: stageName(g, n) });
 }
 
 export function rename(g, id, why) {
@@ -139,7 +162,7 @@ export function doRename(g, id, name) {
   const c = g.majors[id];
   const old = c.name;
   c.name = name;
-  chron(g, `${old}、国号を「${name}」に改める`);
+  chron(g, J(g, `${old}、国号を「${name}」に改める`, `${old}の なまえが「${name}」に かわった`));
   say(g, 'rename', { old, name });
 }
 
@@ -147,8 +170,9 @@ function collapse(g, id, why) {
   const c = g.majors[id];
   if (!c || !c.panel) return;
   c.panel = false; c.collapsedYear = g.year; c.support = 0;
-  g.feed.push({ k: 'sys', cls: 'bad', text: `${c.name}で${why || '政権崩壊'}。パネルがオフになった。` });
-  chron(g, `${c.name}、${why || '政権崩壊'}`);
+  const w = why || '政権崩壊';
+  g.feed.push({ k: 'sys', cls: 'bad', text: J(g, `${c.name}で${w}。パネルがオフになった。`, `${c.name}で ${KID_WHY[w] || 'せいふが たおれた'}。しばらく おやすみ。`) });
+  chron(g, J(g, `${c.name}、${w}`, `${c.name}で ${KID_WHY[w] || 'せいふが たおれた'}`));
   say(g, c.player ? 'player.collapsed' : 'ai.collapsed', { name: c.name });
   g.allies = g.allies.filter((k) => !k.split('-').includes(id));
 }
@@ -160,14 +184,14 @@ function annex(g, owner, id) {
     t.panel = false; t.annexedBy = owner;
     g.allies = g.allies.filter((k) => !k.split('-').includes(id));
     o.stats.gnp += t.stats.gnp * 0.5; o.stats.pop += t.stats.pop; o.stats.ethnic = clamp(o.stats.ethnic + 15, 0, 100);
-    chron(g, `${t.name}、${o.name}に併合される`);
+    chron(g, J(g, `${t.name}、${o.name}に併合される`, `${t.name}が ${o.name}に とられた`));
     say(g, 'annex', { who: t.name, name: o.name });
     if (t.player) endGame(g, 'annexed');
   } else {
     const b = g.backs[id];
     b.owner = owner;
     o.stats.gnp *= 1 + b.stats.econ / 1000; o.stats.ethnic = clamp(o.stats.ethnic + 6, 0, 100);
-    chron(g, `${b.name}、${o.name}に併合される`);
+    chron(g, J(g, `${b.name}、${o.name}に併合される`, `${b.name}が ${o.name}に とられた`));
     say(g, 'annex', { who: b.name, name: o.name });
   }
 }
@@ -213,9 +237,9 @@ export function startGame(g, playerBases) {
     c.bases = c.player ? playerBases.slice(0, 2) : aiBases(g, id);
     for (const b of c.bases) applyFx(g, BASE[b].fx, { self: id });
     c.power = power(c);
-    g.feed.push({ k: 'sys', text: `${c.name}の基本政策：${c.bases.map((b) => BASE[b].name).join('・')}` });
+    g.feed.push({ k: 'sys', text: J(g, `${c.name}の基本政策：${c.bases.map((b) => BASE[b].name).join('・')}`, `${c.name}の やりかた：${c.bases.map((b) => KID_BASE[b][0]).join('、')}`) });
   }
-  g.chron.push({ year: START_YEAR, text: 'ゲーム開始。各国の元首が基本政策を定める' });
+  g.chron.push({ year: START_YEAR, text: J(g, 'ゲーム開始。各国の元首が基本政策を定める', 'げーむ すたーと。くにの だいひょうが やりかたを きめた') });
   beginYear(g);
 }
 
@@ -235,7 +259,7 @@ export function beginYear(g) {
     for (const p of Object.keys(SPARKS[s.type].fx)) if (!g.inserts.includes(p)) g.inserts.push(p);
     if (s.start < g.year) {
       const lv = s.sev <= 25 ? 'low' : s.sev <= 55 ? 'mid' : s.sev <= 80 ? 'high' : 'crit';
-      say(g, `spark.hint.${lv}`, { name: C(g, s.where).name, what: SPARKS[s.type].name });
+      say(g, `spark.hint.${lv}`, { name: C(g, s.where).name, what: g.kid ? KID_SPARK_NAME(s.type) : SPARKS[s.type].name });
     }
   }
   // 席順に時計回り。毎年ひとつずつ開始位置がずれる
@@ -258,7 +282,7 @@ function pickEvents(g, H) {
   // 必ず起きるもの（開幕・報道・世界議会・核のボタン）
   for (const e of EVENTS) if ((e.w === 0 || e.w >= 100) && can(e)) out.push(e);
   const pool = EVENTS.filter((e) => e.w > 0 && e.w < 100 && can(e));
-  const n = H.rng() < 0.45 ? 2 : 1;
+  const n = g.kid ? (H.rng() < 0.5 ? 3 : 2) : H.rng() < 0.45 ? 2 : 1;
   for (let i = 0; i < n && pool.length; i++) {
     const e = weighted(H.rng, pool.filter((x) => !out.includes(x)), (x) => x.w * (1 + (g.boost[x.id] || 0)));
     if (e) out.push(e);
@@ -274,15 +298,16 @@ function fireEvent(g, ev, H) {
   let who = null;
   try { who = ev.who ? ev.who(g, H) : null; } catch (err) { who = null; }
   const whoName = who ? C(g, who)?.name : '';
-  g.feed.push({ k: 'event', id: ev.id, name: ev.name, who, text: fill(ev.text || '', { who: whoName, year: yearLabel(g) }) });
-  chron(g, `${ev.name}${whoName ? `（${whoName}）` : ''}`);
-  if (ev.fx) applyFx(g, ev.fx, { who, self: null });
+  const [evName, evText] = g.kid && KID_EVENT[ev.id] ? KID_EVENT[ev.id] : [ev.name, ev.text || ''];
+  g.feed.push({ k: 'event', id: ev.id, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) });
+  chron(g, `${evName}${whoName ? `（${whoName}）` : ''}`);
+  if (ev.fx) applyFx(g, ev.fx, { who, self: null }, evScale(g));
   if (ev.run) { try { ev.run(g, H, who); } catch (err) { console.warn(ev.id, err); } }
   for (const n of ev.next || []) g.boost[n] = (g.boost[n] || 0) + 3;
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
     g.coop.push(ev.id);
-    g.feed.push({ k: 'sys', cls: 'good', text: `協調の成功例（${g.coop.length}/3）` });
+    g.feed.push({ k: 'sys', cls: 'good', text: J(g, `協調の成功例（${g.coop.length}/3）`, `みんなで ちからを あわせた（${g.coop.length}/3）`) });
   }
   if (ev.special === 'nuke') nukeCrisis(g, H);
   if (ev.special === 'vote') startVote(g, H);
@@ -301,11 +326,11 @@ function nukeCrisis(g, H) {
   for (const id of [a, b]) {
     const c = g.majors[id];
     const pUse = (c.persona === 'ambition' ? 0.2 : c.persona === 'order' ? 0.1 : 0.04) + (c.stats.stability < 25 ? 0.08 : 0);
-    if (H.rng() < pUse) { g.feed.push({ k: 'sys', cls: 'bad', text: `${c.name}が核のボタンを押した。` }); endGame(g, 'nuke'); return; }
+    if (H.rng() < pUse) { g.feed.push({ k: 'sys', cls: 'bad', text: J(g, `${c.name}が核のボタンを押した。`, `${c.name}が かくへいきの ぼたんを おした。`) }); endGame(g, 'nuke'); return; }
   }
   applyFx(g, ['world.tension-m'], {});
   addRel(g, a, b, 10);
-  g.feed.push({ k: 'sys', text: `${g.majors[a].name}と${g.majors[b].name}は、ぎりぎりで踏みとどまった。` });
+  g.feed.push({ k: 'sys', text: J(g, `${g.majors[a].name}と${g.majors[b].name}は、ぎりぎりで踏みとどまった。`, `${g.majors[a].name}と ${g.majors[b].name}は、ぎりぎりで がまんした。`) });
 }
 
 // ───── 世界議会の投票 ─────
@@ -331,9 +356,9 @@ export function runVote(g, agenda) {
     votes.push({ id, ...voteYes(g, c, agenda, rng) });
   }
   const all = votes.every((v) => v.yes);
-  g.feed.push({ k: 'vote', agenda, name: AGENDAS[agenda].name, votes });
+  g.feed.push({ k: 'vote', agenda, name: g.kid ? KID_AGENDAS[agenda] : AGENDAS[agenda].name, votes });
   if (all) {
-    chron(g, `世界議会、最初の議題「${AGENDAS[agenda].name}」を全会一致で可決`);
+    chron(g, J(g, `世界議会、最初の議題「${AGENDAS[agenda].name}」を全会一致で可決`, `せかいの ぎかいで「${KID_AGENDAS[agenda]}」が ぜんいん さんせいで きまった`));
     g.clearAgenda = agenda;
     endGame(g, 'clear');
   } else {
@@ -353,7 +378,7 @@ export function resolvePending(g, choice) {
   if (!p) return;
   g.pending = null;
   if (p.type === 'nuke') {
-    if (choice === 'fire') { g.feed.push({ k: 'sys', cls: 'bad', text: `${g.majors[p.me].name}が核のボタンを押した。` }); endGame(g, 'nuke'); }
+    if (choice === 'fire') { g.feed.push({ k: 'sys', cls: 'bad', text: J(g, `${g.majors[p.me].name}が核のボタンを押した。`, `${g.majors[p.me].name}が かくへいきの ぼたんを おした。`) }); endGame(g, 'nuke'); }
     else {
       say(g, 'nuke.hold');
       applyFx(g, ['world.tension-l', 'self.rep+m'], { self: p.me });
@@ -361,7 +386,7 @@ export function resolvePending(g, choice) {
       const foe = g.majors[p.foe];
       const rng = rngOf(g);
       const pUse = (foe.persona === 'ambition' ? 0.15 : 0.04);
-      if (rng() < pUse) { g.feed.push({ k: 'sys', cls: 'bad', text: `だが、${foe.name}が核のボタンを押した。` }); endGame(g, 'nuke'); }
+      if (rng() < pUse) { g.feed.push({ k: 'sys', cls: 'bad', text: J(g, `だが、${foe.name}が核のボタンを押した。`, `でも、${foe.name}が ぼたんを おして しまった。`) }); endGame(g, 'nuke'); }
     }
   } else if (p.type === 'vote') runVote(g, choice);
   else if (p.type === 'rename') { if (choice) doRename(g, p.id, choice); }
@@ -390,7 +415,7 @@ export function offersFor(g, id) {
   // 国際機関の段階を進める政策は、条件を満たしていれば必ず出す
   for (const o of avail) if ((o.id === 'P72' || o.id === 'P73') && !out.includes(o)) out.push(o);
   const rest = avail.filter((o) => !out.includes(o));
-  while (out.length < 4 && rest.length) {
+  while (out.length < (g.kid ? 3 : 4) && rest.length) {
     const o = weighted(rng, rest, (x) => {
       const pol = POLICIES[x.id];
       let w = pol.w ?? 1;
@@ -459,11 +484,12 @@ export function act(g, id, polId, tgt) {
   const ctx = { self: id, tgt };
   const changes = [];
   const succ = tier === 'crit' || tier === 'ok' || tier === 'partial';
-  if (tier === 'crit') applyFx(g, pol.ok, ctx, 2, changes);
-  else if (tier === 'ok') applyFx(g, pol.ok, ctx, 1, changes);
-  else if (tier === 'partial') { applyFx(g, pol.ok, ctx, 0.5, changes); applyFx(g, pol.ng, ctx, 0.5, changes); }
-  else if (tier === 'ng') applyFx(g, pol.ng, ctx, 1, changes);
-  else applyFx(g, pol.ng, ctx, 2, changes);
+  const k = fxScale(g);
+  if (tier === 'crit') applyFx(g, pol.ok, ctx, 2 * k, changes);
+  else if (tier === 'ok') applyFx(g, pol.ok, ctx, k, changes);
+  else if (tier === 'partial') { applyFx(g, pol.ok, ctx, 0.5 * k, changes); applyFx(g, pol.ng, ctx, 0.5 * k, changes); }
+  else if (tier === 'ng') applyFx(g, pol.ng, ctx, k, changes);
+  else applyFx(g, pol.ng, ctx, 2 * k, changes);
   if (succ && pol.after?.ok) applyFx(g, pol.after.ok, ctx, 1, changes);
   if (pol.run) pol.run(g, ctx, tier, helpers(g));
   if (succ && polId === 'P43') g.flags.harmony = g.year;
@@ -471,19 +497,19 @@ export function act(g, id, polId, tgt) {
   if (succ && polId === 'P53') g.counters.lowAid = (g.counters.lowAid || 0) + 1;
   const spk = sparkEffect(g, id, pol, tgt, tier);
   if (succ && polId === 'P54') g.counters.sanction = (g.counters.sanction || 0) + 1;
-  if (c.stats.nuke >= 4 && changes.some((x) => x.stat === 'nuke')) { g.flags.newNuke = g.year; g.newNukeId = id; chron(g, `${c.name}、核兵器を保有`); }
+  if (c.stats.nuke >= 4 && changes.some((x) => x.stat === 'nuke')) { g.flags.newNuke = g.year; g.newNukeId = id; chron(g, J(g, `${c.name}、核兵器を保有`, `${c.name}が かくへいきを もった`)); }
   c.power = power(c);
   const rec = { k: 'act', id, pol: polId, tgt, p: pr.p, crit: pr.crit, roll, tier, changes, spark: spk, year: g.year };
   c.lastAct = rec;
   g.feed.push(rec);
   g.yearActs.push(rec);
-  if (tier === 'crit' || tier === 'fumble') chron(g, `${c.name}「${pol.name}」${TIER[tier].name}`);
+  if (tier === 'crit' || tier === 'fumble') chron(g, J(g, `${c.name}「${pol.name}」${TIER[tier].name}`, `${c.name}「${KID_POLICY[pol.id]}」${KID_TIERS[tier]}`));
   if (c.player) {
     if (tier === 'crit') say(g, pr.p <= 10 ? 'dice.lowcrit' : 'dice.crit', { p: pr.p });
     else say(g, `dice.${tier}`, { p: pr.p });
   } else {
     if (tier === 'crit' && pr.p <= 10) say(g, 'dice.lowcrit', { p: pr.p });
-    const lines = AI_LINES[succ ? 'good' : 'bad'][c.persona];
+    const lines = (g.kid ? KID_AI_LINES : AI_LINES)[succ ? 'good' : 'bad'][c.persona];
     if (lines && (tier === 'crit' || tier === 'fumble' || rng() < 0.35)) g.feed.push({ k: 'ai', id, pri: 3, text: pick(rng, lines) });
   }
   return rec;
@@ -492,6 +518,13 @@ export function act(g, id, polId, tgt) {
 // ───── 年末 ─────
 export function endYear(g) {
   const H = helpers(g);
+  // 1ねんせいモードは 1かいで 2〜3年ぶん世界が動く（20かいで約50年）
+  const n = g.kid ? (g.year % 2 ? 2 : 3) : 1;
+  for (let k = 1; k < n; k++) {
+    for (const id of g.seats) if (!g.majors[id].annexedBy) tickMajor(g, g.majors[id], H);
+    for (const b of Object.values(g.backs)) if (!b.owner) tickBack(g, b, H);
+    tickWorld(g);
+  }
   for (const id of g.seats) {
     const c = g.majors[id];
     if (c.annexedBy) continue;
@@ -499,7 +532,7 @@ export function endYear(g) {
     if (c.panel) {
       if (c.stats.stability < 12) collapse(g, id, '政権崩壊');
       else if (c.stats.stability < 22 && H.rng() < (22 - c.stats.stability) * 0.01) collapse(g, id, '軍事クーデター');
-    } else if (g.year - c.collapsedYear >= 3) {
+    } else if (g.year - c.collapsedYear >= (g.kid ? 2 : 3)) {
       c.stats.stability = clamp(c.stats.stability + 2.5 + (c.support || 0) / 10, 0, 100);
       const chance = clamp(15 + (c.stats.stability - 15) * 1.5 + (c.support || 0), 5, 80);
       if (H.rng() * 100 < chance) recover(g, id);
@@ -513,12 +546,14 @@ export function endYear(g) {
     if (g.year - g.flags.pandemic >= 3 || g.flags.vaccineCoop != null) { delete g.flags.pandemic; for (const c of Object.values(g.majors)) { delete c.flags.sealed; delete c.flags.cured; } }
   }
   tickSparks(g, H, (tag, vars) => say(g, tag, vars));
+  fixChronYears(g);
   const prevEnv = g.world.env;
   tickWorld(g);
   g.hist.push({ year: yearLabel(g), env: g.world.env, co2: Math.round(g.world.co2), conflicts: g.world.conflicts, tension: Math.round(g.world.tension), power: g.majors[g.player].power, stage: g.world.stage });
   if (g.world.env <= 25 && prevEnv > 25) say(g, 'world.env');
   if (g.world.tension >= 75 && !g.flags.tensionWarned) { say(g, 'world.tension'); g.flags.tensionWarned = g.year; }
   if (g.world.tension < 60) delete g.flags.tensionWarned;
+  g.cal = (g.cal ?? g.year - 1) + n;
   checkEnd(g);
   if (!g.result) g.phase = 'yearEnd';
 }
@@ -528,7 +563,7 @@ function recover(g, id) {
   c.panel = true; c.collapsedYear = null; c.support = 0;
   c.stats.stability = Math.max(c.stats.stability, 38);
   c.stats.guerrilla = Math.max(0, c.stats.guerrilla - 15);
-  chron(g, `${c.name}に新元首、国政に復帰`);
+  chron(g, J(g, `${c.name}に新元首、国政に復帰`, `${c.name}に あたらしい だいひょうが きまった`));
   say(g, 'recovered', { name: c.name });
   if (rngOf(g)() < 0.5) rename(g, id, 'recover');
 }
@@ -541,7 +576,7 @@ function checkEnd(g) {
     const majorsOwned = g.seats.filter((x) => g.majors[x].annexedBy === id).length;
     if (owned >= 10 || (majorsOwned >= 2 && owned >= 5)) { g.conqueror = id; return endGame(g, 'conquest'); }
   }
-  if (g.year >= MAX_YEARS) return endGame(g, 'timeup');
+  if (g.year >= maxYears(g)) return endGame(g, 'timeup');
 }
 
 export const ENDINGS = {
@@ -552,11 +587,11 @@ export function endGame(g, type) {
   if (g.result) return;
   const pl = g.majors[g.player];
   const score = Math.max(0, Math.round(
-    (type === 'clear' ? 5000 + (MAX_YEARS - g.year) * 100 : 0) + g.world.stage * 400 + g.world.env * 10
+    (type === 'clear' ? 5000 + (maxYears(g) - g.year) * (MAX_YEARS / maxYears(g)) * 100 : 0) + g.world.stage * 400 + g.world.env * 10
     + (100 - Math.min(100, g.world.conflicts)) * 5 + pl.power * 10 + g.coop.length * 200 - g.counters.deaths * 2,
   ));
   g.result = { type, year: g.year, calYear: yearLabel(g), score, agenda: g.clearAgenda || null, conqueror: g.conqueror || null };
-  chron(g, `ゲーム終了：${ENDINGS[type].name}`);
+  chron(g, J(g, `ゲーム終了：${ENDINGS[type].name}`, `げーむ おわり：${KID_ENDINGS[type]}`));
   const tag = type === 'clear' ? 'clear' : `over.${type}`;
   say(g, tag, { name: pl.name });
   g.phase = 'over';
@@ -564,10 +599,10 @@ export function endGame(g, type) {
 
 export function timeupGrade(g) {
   const w = g.world;
-  if (w.stage >= 2 && w.env >= 40) return '統一まであと一歩の世界';
-  if (w.env >= 45 && w.conflicts <= 50) return '持ちこたえた世界';
-  if (w.env < 30) return '疲れ切った地球';
-  return '混迷の世界';
+  if (w.stage >= 2 && w.env >= 40) return J(g, '統一まであと一歩の世界', 'ひとつに なるまで あと すこしの せかい');
+  if (w.env >= 45 && w.conflicts <= 50) return J(g, '持ちこたえた世界', 'なんとか がんばった せかい');
+  if (w.env < 30) return J(g, '疲れ切った地球', 'つかれきった ちきゅう');
+  return J(g, '混迷の世界', 'ごちゃごちゃの せかい');
 }
 
 export { REGIONS };

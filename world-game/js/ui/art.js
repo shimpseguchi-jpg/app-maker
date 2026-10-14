@@ -77,7 +77,7 @@ export function mapSvg(g, opts = {}) {
     const c = g.majors[id];
     if (c.annexedBy) continue;
     const [x, y] = CENTERS[id];
-    parts.push(`<text class="maplabel${id === g.player ? ' me' : ''}" x="${x}" y="${y + 4}" text-anchor="middle">${c.name.replace(/(共和国|連邦|王国|首長国|人民共和国|連合王国|市国|群島連邦|連合|同盟|国)$/, '')}${c.panel ? '' : '（崩壊）'}</text>`);
+    parts.push(`<text class="maplabel${id === g.player ? ' me' : ''}" x="${x}" y="${y + 4}" text-anchor="middle">${c.name.replace(/(共和国|連邦|王国|首長国|人民共和国|連合王国|市国|群島連邦|連合|同盟|国)$/, '').replace(/の くに$|の しま$/, '')}${c.panel ? '' : g.kid ? '（おやすみ）' : '（崩壊）'}</text>`);
   }
   return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" preserveAspectRatio="xMidYMid meet">${parts.join('')}</svg>`;
 }

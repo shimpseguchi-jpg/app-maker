@@ -3,6 +3,8 @@
 // 期限と悪化の速さは火種ごとにランダムで、プレイヤーには見せない（現実と同じく、いつ広がるかはわからない）
 // fx：政策ごとの深刻度の変化（マイナスが正しい支援）。カードには正解を表示しない
 import { applyFx } from './effects.js';
+import { KID_SPARK } from '../data/kid.js';
+const sname = (g, type) => (g.kid ? KID_SPARK[type][0] : SPARKS[type].name);
 
 export const SPARKS = {
   disease: {
@@ -101,8 +103,8 @@ export function startSpark(g, H, type, where) {
   const s = { n: (g.sparkCount = (g.sparkCount || 0) + 1), type, where, sev: t.startSev || 35, start: g.year, deadline, grow, helpers: [], log: [] };
   g.sparks.push(s);
   const name = (g.majors[where] || g.backs[where]).name;
-  g.feed.push({ k: 'spark', type, where, text: `火種：${name}で${SPARKS[type].name}。${SPARKS[type].hint}` });
-  H.chron(`火種：${name}で${SPARKS[type].name}`);
+  g.feed.push({ k: 'spark', type, where });
+  g.chron.push({ year: null, text: g.kid ? `ひだね：${name}で ${KID_SPARK[type][0]}` : `火種：${name}で${SPARKS[type].name}`, spark: true });
   return s;
 }
 
@@ -137,17 +139,17 @@ export function tickSparks(g, H, say) {
       for (const a of s.helpers) for (const b of s.helpers) if (a < b) H.addRel(a, b, 8);
       for (const a of s.helpers) if (g.majors[a]) H.fx(['who.rep+s'], { who: a });
       g.coop.push(`S${s.n}`);
-      g.feed.push({ k: 'sys', cls: 'good', text: `${name}の${t.name}を封じ込めた（協調の成功例 ${Math.min(g.coop.length, 3)}/3）` });
-      H.chron(`${name}の${t.name}、各国の支援で封じ込め`);
-      say('spark.contain', { name, what: t.name });
+      g.feed.push({ k: 'sys', cls: 'good', text: g.kid ? `${name}の ${sname(g, s.type)}を おさえこんだ（みんなで ちからを あわせた ${Math.min(g.coop.length, 3)}/3）` : `${name}の${t.name}を封じ込めた（協調の成功例 ${Math.min(g.coop.length, 3)}/3）` });
+      g.chron.push({ year: null, text: g.kid ? `${name}の ${sname(g, s.type)}を みんなで おさえこんだ` : `${name}の${t.name}、各国の支援で封じ込め` });
+      say('spark.contain', { name, what: sname(g, s.type) });
       continue;
     }
     s.sev = Math.min(100, s.sev + (s.grow ?? t.grow));
     if (s.sev >= 100 || g.year - s.start + 1 >= (s.deadline ?? t.deadline)) {
       t.outbreak(g, H, s);
-      g.feed.push({ k: 'sys', cls: 'bad', text: `${name}の${t.name}：${t.outText}` });
-      H.chron(`${name}の${t.name}が世界に拡大`);
-      say('spark.outbreak', { name, what: t.name });
+      g.feed.push({ k: 'sys', cls: 'bad', text: g.kid ? `${name}の ${sname(g, s.type)}：${KID_SPARK[s.type][2]}` : `${name}の${t.name}：${t.outText}` });
+      g.chron.push({ year: null, text: g.kid ? `${name}の ${sname(g, s.type)}が せかいに ひろがった` : `${name}の${t.name}が世界に拡大` });
+      say('spark.outbreak', { name, what: sname(g, s.type) });
       continue;
     }
     keep.push(s);

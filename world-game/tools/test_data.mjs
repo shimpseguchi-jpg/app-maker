@@ -47,5 +47,15 @@ ok(JSON.stringify(a) === JSON.stringify(b), 'シード値の再現性');
 const g = newGame('SAME42');
 ok(Object.keys(g.majors).length === 6 && Object.keys(g.backs).length === 40, '席6・背景国40');
 
+// 1ねんせいモードの ことばに かんじ・かたかなが ないか
+const KID = await import('../js/data/kid.js');
+const walk = (v, path) => { if (typeof v === 'string') { if (/[一-龯々ァ-ヺ]/.test(v)) ok(false, `1ねんせい ${path}: ${v}`); } else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`); };
+for (const k of ['KID_STATS', 'KID_FX_NAME', 'KID_COUNTRY', 'KID_PERSONA', 'KID_CATS', 'KID_STAGES', 'KID_AGENDAS', 'KID_ENDINGS', 'KID_TIERS', 'KID_BASE', 'KID_SPARK', 'KID_POLICY', 'KID_EVENT', 'KID_GM_NAME', 'KID_GM', 'KID_AI_LINES']) walk(KID[k], k);
+for (const v of Object.values(KID.KID_MOD)) walk(v, 'KID_MOD');
+for (const p of POLICY_LIST) ok(KID.KID_POLICY[p.id], `1ねんせいの せいさく ${p.id}`);
+for (const e of EVENTS) ok(KID.KID_EVENT[e.id], `1ねんせいの できごと ${e.id}`);
+for (const k of Object.keys(GM)) ok(KID.KID_GM[k], `1ねんせいの せりふ ${k}`);
+for (const k of Object.keys(SPARKS)) ok(KID.KID_SPARK[k], `1ねんせいの ひだね ${k}`);
+
 console.log(fail ? `${fail} 件の問題` : 'すべて OK');
 process.exit(fail ? 1 : 0);

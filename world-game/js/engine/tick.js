@@ -4,6 +4,7 @@ import { power, rel } from './core.js';
 import { BASE } from '../data/policies.js';
 
 const rev = (v, to, k) => v + (to - v) * k;
+export const KID_TUNE = { co2: 0.15, forest: 0.2, stab: 5 };
 
 export function tickMajor(g, c, H) {
   const s = c.stats, w = g.world;
@@ -40,7 +41,7 @@ export function tickMajor(g, c, H) {
   if (s.food < 60) { short += (60 - s.food) / 4; popShort += (60 - s.food) / 20; }
   if (s.water < 20) { short += (20 - s.water) / 2; popShort += (20 - s.water) / 10; }
   short *= imp; popShort *= imp;
-  const natural = 50 + (s.security - 50) * 0.35 - (s.inequality - 50) * 0.3 - (s.ethnic - 50) * 0.25 - s.guerrilla * 0.2
+  const natural = (g.kid ? -KID_TUNE.stab : 0) + 50 + (s.security - 50) * 0.35 - (s.inequality - 50) * 0.3 - (s.ethnic - 50) * 0.25 - s.guerrilla * 0.2
     + growth * 1.5 - short + (s.rep - 50) * 0.05 + 18;
   s.stability = clamp(rev(s.stability, natural, 0.2), 0, 100);
 
@@ -86,11 +87,13 @@ export function tickWorld(g) {
   const all = Object.values(g.majors).filter((c) => !c.annexedBy);
   const act = all.filter((c) => c.panel);
   const emis = all.reduce((sum, c) => sum + c.stats.co2, 0) + Object.values(g.bgStatic || {}).reduce((sum, v) => sum + v, 0);
-  w.co2 = clamp(w.co2 + emis / 1000 + 0.2 - w.forestRes / 200, 0, 100);
+  // 1ねんせいモードは手番が少ないぶん、人の活動による環境の悪化を年ごとの変化に上乗せする（KID_TUNE）
+  const kt = g.kid ? KID_TUNE : null;
+  w.co2 = clamp(w.co2 + emis / 1000 + 0.2 - w.forestRes / 200 + (kt ? kt.co2 : 0), 0, 100);
   w.ice = clamp(w.ice - 0.15 - Math.max(0, w.co2 - 45) / 15, 0, 100);
   w.rain = clamp(rev(w.rain - Math.max(0, w.co2 - 50) / 20, 60, 0.02), 0, 100);
   w.waterRes = clamp(w.waterRes - 0.25 - Math.max(0, w.co2 - 50) / 25 + (w.rain - 60) / 40, 0, 100);
-  w.forestRes = clamp(w.forestRes + 0.1, 0, 100);
+  w.forestRes = clamp(w.forestRes + 0.1 - (kt ? kt.forest : 0), 0, 100);
   w.biodiv = clamp(w.biodiv - 0.1 - (100 - w.forestRes) / 400 - Math.max(0, w.co2 - 50) / 50, 0, 100);
   w.oilRes = clamp(w.oilRes - 0.35, 0, 100);
   const avgFood = act.length ? act.reduce((s, c) => s + c.stats.food, 0) / act.length : 100;

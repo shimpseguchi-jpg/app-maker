@@ -206,3 +206,32 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
   body:not(.allow-portrait) .rotate-hint { position: fixed; inset: 0; z-index: 99; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg); text-align: center; }
   .rotate-hint .ph { font-size: 64px; transform: rotate(90deg); }
 }
+
+/* ── 1ねんせいモード ── */
+.title .modes { display: flex; gap: 6px; justify-content: center; }
+.title .modes .btn { flex: 1; }
+.kid { --kidfs: 15px; }
+.kid .gm .bubble { font-size: 16px; line-height: 1.75; }
+.kid .feed { font-size: 14.5px; line-height: 1.7; }
+.kid .card h4 { font-size: 15.5px; line-height: 1.45; }
+.kid .card .fx { font-size: 12.5px; }
+.kid .gauge i { font-size: 11px; }
+.kid .gauge { min-width: 84px; }
+.setup .side .pane { flex: none; }
+.kid .gauge b { font-size: 17px; }
+.kid .base { font-size: 14px; }
+.kid .base small { font-size: 12px; }
+.kid .modal { font-size: 15px; line-height: 1.75; }
+.howto p { margin: 0 0 8px; font-size: 15px; line-height: 1.8; }
+.kidstats { display: flex; flex-direction: column; gap: 7px; overflow: auto; }
+.kidstats.small { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 12px; }
+.kstat { display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; }
+.kidstats.small .kstat { font-size: 12px; }
+.kstat.danger span:first-child { color: var(--red); }
+.kstat.danger span:first-child::after { content: ' ⚠'; }
+.kbar { height: 10px; background: var(--panel2); border-radius: 5px; overflow: hidden; border: 1px solid var(--line); }
+.kbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--green)); border-radius: 5px; }
+.kstat.danger .kbar i { background: var(--red); }
+.card .kidprob { align-items: center; gap: 6px; }
+.card .kidprob b { font-size: 30px; }
+.card .kidprob small { font-size: 11.5px; line-height: 1.3; }

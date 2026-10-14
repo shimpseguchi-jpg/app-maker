@@ -1,14 +1,18 @@
-// 世界統一ゲーム（仮）：画面と進行
+// 世界統一ゲーム（仮）：画面と進行（おとなモード／1ねんせいモード）
 import { $, $$, el, esc, fmt, newSeed, normSeed, wait } from './util.js';
 import * as G from './engine/game.js';
-import { POLICIES, BASE, CATS, targetsFor } from './data/policies.js';
-import { STAT_INFO, STAT_CATS, NUKE_STAGES, MAJORS } from './data/countries.js';
+import { POLICIES, BASE, CATS } from './data/policies.js';
+import { STAT_INFO, STAT_CATS, NUKE_STAGES } from './data/countries.js';
 import { GM_NAME } from './data/gm.js';
 import { describeFx, STAT_JA } from './engine/effects.js';
 import { probability, TIER, rel, allied, C, isSeat } from './engine/core.js';
 import { PERSONAS, AGENDAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
 import { SPARKS } from './engine/sparks.js';
+import {
+  KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
+  KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF,
+} from './data/kid.js';
 
 const stage = $('#stage');
 
@@ -36,33 +40,49 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 保存できない環境でも遊べる */ } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } },
 };
-const settings = Object.assign({ gm: 'normal', speed: 'normal' }, store.get(SKEY) || {});
+const settings = Object.assign({ gm: 'normal', speed: 'normal', mode: 'adult' }, store.get(SKEY) || {});
 const saveSettings = () => store.set(SKEY, settings);
 let g = null;
 const persist = () => { if (g) { if (g.result) store.del(KEY); else store.set(KEY, g); } };
 
+// 1ねんせいモードかどうか（ゲーム中はゲームの設定、タイトルでは選んだモード）
+const kid = () => (g ? !!g.kid : settings.mode === 'kid');
+const K = (adult, k) => (kid() ? k : adult);
+const setKidClass = () => stage.classList.toggle('kid', kid());
+
 const SPEED = { slow: 1100, normal: 550, fast: 180 };
 const GM_PRI = { few: 1, normal: 2, many: 3 };
-const mount = (node) => { $$('.screen', stage).forEach((s) => s.remove()); $$('.modal-back, .dice-back', stage).forEach((s) => s.remove()); stage.prepend(node); };
-const gmBubble = (text) => `<div class="gm"><div class="face">GM</div><div class="bubble"><b class="name">${GM_NAME}</b>${esc(text)}</div></div>`;
+const mount = (node) => { setKidClass(); $$('.screen', stage).forEach((s) => s.remove()); $$('.modal-back, .dice-back', stage).forEach((s) => s.remove()); stage.prepend(node); };
+const gmBubble = (text) => `<div class="gm"><div class="face">${K('GM', '🎩')}</div><div class="bubble"><b class="name">${K(GM_NAME, KID_GM_NAME)}</b>${esc(text)}</div></div>`;
 const nameOf = (id) => (id ? C(g, id)?.name || '' : '');
+const polName = (id) => (kid() ? KID_POLICY[id] : POLICIES[id].name);
+const tierName = (t) => (kid() ? KID_TIERS[t] : TIER[t].name);
+const personaName = (p) => (kid() ? KID_PERSONA[p] : PERSONAS[p].name);
+const baseName = (b) => (kid() ? KID_BASE[b][0] : BASE[b].name);
+const sparkName = (t) => (kid() ? KID_SPARK[t][0] : SPARKS[t].name);
+const stageNames = () => (kid() ? KID_STAGES : G.STAGES);
+const agendaName = (a) => (kid() ? KID_AGENDAS[a] : AGENDAS[a].name);
 
 // ───── タイトル ─────
 function titleScreen() {
+  g = null;
   const saved = store.get(KEY);
+  const sk = saved && !saved.result ? saved : null;
   const node = el(`<div class="screen title">
     <div class="map-bg">${plainMapSvg()}</div>
-    <h1>世界統一ゲーム<small>WORLD UNIFICATION GAME — 一人用</small></h1>
+    <h1>${K('世界統一ゲーム', 'せかい とういつ げーむ')}<small>${K('WORLD UNIFICATION GAME — 一人用', 'ひとりで あそぶ せかいの げーむ')}</small></h1>
     <div class="menu">
-      ${saved && !saved.result ? `<button class="btn primary" data-cont>つづきから（${G.START_YEAR + saved.year - 1}年）</button>` : ''}
-      <button class="btn ${saved && !saved.result ? '' : 'primary'}" data-new>新しいゲーム</button>
-      <div class="seedrow"><input data-seed maxlength="12" placeholder="シード値" autocomplete="off"><button class="btn" data-seedgo>この世界で</button></div>
+      <div class="modes"><button class="btn small ${settings.mode === 'adult' ? 'primary' : ''}" data-mode="adult">おとな</button><button class="btn small ${settings.mode === 'kid' ? 'primary' : ''}" data-mode="kid">1ねんせい</button></div>
+      ${sk ? `<button class="btn primary" data-cont>${K('つづきから', 'つづきから')}（${sk.kid ? '1ねんせい' : 'おとな'}・${G.yearLabel(sk)}${K('年', 'ねん')}）</button>` : ''}
+      <button class="btn ${sk ? '' : 'primary'}" data-new>${K('新しいゲーム', 'あたらしく はじめる')}</button>
+      <div class="seedrow"><input data-seed maxlength="12" placeholder="${K('シード値', 'せかいの ばんごう')}" autocomplete="off"><button class="btn" data-seedgo>${K('この世界で', 'この せかいで')}</button></div>
       <button class="btn" data-how>あそびかた</button>
       <button class="btn" data-set>せってい</button>
     </div>
-    <div class="note">原作：冲方丁『スプライトシュピーゲルIV テンペスト』の作中ゲームをもとにした個人制作のファン作品です。国名・事件名は架空です。</div>
+    <div class="note">${K('原作：冲方丁『スプライトシュピーゲルIV テンペスト』の作中ゲームをもとにした個人制作のファン作品です。国名・事件名は架空です。', 'くにの なまえや できごとは、つくりものです。')}</div>
   </div>`);
   mount(node);
+  $$('[data-mode]', node).forEach((b) => b.addEventListener('click', () => { settings.mode = b.dataset.mode; saveSettings(); titleScreen(); }));
   $('[data-cont]', node)?.addEventListener('click', () => { g = migrate(saved); resume(); });
   $('[data-new]', node).addEventListener('click', () => startSetup(newSeed()));
   $('[data-seedgo]', node).addEventListener('click', () => { const s = normSeed($('[data-seed]', node).value); if (s) startSetup(s); });
@@ -78,6 +98,18 @@ function migrate(sv) {
 }
 
 function howTo() {
+  if (kid()) {
+    modal(`<h2>あそびかた</h2>
+    <div class="howto">
+    <p>きみは ある くにの だいひょうです。まいかい、した に でる かーどから ひとつ えらびます。</p>
+    <p>かーどには「でめが 〇〇 いかなら せいこう」と かいて あります。1から100の だいすを ふって、でめが その かず いかなら せいこう。とても ちいさい かずが でたら だいせいこう です。</p>
+    <p>ほかの 5つの くにも、それぞれ かーどを えらびます。ある くにが とくを すると、べつの くにが こまる ことも あります。</p>
+    <p>🔥 <b>ひだね</b>：ときどき、ある くにで びょうきや けんかの「ひだね」が おきます。みんなで ただしく たすければ おさまります。まちがえたり ほうって おくと、せかいじゅうに ひろがります。どれが ただしいかは かいて ありません。みったーまいやーの ことばを よく きこう。</p>
+    <p>😱 <b>おしまい</b>：かくせんそう／ちきゅうが こわれる／ひとつの くにが せかいを のっとる。</p>
+    <p>🎉 <b>くりあ</b>：「せかいの ぎかい」まで すすんで、みんなが さんせいしたら くりあ。20かいで じかん ぎれです。</p>
+    </div><div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+    return;
+  }
   modal(`<h2>あそびかた</h2>
   <div style="font-size:14px;line-height:1.8">
   <p>あなたは架空の国の元首です。1年に1回、パネルに出た政策から1つを選びます。どの政策にも<b>成功確率</b>が表示され、<b>100面ダイス</b>で判定します。出目が確率以下なら成功、確率の1/10以下なら大成功です。</p>
@@ -91,8 +123,8 @@ function howTo() {
 function openSettings() {
   const seg = (k, opts) => `<div style="display:flex;gap:6px">${opts.map(([v, l]) => `<button class="btn small ${settings[k] === v ? 'primary' : ''}" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const m = modal(`<h2>せってい</h2>
-    <div>GM の発言の多さ</div>${seg('gm', [['few', '少ない'], ['normal', 'ふつう'], ['many', '多い']])}
-    <div>AI の手番の速さ</div>${seg('speed', [['slow', 'ゆっくり'], ['normal', 'ふつう'], ['fast', 'はやい']])}
+    <div>${K('GM の発言の多さ', 'みったーまいやーの おしゃべり')}</div>${seg('gm', [['few', K('少ない', 'すくない')], ['normal', 'ふつう'], ['many', K('多い', 'おおい')]])}
+    <div>${K('AI の手番の速さ', 'ほかの くにの はやさ')}</div>${seg('speed', [['slow', 'ゆっくり'], ['normal', 'ふつう'], ['fast', 'はやい']])}
     <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
   $$('[data-k]', m).forEach((b) => b.addEventListener('click', () => {
     settings[b.dataset.k] = b.dataset.v; saveSettings();
@@ -109,34 +141,38 @@ function modal(html, cls = '') {
 }
 
 // ───── 準備（抽選・基本政策） ─────
-function startSetup(seed, rerolled = false) {
-  g = G.newGame(seed, { rerolled });
+function startSetup(seed) {
+  g = G.newGame(seed, { kid: settings.mode === 'kid' });
   setupScreen();
+}
+function kidBars(c, small = false) {
+  const ks = kidStats(c);
+  return `<div class="kidstats ${small ? 'small' : ''}">${KID_STATS.map((s) => `<div class="kstat ${ks[s.key] <= KID_DANGER ? 'danger' : ''}"><span>${s.icon} ${s.name}</span><span class="kbar"><i style="width:${ks[s.key]}%"></i></span></div>`).join('')}</div>`;
 }
 function setupScreen() {
   const me = g.majors[g.player];
   let picked = [];
   const node = el(`<div class="screen setup">
-    <div class="head"><h2>世界の抽選</h2><span class="chip">シード値 <b>${esc(g.seed)}</b></span></div>
+    <div class="head"><h2>${K('世界の抽選', 'せかいの くじびき')}</h2><span class="chip">${K('シード値', 'せかいの ばんごう')} <b>${esc(g.seed)}</b></span></div>
     <div class="body">
       <div class="mapbox">
         <div class="mapwrap">${mapSvg(g, { highlight: g.seats })}</div>
-        <div class="seats">${g.seats.map((id) => { const c = g.majors[id]; return `<div class="seat ${c.player ? 'mine' : ''}" style="border-left:4px solid ${seatColor(g, id)}">${flagSvg(c.flag, 24, 16)}<div><b>${esc(c.name)}</b><br><span class="muted">${c.player ? 'あなた' : 'AI：' + PERSONAS[c.persona].name}</span></div></div>`; }).join('')}</div>
+        <div class="seats">${g.seats.map((id) => { const c = g.majors[id]; return `<div class="seat ${c.player ? 'mine' : ''}" style="border-left:4px solid ${seatColor(g, id)}">${flagSvg(c.flag, 24, 16)}<div><b>${esc(c.name)}</b><br><span class="muted">${c.player ? K('あなた', 'きみの くに') : K('AI：', '') + personaName(c.persona)}</span></div></div>`; }).join('')}</div>
       </div>
       <div class="side">
         ${gmBubble(g.feed.find((f) => f.k === 'gm')?.text || '')}
         <div class="pane" style="padding:8px 10px;gap:4px">
-          <div class="me" style="padding:0"><div class="name">${flagSvg(me.flag, 30, 20)}${esc(me.name)}</div><div class="sub">国力 ${me.power}</div></div>
-          <div class="statgrid" style="font-size:12px">${['pop', 'gnp', 'stability', 'literacy', 'oil', 'food', 'water', 'soldiers', 'nuke'].map((k) => `<div class="stat"><span>${STAT_INFO[k].name}</span><b>${statText(me, k)}</b></div>`).join('')}</div>
+          <div class="me" style="padding:0"><div class="name">${flagSvg(me.flag, 30, 20)}${esc(me.name)}</div>${K(`<div class="sub">国力 ${me.power}</div>`, '')}</div>
+          ${kid() ? kidBars(me, true) : `<div class="statgrid" style="font-size:12px">${['pop', 'gnp', 'stability', 'literacy', 'oil', 'food', 'water', 'soldiers', 'nuke'].map((k) => `<div class="stat"><span>${STAT_INFO[k].name}</span><b>${statText(me, k)}</b></div>`).join('')}</div>`}
         </div>
-        <div class="muted" style="font-size:12px">基本政策を1〜2個選んでください</div>
-        <div class="bases">${Object.entries(BASE).map(([id, b]) => `<button class="base" data-b="${id}"><b>${b.name}</b><small>${b.desc}</small></button>`).join('')}</div>
+        <div class="muted" style="font-size:12px">${K('基本政策を1〜2個選んでください', 'くにの やりかたを 1つか 2つ えらんでね')}</div>
+        <div class="bases">${Object.keys(BASE).map((id) => `<button class="base" data-b="${id}"><b>${esc(baseName(id))}</b><small>${esc(kid() ? KID_BASE[id][1] : BASE[id].desc)}</small></button>`).join('')}</div>
       </div>
     </div>
     <div class="foot">
-      <button class="btn" data-back>タイトルへ</button>
-      <button class="btn" data-reroll ${g.rerolled ? 'disabled' : ''}>引き直す（1回だけ）</button>
-      <button class="btn primary" data-start disabled>この国で始める</button>
+      <button class="btn" data-back>${K('タイトルへ', 'もどる')}</button>
+      <button class="btn" data-reroll ${g.rerolled ? 'disabled' : ''}>${K('引き直す（1回だけ）', 'くじを ひきなおす（1かい だけ）')}</button>
+      <button class="btn primary" data-start disabled>${K('この国で始める', 'この くにで はじめる')}</button>
     </div>
   </div>`);
   mount(node);
@@ -149,8 +185,7 @@ function setupScreen() {
   }));
   $('[data-back]', node).addEventListener('click', titleScreen);
   $('[data-reroll]', node).addEventListener('click', () => {
-    const s = newSeed();
-    g = G.newGame(s, { rerolled: true });
+    g = G.newGame(newSeed(), { rerolled: true, kid: g.kid });
     G.say(g, 'setup.reroll');
     g.feed.reverse();
     setupScreen();
@@ -182,9 +217,9 @@ function dashScreen() {
   mount(el(`<div class="screen dash">
     <div class="top"></div>
     <div class="mid">
-      <div class="pane"><h3>自国</h3><div class="me"></div></div>
+      <div class="pane"><h3>${K('自国', 'きみの くに')}</h3><div class="me"></div></div>
       <div class="center"><div class="mapwrap"></div><div class="pane"><div class="feed"></div></div></div>
-      <div class="pane"><h3>各国の元首</h3><div class="rivals"></div></div>
+      <div class="pane"><h3>${K('各国の元首', 'ほかの くに')}</h3><div class="rivals"></div></div>
     </div>
     <div class="bottom"><div class="gmbox"></div><div class="actions"></div></div>
   </div>`));
@@ -199,32 +234,52 @@ function renderTop() {
   const w = g.world;
   const gauge = (label, val, cls = '') => `<div class="gauge ${cls}"><b>${val}</b><i>${label}</i></div>`;
   const lvl = (v, warn, danger, rev = false) => (rev ? (v <= danger ? 'danger' : v <= warn ? 'warn' : '') : (v >= danger ? 'danger' : v >= warn ? 'warn' : ''));
-  $('.top', stage).innerHTML = `
-    <div class="year">${G.yearLabel(g)}年<small>${g.year}/${G.MAX_YEARS}年目</small></div>
-    <div class="stages">${G.STAGES.map((s, i) => `<span class="${i < w.stage ? 'on' : i === w.stage ? 'now' : ''}">${s}</span>`).join('')}</div>
-    <div class="gauges">
-      ${gauge('地球環境', w.env, lvl(w.env, 35, 20, true))}
-      ${gauge('CO₂', Math.round(w.co2), lvl(w.co2, 60, 75))}
-      ${gauge('気温', '+' + fmt(w.temp || 0, 1) + '℃')}
-      ${gauge('氷', Math.round(w.ice), lvl(w.ice, 60, 40, true))}
-      ${gauge('水資源', Math.round(w.waterRes), lvl(w.waterRes, 50, 35, true))}
-      ${gauge('生態系', Math.round(w.biodiv ?? 70), lvl(w.biodiv ?? 70, 50, 35, true))}
-      ${gauge('紛争', w.conflicts, lvl(w.conflicts, 90, 130))}
-      ${gauge('緊張', Math.round(w.tension), lvl(w.tension, 60, 75))}
-      ${gauge('条約有効', Math.round(w.treaty) + '%')}
-      ${gauge('破綻国', w.bankrupt ?? 0)}
-      ${gauge('協調', g.coop.length + '/3')}
-    </div>
-    <div class="tools"><button class="btn small" data-chron>年表</button><button class="btn small" data-menu>☰</button></div>`;
+  const stages = `<div class="stages">${stageNames().map((s, i) => `<span class="${i < w.stage ? 'on' : i === w.stage ? 'now' : ''}">${s}</span>`).join('')}</div>`;
+  const tools = `<div class="tools"><button class="btn small" data-chron>${K('年表', 'ねんぴょう')}</button><button class="btn small" data-menu>☰</button></div>`;
+  if (kid()) {
+    $('.top', stage).innerHTML = `
+      <div class="year">${G.yearLabel(g)}ねん<small>${g.year}／${G.maxYears(g)}かいめ</small></div>${stages}
+      <div class="gauges">
+        ${gauge('🌏 ちきゅう', w.env, lvl(w.env, 35, 20, true))}
+        ${gauge('⚔ けんか', w.conflicts, lvl(w.conflicts, 90, 130))}
+        ${gauge('⚡ ぴりぴり', Math.round(w.tension), lvl(w.tension, 60, 75))}
+        ${gauge('🤝 きょうりょく', g.coop.length + '／3')}
+      </div>${tools}`;
+  } else {
+    $('.top', stage).innerHTML = `
+      <div class="year">${G.yearLabel(g)}年<small>${g.year}/${G.maxYears(g)}年目</small></div>${stages}
+      <div class="gauges">
+        ${gauge('地球環境', w.env, lvl(w.env, 35, 20, true))}
+        ${gauge('CO₂', Math.round(w.co2), lvl(w.co2, 60, 75))}
+        ${gauge('気温', '+' + fmt(w.temp || 0, 1) + '℃')}
+        ${gauge('氷', Math.round(w.ice), lvl(w.ice, 60, 40, true))}
+        ${gauge('水資源', Math.round(w.waterRes), lvl(w.waterRes, 50, 35, true))}
+        ${gauge('生態系', Math.round(w.biodiv ?? 70), lvl(w.biodiv ?? 70, 50, 35, true))}
+        ${gauge('紛争', w.conflicts, lvl(w.conflicts, 90, 130))}
+        ${gauge('緊張', Math.round(w.tension), lvl(w.tension, 60, 75))}
+        ${gauge('条約有効', Math.round(w.treaty) + '%')}
+        ${gauge('破綻国', w.bankrupt ?? 0)}
+        ${gauge('協調', g.coop.length + '/3')}
+      </div>${tools}`;
+  }
   $('[data-chron]', stage).addEventListener('click', showChron);
   $('[data-menu]', stage).addEventListener('click', showMenu);
 }
 
 function renderMe() {
   const c = g.majors[g.player];
+  const allies = g.seats.filter((x) => x !== c.id && allied(g, c.id, x));
+  if (kid()) {
+    $('.me', stage).innerHTML = `
+      <div class="name">${flagSvg(c.flag, 30, 20)}<span>${esc(c.name)}</span></div>
+      <div class="sub">やりかた：${c.bases.map((b) => esc(baseName(b))).join('、')}</div>
+      <div class="sub">てを くんだ くに：${allies.length ? allies.map((x) => esc(nameOf(x))).join('、') : 'まだ ない'}</div>
+      ${c.panel ? '' : '<div class="offline">きみの くには たおれて しまった。しばらく おやすみ。ほかの くにが たすけて くれると、はやく もどれる。</div>'}
+      ${kidBars(c)}`;
+    return;
+  }
   const groups = {};
   for (const [k, info] of Object.entries(STAT_INFO)) if (k !== 'power') (groups[info.cat] ||= []).push(k);
-  const allies = g.seats.filter((x) => x !== c.id && allied(g, c.id, x));
   $('.me', stage).innerHTML = `
     <div class="name">${flagSvg(c.flag, 30, 20)}<span>${esc(c.name)}</span></div>
     <div class="sub">基本政策：${c.bases.map((b) => BASE[b].name).join('・')}</div>
@@ -243,7 +298,7 @@ function renderMe() {
 
 function renderMap() {
   const box = $('.mapwrap', stage);
-  box.innerHTML = mapSvg(g) + `<div class="legend"><span>● 紛争</span><span>☢ 核保有</span><span>--- 提携</span><span>🔥 火種</span></div><div class="seedtag">SEED ${esc(g.seed)}</div>`;
+  box.innerHTML = mapSvg(g) + `<div class="legend">${K('<span>● 紛争</span><span>☢ 核保有</span><span>--- 提携</span><span>🔥 火種</span>', '<span>● けんか</span><span>☢ かくへいき</span><span>--- てを くんだ</span><span>🔥 ひだね</span>')}</div><div class="seedtag">SEED ${esc(g.seed)}</div>`;
   $$('[data-id]', box).forEach((p) => p.addEventListener('click', () => countryInfo(p.dataset.id)));
 }
 
@@ -252,14 +307,11 @@ function feedHtml(f) {
   switch (f.k) {
     case 'gm': return f.pri <= pri ? `<div class="gmline">${esc(f.text)}</div>` : '';
     case 'event': return `<div class="ev"><b>📰 ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}</div>`;
-    case 'act': {
-      const pol = POLICIES[f.pol];
-      return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(pol.name)}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${f.p}% / 出目${f.roll}</span><span class="tier ${f.tier}">${TIER[f.tier].name}</span></div>`;
-    }
+    case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
-    case 'spark': return `<div class="ev spark"><b>${SPARKS[f.type].icon} 火種：${esc(nameOf(f.where))}で${esc(SPARKS[f.type].name)}</b>${esc(SPARKS[f.type].hint)}</div>`;
-    case 'vote': return `<div class="vote"><b>世界議会の投票：「${esc(f.name)}」</b><br>${f.votes.map((v) => `${esc(nameOf(v.id))} ${v.yes ? '<span class="good">賛成</span>' : '<span class="bad">反対</span>'}`).join('　')}</div>`;
+    case 'spark': return `<div class="ev spark"><b>${SPARKS[f.type].icon} ${K('火種', 'ひだね')}：${esc(nameOf(f.where))}${K('で', 'で ')}${esc(sparkName(f.type))}</b>${esc(kid() ? KID_SPARK[f.type][1] : SPARKS[f.type].hint)}</div>`;
+    case 'vote': return `<div class="vote"><b>${K('世界議会の投票', 'せかいの ぎかいの きめごと')}：「${esc(f.name)}」</b><br>${f.votes.map((v) => `${esc(nameOf(v.id))} ${v.yes ? `<span class="good">${K('賛成', 'さんせい')}</span>` : `<span class="bad">${K('反対', 'はんたい')}</span>`}`).join('　')}</div>`;
     default: return '';
   }
 }
@@ -274,17 +326,17 @@ function renderRivals() {
   const sparks = (g.sparks || []).map((s) => {
     const t = SPARKS[s.type];
     // 深刻度と期限は秘匿。見えるのは場所・種類・経過年数だけで、様子は GM の言葉から推し量る
-    return `<div class="sparkcard" data-id="${s.where}"><div class="row"><b>${t.icon} ${esc(nameOf(s.where))}</b><span class="chip">${g.year - s.start + 1}年目</span></div>
-      <div class="meta">${esc(t.name)}</div><div class="meta">状況は不明。いつ世界に広がるかもわからない</div></div>`;
+    return `<div class="sparkcard" data-id="${s.where}"><div class="row"><b>${t.icon} ${esc(nameOf(s.where))}</b><span class="chip">${g.year - s.start + 1}${K('年目', 'かいめ')}</span></div>
+      <div class="meta">${esc(sparkName(s.type))}</div><div class="meta">${K('状況は不明。いつ世界に広がるかもわからない', 'ようすは わからない。いつ ひろがるかも わからない')}</div></div>`;
   }).join('');
-  $('.rivals', stage).innerHTML = (sparks ? `<div class="sparks"><h3>🔥 火種</h3>${sparks}</div>` : '') + g.seats.filter((id) => id !== me).map((id) => {
+  $('.rivals', stage).innerHTML = (sparks ? `<div class="sparks"><h3>🔥 ${K('火種', 'ひだね')}</h3>${sparks}</div>` : '') + g.seats.filter((id) => id !== me).map((id) => {
     const c = g.majors[id];
     const r = rel(g, me, id);
-    const last = c.lastAct && c.lastAct.year === g.year ? `${POLICIES[c.lastAct.pol].name} <span class="tier ${c.lastAct.tier}">${TIER[c.lastAct.tier].name}</span>` : c.lastAct ? `<span class="muted">昨年：${POLICIES[c.lastAct.pol].name}</span>` : '';
-    const status = c.annexedBy ? `${nameOf(c.annexedBy)}に併合` : c.panel ? '' : 'パネル オフ';
+    const last = c.lastAct && c.lastAct.year === g.year ? `${esc(polName(c.lastAct.pol))} <span class="tier ${c.lastAct.tier}">${tierName(c.lastAct.tier)}</span>` : c.lastAct ? `<span class="muted">${K('昨年', 'まえ')}：${esc(polName(c.lastAct.pol))}</span>` : '';
+    const status = c.annexedBy ? K(`${nameOf(c.annexedBy)}に併合`, `${nameOf(c.annexedBy)}に とられた`) : c.panel ? '' : K('パネル オフ', 'おやすみ ちゅう');
     return `<div class="rival ${c.panel ? '' : 'off'}" style="--c:${seatColor(g, id)}" data-id="${id}">
-      <div class="row">${flagSvg(c.flag, 24, 16)}<b>${esc(c.name)}</b><span class="chip">${c.power}</span></div>
-      <div class="meta"><span>${PERSONAS[c.persona].name}</span>${allied(g, me, id) ? '<span class="good">提携</span>' : ''}${c.stats.nuke >= 4 ? '<span>☢</span>' : ''}<span>関係</span><span class="relbar"><i style="width:${r}%;background:${r >= 60 ? 'var(--green)' : r <= 30 ? 'var(--red)' : 'var(--gold)'}"></i></span>${status ? `<span class="bad">${status}</span>` : ''}</div>
+      <div class="row">${flagSvg(c.flag, 24, 16)}<b>${esc(c.name)}</b>${K(`<span class="chip">${c.power}</span>`, '')}</div>
+      <div class="meta"><span>${esc(personaName(c.persona))}</span>${allied(g, me, id) ? `<span class="good">${K('提携', 'てを くんだ')}</span>` : ''}${c.stats.nuke >= 4 ? '<span>☢</span>' : ''}<span>${K('関係', 'なかよし')}</span><span class="relbar"><i style="width:${r}%;background:${r >= 60 ? 'var(--green)' : r <= 30 ? 'var(--red)' : 'var(--gold)'}"></i></span>${status ? `<span class="bad">${status}</span>` : ''}</div>
       <div class="last">${last}</div>
     </div>`;
   }).join('');
@@ -298,7 +350,7 @@ function lastGmLine() {
     if (f.k === 'gm' && f.pri <= pri) return f.text;
     if (f.k === 'event') return f.text;
   }
-  return 'さて、どうする？';
+  return K('さて、どうする？', 'さて、どうする？');
 }
 
 function renderBottom() {
@@ -307,28 +359,33 @@ function renderBottom() {
   if (g.phase === 'player') return renderChoices(box);
   if (g.phase === 'yearEnd') return renderYearEnd(box);
   const me = g.majors[g.player];
-  box.innerHTML = `<div class="waiting">${me.panel ? '各国が政策を選んでいます……' : 'あなたの国のパネルはオフです。世界の動きを見守っています……'}</div>`;
+  box.innerHTML = `<div class="waiting">${me.panel ? K('各国が政策を選んでいます……', 'ほかの くにが かんがえて いるよ……') : K('あなたの国のパネルはオフです。世界の動きを見守っています……', 'きみの くには おやすみ ちゅう。せかいを みまもろう……')}</div>`;
 }
 
 function renderChoices(box) {
   const c = g.majors[g.player];
   const list = g.offers.list;
-  box.innerHTML = list.map((o, i) => {
+  box.innerHTML = list.map((o) => {
     const pol = POLICIES[o.id];
     const sparkTgt = (g.sparks || []).map((s) => s.where).find((w) => o.tgts.includes(w));
     const tg = o.tgts[0] == null ? null : (ui.tgt[o.id] && o.tgts.includes(ui.tgt[o.id]) ? ui.tgt[o.id] : sparkTgt || o.tgts[0]);
     ui.tgt[o.id] = tg;
     const pr = probability(g, c, pol, tg);
-    const okFx = describeFx(pol.ok).slice(0, 5).join('　');
-    const ngFx = describeFx(pol.ng).slice(0, 3).join('　');
+    const okFx = (kid() ? kidFx(pol.ok) : describeFx(pol.ok)).slice(0, kid() ? 3 : 5).join('　');
+    const ngFx = (kid() ? kidFx(pol.ng) : describeFx(pol.ng)).slice(0, kid() ? 2 : 3).join('　');
+    const isSpark = (g.sparks || []).some((s) => SPARKS[s.type].fx[o.id] != null);
+    const tag = isSpark ? `<span class="ins">🔥 ${K('火種', 'ひだね')}</span>` : g.inserts.includes(o.id) ? `<span class="ins">📰 ${K('情勢', 'にゅーす')}</span>` : '';
+    const prob = kid()
+      ? `<div class="prob kidprob"><small>でめが</small><b>${pr.p}</b><small>いかなら<br>せいこう</small></div>`
+      : `<div class="prob"><b>${pr.p}%</b><small>大成功 ${pr.crit}%<br>大失敗 ${pr.fumble}%</small></div>`;
     return `<div class="card ${ui.sel === o.id ? 'sel' : ''}" style="--cc:var(--${pol.cat})" data-pol="${o.id}">
-      <div class="cat"><span>${CATS[pol.cat]}</span>${(g.sparks || []).some((s) => SPARKS[s.type].fx[o.id] != null) ? '<span class="ins">🔥 火種</span>' : g.inserts.includes(o.id) ? '<span class="ins">📰 情勢</span>' : ''}</div>
-      <h4>${esc(pol.name)}</h4>
-      <div class="prob"><b>${pr.p}%</b><small>大成功 ${pr.crit}%<br>大失敗 ${pr.fumble}%</small></div>
-      <div class="fx">成功：${okFx || '—'}</div>
-      ${ngFx ? `<div class="fx ng">失敗：${ngFx}</div>` : ''}
-      ${tg ? `<div class="tg">${[...new Set([tg, ...o.tgts])].slice(0, 6).map((t) => `<button data-t="${t}" class="${t === tg ? 'on' : ''}">${esc(nameOf(t).slice(0, 6))}</button>`).join('')}</div>` : '<div class="tg"></div>'}
-      <button class="btn small ${ui.sel === o.id ? 'primary' : ''} go" data-go>${ui.sel === o.id ? 'ダイスを振る' : 'これにする'}</button>
+      <div class="cat"><span>${kid() ? KID_CATS[pol.cat] : CATS[pol.cat]}</span>${tag}</div>
+      <h4>${esc(polName(o.id))}</h4>
+      ${prob}
+      <div class="fx">${K('成功', 'せいこう')}：${okFx || '—'}</div>
+      ${ngFx ? `<div class="fx ng">${K('失敗', 'しっぱい')}：${ngFx}</div>` : ''}
+      ${tg ? `<div class="tg">${[...new Set([tg, ...o.tgts])].slice(0, 6).map((t) => `<button data-t="${t}" class="${t === tg ? 'on' : ''}">${esc(nameOf(t).replace(/の くに$|の しま$/, '').slice(0, 7))}</button>`).join('')}</div>` : '<div class="tg"></div>'}
+      <button class="btn small ${ui.sel === o.id ? 'primary' : ''} go" data-go>${ui.sel === o.id ? K('ダイスを振る', 'だいすを ふる') : K('これにする', 'これに する')}</button>
     </div>`;
   }).join('');
   $$('.card', box).forEach((card) => {
@@ -344,8 +401,15 @@ function probDetail(polId) {
   const c = g.majors[g.player];
   const pol = POLICIES[polId];
   const pr = probability(g, c, pol, ui.tgt[polId]);
-  modal(`<h2>${esc(pol.name)}：成功確率 ${pr.p}%</h2>
-    <div class="chron">${pr.parts.map(([l, v]) => `<div><span>${v > 0 && l !== '基本' ? '+' : ''}${v}</span><span>${esc(l)}</span></div>`).join('')}</div>
+  const parts = `<div class="chron">${pr.parts.map(([l, v]) => `<div><span>${v > 0 && l !== '基本' ? '+' : ''}${v}</span><span>${esc(kid() ? KID_MOD[l] || l : l)}</span></div>`).join('')}</div>`;
+  if (kid()) {
+    modal(`<h2>${esc(polName(polId))}：でめ ${pr.p} いかで せいこう</h2>${parts}
+      <div class="muted">でめが ${pr.crit} いかなら だいせいこう。96 いじょうで しっぱいすると だいしっぱい。</div>
+      <div>せいこう：${kidFx(pol.ok).join('　')}<br><span class="bad">しっぱい：${kidFx(pol.ng).join('　') || 'なし'}</span></div>
+      <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+    return;
+  }
+  modal(`<h2>${esc(pol.name)}：成功確率 ${pr.p}%</h2>${parts}
     <div class="muted" style="font-size:12px">上限95%・下限1%。出目が確率の1/10以下なら大成功、96以上で失敗すると大失敗。</div>
     <div style="font-size:13px">成功：${describeFx(pol.ok).join('　')}<br><span class="bad">失敗：${describeFx(pol.ng).join('　') || 'なし'}</span></div>
     <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
@@ -365,6 +429,19 @@ async function choose(polId) {
 }
 
 function changeText(rec) {
+  if (kid()) {
+    // じぶんの くにの 8つの すうじが どう かわったか
+    const acc = {};
+    for (const ch of rec.changes) {
+      if (ch.id !== rec.id) continue;
+      const k = KID_STAT_OF[ch.stat];
+      if (!k || k === 'earth') continue;
+      const bad = ['inequality', 'ethnic', 'guerrilla', 'debt'].includes(ch.stat);
+      acc[k] = (acc[k] || 0) + ((ch.d > 0) !== bad ? 1 : -1);
+    }
+    const s = KID_STATS.filter((x) => acc[x.key]).map((x) => `${x.icon} ${x.name} ${acc[x.key] > 0 ? 'あがった' : 'さがった'}`);
+    return s.length ? 'きみの くに：' + s.join('　') : '';
+  }
   const out = [];
   for (const ch of rec.changes.slice(0, 8)) {
     const who = ch.id === 'world' ? '世界' : ch.id === rec.id ? '自国' : ['all', 'nb'].includes(ch.id) ? '各国' : nameOf(ch.id);
@@ -377,10 +454,10 @@ function changeText(rec) {
 
 async function diceShow(rec) {
   const back = el(`<div class="dice-back"><div class="dice-box">
-    <div class="need">${esc(POLICIES[rec.pol].name)}　成功 ${rec.p}% 以下</div>
+    <div class="need">${esc(polName(rec.pol))}　${K(`成功 ${rec.p}% 以下`, `でめが ${rec.p} いかなら せいこう`)}</div>
     <div class="dice spin">${diceSvg()}<div class="num">--</div></div>
     <div class="res"></div><div class="changes"></div>
-    <button class="btn primary" data-ok style="visibility:hidden">つづける</button>
+    <button class="btn primary" data-ok style="visibility:hidden">${K('つづける', 'つぎへ')}</button>
   </div></div>`);
   stage.append(back);
   const num = $('.num', back);
@@ -389,7 +466,7 @@ async function diceShow(rec) {
   $('.dice', back).classList.remove('spin');
   num.textContent = rec.roll;
   const res = $('.res', back);
-  res.textContent = TIER[rec.tier].name; res.className = 'res ' + rec.tier;
+  res.textContent = tierName(rec.tier); res.className = 'res ' + rec.tier;
   $('.changes', back).textContent = changeText(rec);
   const ok = $('[data-ok]', back);
   ok.style.visibility = 'visible';
@@ -403,10 +480,10 @@ function renderYearEnd(box) {
   const prev = g.hist[g.hist.length - 2];
   const diff = (k) => (prev ? h[k] - prev[k] : 0);
   const sign = (v, rev) => (v === 0 ? '±0' : `<span class="${(v > 0) !== !!rev ? 'good' : 'bad'}">${v > 0 ? '+' : ''}${v}</span>`);
-  box.innerHTML = `<div class="yearend"><div class="sum">
-    <b style="color:var(--text);font-size:15px">${G.yearLabel(g)}年が終わった</b><br>
-    自国の国力 ${me.power}（${sign(diff('power'))}）　GNP成長率 ${fmt(me.growth || 0, 1)}%　地球環境 ${h.env}（${sign(diff('env'))}）　紛争 ${h.conflicts}カ所（${sign(diff('conflicts'), true)}）
-  </div><button class="btn primary" data-next>次の年へ ▶</button></div>`;
+  const sum = kid()
+    ? `<b style="color:var(--text);font-size:17px">${g.year}かいめが おわった（${G.yearLabel(g)}ねん）</b><br>🌏 ちきゅうの げんき ${h.env}（${sign(diff('env'))}）　⚔ せかいの けんか ${h.conflicts}（${sign(diff('conflicts'), true)}）`
+    : `<b style="color:var(--text);font-size:15px">${G.yearLabel(g)}年が終わった</b><br>自国の国力 ${me.power}（${sign(diff('power'))}）　GNP成長率 ${fmt(me.growth || 0, 1)}%　地球環境 ${h.env}（${sign(diff('env'))}）　紛争 ${h.conflicts}カ所（${sign(diff('conflicts'), true)}）`;
+  box.innerHTML = `<div class="yearend"><div class="sum">${sum}</div><button class="btn primary" data-next>${K('次の年へ ▶', 'つぎへ ▶')}</button></div>`;
   $('[data-next]', box).addEventListener('click', () => { G.beginYear(g); persist(); renderDash(); run(); });
 }
 
@@ -444,21 +521,21 @@ function handlePending() {
   const p = g.pending;
   return new Promise((resolve) => {
     if (p.type === 'nuke') {
-      const m = modal(`<h2>☢ 核のボタン</h2>
-        ${gmBubble(`${nameOf(p.foe)}との緊張が限界を超えた。国民は「撃て」と叫んでいる。核を使えば、そこでゲームオーバーだ。……さて、どうする？`)}
-        <div class="row"><button class="btn danger" data-fire>核を使う</button><button class="btn primary" data-hold>撃たない</button></div>`, 'nuke');
+      const m = modal(`<h2>☢ ${K('核のボタン', 'かくへいきの ぼたん')}</h2>
+        ${gmBubble(K(`${nameOf(p.foe)}との緊張が限界を超えた。国民は「撃て」と叫んでいる。核を使えば、そこでゲームオーバーだ。……さて、どうする？`, `${nameOf(p.foe)}と ものすごく ぴりぴり して いる。みんなが「うて」と さけんで いる。かくへいきを つかったら、そこで おしまいだ。……さて、どうする？`))}
+        <div class="row"><button class="btn danger" data-fire>${K('核を使う', 'つかう')}</button><button class="btn primary" data-hold>${K('撃たない', 'つかわない')}</button></div>`, 'nuke');
       $('[data-fire]', m).addEventListener('click', () => { m.remove(); G.resolvePending(g, 'fire'); resolve(); });
       $('[data-hold]', m).addEventListener('click', () => { m.remove(); G.resolvePending(g, 'hold'); resolve(); });
     } else if (p.type === 'vote') {
-      const m = modal(`<h2>世界議会：最初の議題</h2>
-        ${gmBubble('こぎ着けたな。世界議会の最初の議題を選びたまえ。全会一致で可決されれば、世界は統一的に運営される。')}
-        <div class="opts">${p.options.map((a) => `<button class="opt" data-a="${a}">${esc(AGENDAS[a].name)}</button>`).join('')}</div>`);
+      const m = modal(`<h2>${K('世界議会：最初の議題', 'せかいの ぎかい：はじめての きめごと')}</h2>
+        ${gmBubble(K('こぎ着けたな。世界議会の最初の議題を選びたまえ。全会一致で可決されれば、世界は統一的に運営される。', 'ここまで きたな。せかいの ぎかいで きめる ことを えらびなさい。ぜんいんが さんせいしたら、せかいは ひとつに なる。'))}
+        <div class="opts">${p.options.map((a) => `<button class="opt" data-a="${a}">${esc(agendaName(a))}</button>`).join('')}</div>`);
       $$('[data-a]', m).forEach((b) => b.addEventListener('click', () => { m.remove(); G.resolvePending(g, b.dataset.a); renderFeed(); resolve(); }));
     } else if (p.type === 'rename') {
       const c = g.majors[p.id];
-      const m = modal(`<h2>国号を改める</h2>
-        ${gmBubble(`${c.name}の新しい国名を選びたまえ。`)}
-        <div class="opts">${p.options.map((n) => `<button class="opt" data-n="${esc(n)}">${esc(n)}</button>`).join('')}<button class="opt" data-n="">いまの国名のままにする</button></div>`);
+      const m = modal(`<h2>${K('国号を改める', 'くにの なまえを かえる')}</h2>
+        ${gmBubble(K(`${c.name}の新しい国名を選びたまえ。`, `${c.name}の あたらしい なまえを えらびなさい。`))}
+        <div class="opts">${p.options.map((n) => `<button class="opt" data-n="${esc(n)}">${esc(n)}</button>`).join('')}<button class="opt" data-n="">${K('いまの国名のままにする', 'いまの なまえの まま')}</button></div>`);
       $$('[data-n]', m).forEach((b) => b.addEventListener('click', () => { m.remove(); G.resolvePending(g, b.dataset.n || null); resolve(); }));
     } else { G.resolvePending(g, null); resolve(); }
   });
@@ -469,6 +546,13 @@ function countryInfo(id) {
   const c = C(g, id);
   if (!c) return;
   if (isSeat(g, id)) {
+    if (kid()) {
+      modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
+        <div class="muted">${c.player ? 'きみの くに' : esc(personaName(c.persona))}　やりかた：${c.bases.map((b) => esc(baseName(b))).join('、')}${c.player ? '' : `　きみと なかよし ${Math.round(rel(g, g.player, id))}`}</div>
+        ${kidBars(c)}
+        <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+      return;
+    }
     const keys = Object.keys(STAT_INFO).filter((k) => k !== 'power');
     modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
       <div class="muted">${c.player ? 'あなたの国' : 'AI：' + PERSONAS[c.persona].name}　基本政策：${c.bases.map((b) => BASE[b].name).join('・')}　国力 ${c.power}${c.player ? '' : `　あなたとの関係 ${Math.round(rel(g, g.player, id))}`}</div>
@@ -477,25 +561,28 @@ function countryInfo(id) {
       <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
   } else {
     const s = c.stats;
+    const rows = kid()
+      ? [['💰 おかね', s.econ], ['🏠 あんしん', s.stability], ['💧 みず', s.water], ['🍚 たべもの', s.food], ['📉 しゃっきん', s.debt]]
+      : [['経済', s.econ], ['政情', s.stability], ['水', s.water], ['食糧', s.food], ['負債', s.debt]];
     modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
-      <div class="muted">${esc(c.role || '')}${c.owner ? `　${esc(nameOf(c.owner))}に併合` : ''}${c.sunk ? '　海面上昇で国土を失った' : ''}</div>
-      <div class="statgrid">${[['経済', s.econ], ['政情', s.stability], ['水', s.water], ['食糧', s.food], ['負債', s.debt]].map(([l, v]) => `<div class="stat ${(l === '負債' ? v >= 90 : v <= 20) ? 'danger' : ''}"><span>${l}</span><b>${fmt(v, 0)}</b></div>`).join('')}</div>
+      <div class="muted">${kid() ? '' : esc(c.role || '')}${c.owner ? K(`　${esc(nameOf(c.owner))}に併合`, `　${esc(nameOf(c.owner))}に とられた`) : ''}${c.sunk ? K('　海面上昇で国土を失った', '　うみに しずんで しまった') : ''}</div>
+      <div class="statgrid">${rows.map(([l, v], i) => `<div class="stat ${(i === 4 ? v >= 90 : v <= 20) ? 'danger' : ''}"><span>${l}</span><b>${fmt(v, 0)}</b></div>`).join('')}</div>
       <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
   }
 }
 
 function showChron() {
-  modal(`<h2>年表</h2><div class="chron">${g.chron.map((x) => `<div><span>${x.year}</span><span>${esc(x.text)}</span></div>`).join('')}</div>
+  modal(`<h2>${K('年表', 'ねんぴょう')}</h2><div class="chron">${g.chron.map((x) => `<div><span>${x.year}</span><span>${esc(x.text)}</span></div>`).join('')}</div>
     <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
 }
 
 function showMenu() {
-  const m = modal(`<h2>メニュー</h2>
-    <div class="muted">シード値：<b style="color:var(--text);letter-spacing:.1em">${esc(g.seed)}</b>（同じ組み合わせで遊び直せます）</div>
+  const m = modal(`<h2>${K('メニュー', 'めにゅー')}</h2>
+    <div class="muted">${K('シード値', 'せかいの ばんごう')}：<b style="color:var(--text);letter-spacing:.1em">${esc(g.seed)}</b>${K('（同じ組み合わせで遊び直せます）', '（おなじ せかいで また あそべる）')}</div>
     <div class="opts">
       <button class="opt" data-how>あそびかた</button>
       <button class="opt" data-set>せってい</button>
-      <button class="opt" data-title>タイトルへ（自動で保存されています）</button>
+      <button class="opt" data-title>${K('タイトルへ（自動で保存されています）', 'さいしょの がめんへ（とちゅうから また あそべる）')}</button>
     </div><div class="row"><button class="btn primary" data-close>とじる</button></div>`);
   $('[data-how]', m).addEventListener('click', () => { m.remove(); howTo(); });
   $('[data-set]', m).addEventListener('click', () => { m.remove(); openSettings(); });
@@ -503,7 +590,7 @@ function showMenu() {
 }
 
 // ───── 結末 ─────
-function sparkline(key, color, label, max = 100) {
+function sparkline(key, color, label) {
   const h = g.hist;
   if (h.length < 2) return '';
   const W = 520, Hh = 70;
@@ -516,36 +603,38 @@ function endingScreen() {
   const r = g.result;
   const me = g.majors[g.player];
   const good = r.type === 'clear';
-  let title = G.ENDINGS[r.type].name, sub = '';
-  if (r.type === 'clear') sub = `世界議会の最初の議題「${AGENDAS[r.agenda].name}」が全会一致で可決された。`;
+  const title = kid() ? KID_ENDINGS[r.type] : G.ENDINGS[r.type].name;
+  let sub = '';
+  if (r.type === 'clear') sub = K(`世界議会の最初の議題「${AGENDAS[r.agenda].name}」が全会一致で可決された。`, `せかいの ぎかいで「${KID_AGENDAS[r.agenda]}」が ぜんいん さんせいで きまった。`);
   if (r.type === 'timeup') sub = `${G.timeupGrade(g)}。`;
-  if (r.type === 'conquest') sub = `${nameOf(r.conqueror)}が世界を征服した。`;
+  if (r.type === 'conquest') sub = K(`${nameOf(r.conqueror)}が世界を征服した。`, `${nameOf(r.conqueror)}が せかいを のっとった。`);
   const lastGm = [...g.feed].reverse().find((f) => f.k === 'gm')?.text || '';
   mount(el(`<div class="screen ending ${good ? '' : 'badend'}">
     <div style="display:flex;justify-content:space-between;align-items:flex-end">
-      <div><div class="muted">${r.calYear}年（${r.year}年目）</div><h1>${title}</h1><div>${esc(sub)}</div></div>
-      <div style="text-align:right"><div class="muted">スコア</div><div style="font-size:40px;font-weight:900;color:var(--gold)">${r.score.toLocaleString()}</div></div>
+      <div><div class="muted">${K(`${r.calYear}年（${r.year}年目）`, `${r.calYear}ねん（${r.year}かいめ）`)}</div><h1>${good && kid() ? '🎉 ' : ''}${title}</h1><div>${esc(sub)}</div></div>
+      <div style="text-align:right"><div class="muted">${K('スコア', 'てんすう')}</div><div style="font-size:40px;font-weight:900;color:var(--gold)">${r.score.toLocaleString()}</div></div>
     </div>
     ${gmBubble(lastGm)}
     <div class="nums">
-      <div class="num"><b>${flagSvg(me.flag, 24, 16)} ${esc(me.name)}</b><i>あなたの国（国力 ${me.power}）</i></div>
-      <div class="num"><b>${G.STAGES[g.world.stage]}</b><i>国際機関の段階</i></div>
-      <div class="num"><b>${g.world.env}</b><i>地球環境</i></div>
-      <div class="num"><b>${fmt(g.counters.deaths, 1)}百万人</b><i>犠牲になった人々（推計）</i></div>
+      <div class="num"><b>${flagSvg(me.flag, 24, 16)} ${esc(me.name)}</b><i>${K(`あなたの国（国力 ${me.power}）`, 'きみの くに')}</i></div>
+      <div class="num"><b>${stageNames()[g.world.stage]}</b><i>${K('国際機関の段階', 'どこまで すすんだか')}</i></div>
+      <div class="num"><b>${g.world.env}</b><i>${K('地球環境', 'ちきゅうの げんき')}</i></div>
+      <div class="num"><b>${K(`${fmt(g.counters.deaths, 1)}百万人`, `${Math.round(g.counters.deaths * 100)}まんにん`)}</b><i>${K('犠牲になった人々（推計）', 'なくなった ひと（だいたい）')}</i></div>
     </div>
     <div class="grid">
-      <div class="spark">${sparkline('env', '#46b37b', '地球環境')}${sparkline('conflicts', '#e5534b', '紛争の数', 200)}${sparkline('power', '#f2b632', '自国の国力')}</div>
+      <div class="spark">${sparkline('env', '#46b37b', K('地球環境', 'ちきゅうの げんき'))}${sparkline('conflicts', '#e5534b', K('紛争の数', 'せかいの けんか'))}${kid() ? '' : sparkline('power', '#f2b632', '自国の国力')}</div>
       <div class="chron">${g.chron.map((x) => `<div><span>${x.year}</span><span>${esc(x.text)}</span></div>`).join('')}</div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
-      <span class="muted">シード値 <b style="color:var(--text);letter-spacing:.1em">${esc(g.seed)}</b></span>
-      <button class="btn" data-same>同じ世界でもう一度</button>
-      <button class="btn primary" data-new>新しいゲーム</button>
-      <button class="btn" data-title>タイトルへ</button>
+      <span class="muted">${K('シード値', 'せかいの ばんごう')} <b style="color:var(--text);letter-spacing:.1em">${esc(g.seed)}</b></span>
+      <button class="btn" data-same>${K('同じ世界でもう一度', 'おなじ せかいで もういちど')}</button>
+      <button class="btn primary" data-new>${K('新しいゲーム', 'あたらしく はじめる')}</button>
+      <button class="btn" data-title>${K('タイトルへ', 'さいしょの がめんへ')}</button>
     </div>
   </div>`));
-  $('[data-same]', stage).addEventListener('click', () => startSetup(g.seed));
-  $('[data-new]', stage).addEventListener('click', () => startSetup(newSeed()));
+  const wasKid = g.kid;
+  $('[data-same]', stage).addEventListener('click', () => { settings.mode = wasKid ? 'kid' : 'adult'; startSetup(g.seed); });
+  $('[data-new]', stage).addEventListener('click', () => { settings.mode = wasKid ? 'kid' : 'adult'; startSetup(newSeed()); });
   $('[data-title]', stage).addEventListener('click', titleScreen);
 }
 

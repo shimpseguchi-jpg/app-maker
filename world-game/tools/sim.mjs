@@ -8,12 +8,13 @@ import { makeRng } from '../js/util.js';
 const N = Number(process.argv[2] || 300);
 const VERBOSE = !!process.env.V;
 const PERSONA = process.env.P || null; // 自国の打ち方（未指定ならランダム）
+const KID = !!process.env.KID; // 1ねんせいモード（20かい）
 const rng = makeRng(12345);
 const PERS = ['tech', 'edu', 'trade', 'order', 'finance', 'ambition'];
 
 function playOne(i) {
   const seed = 'SIM' + i;
-  const g = G.newGame(seed, { diceSeed: 1000 + i });
+  const g = G.newGame(seed, { diceSeed: 1000 + i, kid: KID });
   const pl = g.majors[g.player];
   pl.persona = PERSONA || PERS[Math.floor(rng() * PERS.length)];
   const bases = Object.keys(BASE).filter((b) => b !== 'B10');
@@ -44,19 +45,22 @@ for (let i = 0; i < N; i++) {
   res[r.type] = (res[r.type] || 0) + 1;
   years.push(r.year);
   stageMax[g.world.stage]++;
-  for (const h of g.hist) { const y = h.year - 2004; if (y % 10) continue; const t = (traj[y] ||= { n: 0, env: 0, co2: 0, conflicts: 0, tension: 0 }); t.n++; for (const k of ['env', 'co2', 'conflicts', 'tension']) t[k] += h[k]; }
+  // 推移は「50年に換算した経過」で10年ごとにまとめる（1ねんせいモードは20かい＝50年）
+  const last = {};
+  g.hist.forEach((h, i) => { const q = ((i + 1) * 50) / G.maxYears(g); if (q % 10 < 2.5 || q % 10 === 0) last[Math.round(q / 10) * 10] = h; });
+  for (const [y, h] of Object.entries(last)) { if (+y === 0) continue; const t = (traj[y] ||= { n: 0, env: 0, co2: 0, conflicts: 0, tension: 0 }); t.n++; for (const k of ['env', 'co2', 'conflicts', 'tension']) t[k] += h[k]; }
   coopN += g.coop.length; alliesSum += g.allies.length;
-  for (const c of g.chron) { if (c.text.startsWith('火種：')) sparkStart++; if (c.text.includes('封じ込め')) sparkOk++; if (c.text.includes('世界に拡大')) sparkNg++; }
+  for (const c of g.chron) { if (/^(火種|ひだね)：/.test(c.text)) sparkStart++; if (/封じ込め|おさえこんだ/.test(c.text)) sparkOk++; if (/世界に拡大|せかいに ひろがった/.test(c.text)) sparkNg++; }
   for (const id of Object.keys(g.fired)) fired[id] = (fired[id] || 0) + 1;
   // 自国になった国ごとの成績（国力の順位・崩壊・クリア）
   const pid = g.player;
   const rank = 1 + g.seats.filter((x) => g.majors[x].power > g.majors[pid].power).length;
   const b = (byCountry[pid] ||= { n: 0, rank: 0, collapsed: 0, clear: 0, conquest: 0, power: 0 });
   b.n++; b.rank += rank; b.power += g.majors[pid].power;
-  if (g.chron.some((x) => x.text.startsWith(g.majors[pid].origName) && /崩壊|クーデター|敗戦/.test(x.text))) b.collapsed++;
+  if (g.chron.some((x) => x.text.startsWith(g.majors[pid].origName) && /崩壊|クーデター|敗戦|たおれた|のっとった|まけた/.test(x.text))) b.collapsed++;
   if (r.type === 'clear') b.clear++;
   if (r.type === 'conquest' && g.conqueror === pid) b.conquest++;
-  collapses += g.chron.filter((x) => /崩壊|クーデター|敗戦/.test(x.text)).length;
+  collapses += g.chron.filter((x) => /崩壊|クーデター|敗戦|せいふが たおれた|のっとった|まけた/.test(x.text)).length;
   if (VERBOSE && i === 0) {
     for (const c of g.chron) console.log(c.year, c.text);
     console.log(g.world, g.result);

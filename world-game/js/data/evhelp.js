@@ -1,6 +1,8 @@
 // イベントの条件・効果で使う小さな道具
 import { rel } from '../engine/core.js';
 
+// 暦の上での年数（1年生モードは1かいで2〜3年すすむので、年の条件はこれで見る）
+export const Y = (g) => (g.cal ?? g.year - 1) + 1;
 export const act = (g) => g.seats.filter((id) => g.majors[id].panel).map((id) => g.majors[id]);
 export const bgs = (g) => Object.values(g.backs).filter((b) => !b.owner && !b.sunk);
 export const avg = (g, k) => { const a = act(g); return a.length ? a.reduce((s, c) => s + c.stats[k], 0) / a.length : 0; };

@@ -1,7 +1,7 @@
 // 追加の世界イベント（POLICIES_EVENTS.md の 4.5〜4.9）：南極・北極、いまの問題、過去の問題、未来の問題、火種
 // 書き方は events.js と同じ。「モチーフ」はコメントに書き、ゲーム画面には出さない
 import { neighbors, isSeat, rel } from '../engine/core.js';
-import { act, bgs, avg, fired, since, flagSince, best, ai, live } from './evhelp.js';
+import { Y, act, bgs, avg, fired, since, flagSince, best, ai, live } from './evhelp.js';
 
 const north = (g) => act(g).filter((c) => c.polar === 'N');
 const coastalBig = (g) => act(g).filter((c) => ['M13', 'M15', 'M14', 'M01', 'M12', 'M11', 'M04'].includes(c.id));
@@ -18,7 +18,7 @@ export const EVENTS_MORE = [
     run: (g, H) => { for (const c of north(g)) H.fx(['who.gnp-s', 'who.fiscal-s'], { who: c.id }); }, fx: ['world.co2+m'],
     ins: ['P91'], text: '凍った大地が解け始めた。閉じ込められていたメタンが空に出て、温暖化をさらに早める。北の国では道路とパイプラインが傾いている。' },
   // モチーフ：南極条約の環境保護議定書の見直し（2048年以降に可能）
-  { id: 'E83', name: '南極条約の見直し', cat: 'polar', w: 30, cond: (g) => g.year >= 20,
+  { id: 'E83', name: '南極条約の見直し', cat: 'polar', w: 30, cond: (g) => Y(g) >= 20,
     run: (g) => { g.flags.antarcticReview = g.year; g.counters.antKeep = 0; g.counters.antOpen = 0; }, ins: ['P94', 'P95'], next: ['E84', 'E85'],
     text: '南極の鉱物資源の開発禁止を続けるかどうか、見直しの時期が来た。資源を取るか、最後の手つかずの大陸を残すか。さて、どうする？' },
   { id: 'E84', name: '南極条約の延長', cat: 'polar', w: 40, coop: true, cond: (g) => g.flags.antarcticReview != null && (g.counters.antKeep || 0) >= 3,
@@ -33,14 +33,14 @@ export const EVENTS_MORE = [
     run: (g, H) => { const n = north(g); for (const c of n) H.fx(['who.bases+s', 'who.fiscal-s'], { who: c.id }); for (const a of n) for (const b of n) if (a.id < b.id) H.addRel(a.id, b.id, -10); },
     fx: ['world.tension+m'], ins: ['P102', 'P60'], text: '北極の海に、潜水艦と基地が集まり始めた。氷が消えた場所は、国境線の引き直しの場になる。' },
   // モチーフ：グリーンランド買収騒動
-  { id: 'E88', name: '巨大な島の買収騒動', cat: 'polar', w: 8, cond: (g) => g.year >= 8 && act(g).some((c) => c.id === 'M06') && act(g).some((c) => c.id !== 'M06' && c.power >= 80),
+  { id: 'E88', name: '巨大な島の買収騒動', cat: 'polar', w: 8, cond: (g) => Y(g) >= 8 && act(g).some((c) => c.id === 'M06') && act(g).some((c) => c.id !== 'M06' && c.power >= 80),
     who: (g) => best(act(g).filter((c) => c.id !== 'M06'), (c) => c.power).id, run: (g, H, who) => { H.addRel(who, 'M06', -20); H.say(`${g.majors[who].name}が、${g.majors.M06.name}の北の島を丸ごと買い取りたいと言い出した。`); },
     fx: ['who.rep-s'], text: '国を、お金で買う。冗談に聞こえるが、本気で言っている元首がいる。' },
   { id: 'E89', name: '南極海のオキアミ漁', cat: 'polar', w: 10, cond: (g) => g.world.foodPrice >= 65,
     fx: ['world.biodiv-m', 'world.foodPrice-s'], ins: ['P98', 'P97'], text: '南極の海で、小さなエビの奪い合いが始まった。クジラもペンギンも、同じエビを食べて生きているのだがね。' },
 
   // ───── いまの問題：人口・社会 ─────
-  { id: 'E90', name: '少子高齢化と年金', cat: 'society', w: 12, repeat: 15, cond: (g) => g.year >= 8 && act(g).some((c) => c.stats.literacy >= 98 && !c.flags.aging),
+  { id: 'E90', name: '少子高齢化と年金', cat: 'society', w: 12, repeat: 15, cond: (g) => Y(g) >= 8 && act(g).some((c) => c.stats.literacy >= 98 && !c.flags.aging),
     who: (g) => act(g).find((c) => c.stats.literacy >= 98 && !c.flags.aging).id, run: (g, H, who) => { g.majors[who].flags.aging = g.year; },
     fx: ['who.fiscal-m', 'who.industry-s'], ins: ['P96', 'P42'], text: '{who}では、子どもが減り、お年寄りが増え続けている。年金を払う人より、受け取る人のほうが多くなる日が近い。' },
   { id: 'E91', name: '人口爆発', cat: 'society', w: 10, cond: (g) => act(g).some((c) => c.stats.literacy < 85),
@@ -74,10 +74,10 @@ export const EVENTS_MORE = [
     ins: ['P42', 'P41'], next: ['E19'], text: '住めなくなった土地から、人々が移り始めた。戦争からではなく、天気から逃げる難民だ。' },
 
   // ───── いまの問題：健康 ─────
-  { id: 'E100', name: '耐性菌の拡大', cat: 'health', w: 8, cond: (g) => g.year >= 10,
+  { id: 'E100', name: '耐性菌の拡大', cat: 'health', w: 8, cond: (g) => Y(g) >= 10,
     run: (g, H) => { g.flags.amr = g.year; H.deaths(0.5); }, fx: ['majors.pop-s'], ins: ['P99', 'P81'],
     text: '抗生物質が効かない細菌が広がっている。家畜にも人にも薬を使いすぎた結果だ。かすり傷が命取りになる時代が戻ってくる。' },
-  { id: 'E101', name: '飢餓と肥満', cat: 'health', w: 6, cond: (g) => g.year >= 6 && act(g).some((c) => c.stats.food >= 110),
+  { id: 'E101', name: '飢餓と肥満', cat: 'health', w: 6, cond: (g) => Y(g) >= 6 && act(g).some((c) => c.stats.food >= 110),
     run: (g, H) => { for (const c of act(g)) if (c.stats.food >= 110) H.fx(['who.fiscal-s'], { who: c.id }); }, fx: ['poorBg.food-s'], ins: ['P31'],
     text: 'ある国では食べすぎで病気になり、別の国では食べられずに死んでいく。食べ物の量は、足りているはずなのだがね。' },
 
@@ -86,10 +86,10 @@ export const EVENTS_MORE = [
   { id: 'E102', name: '債務の罠', cat: 'eco', w: 15, cond: (g) => (g.counters.aidHigh || 0) >= 3,
     who: (g) => best(act(g), (c) => c.stats.capital).id, run: (g, H, who) => { const b = pickBg(g, (x) => x.stats.debt >= 70); if (b) { g.backs[b].stats.stability -= 10; H.say(`返済できなくなった${g.backs[b].name}の港が、担保として取り上げられた。`); } },
     fx: ['who.bases+s', 'who.rep-m'], ins: ['P120', 'P53'], text: '{who}が貸した道路と港の代金が、返ってこない。代わりに受け取ったのは、その港そのものだった。' },
-  { id: 'E103', name: '租税回避地', cat: 'eco', w: 10, cond: (g) => g.year >= 6,
+  { id: 'E103', name: '租税回避地', cat: 'eco', w: 10, cond: (g) => Y(g) >= 6,
     run: (g, H) => { g.flags.taxHaven = g.year; const h = act(g).find((c) => c.id === 'M14'); for (const c of act(g)) H.fx([c === h ? 'who.capital+m' : 'who.fiscal-s'], { who: c.id }); },
     ins: ['P100'], text: '大企業と大富豪の資産が、税金のほとんどかからない小さな島や都市に流れている。ほかの国の税収は、そのぶん減る。' },
-  { id: 'E104', name: '貿易ルールの機能停止', cat: 'eco', w: 10, cond: (g) => g.world.treaty <= 40 && g.year >= 8,
+  { id: 'E104', name: '貿易ルールの機能停止', cat: 'eco', w: 10, cond: (g) => g.world.treaty <= 40 && Y(g) >= 8,
     fx: ['world.treaty-m', 'majors.gnp-s'], ins: ['P05', 'P51'], text: '貿易の揉め事を裁く国際機関が、判事を選べずに止まった。ルールを守らない国を、誰も止められない。' },
   { id: 'E105', name: '電子ゴミの押し付け', cat: 'eco', w: 8, cond: (g) => avg(g, 'tech') >= 65,
     run: (g, H) => { for (const c of act(g)) if (c.stats.tech >= 80) H.fx(['who.rep-s'], { who: c.id }); }, fx: ['poorBg.stability-s', 'world.biodiv-s'], ins: ['P91'],
@@ -102,7 +102,7 @@ export const EVENTS_MORE = [
     who: (g) => act(g).find((c) => (c.flags.censor || 0) >= 1 && c.stats.tech >= 70).id, fx: ['who.security+m', 'who.rep-m', 'who.mobility-s'], ins: ['P101'],
     text: '{who}の街角のカメラが、すべての国民の顔を覚えている。犯罪は減った。不満を口にする人も減った。' },
   // モチーフ：ケスラーシンドローム
-  { id: 'E108', name: '宇宙ゴミの連鎖衝突', cat: 'tech', w: 10, cond: (g) => (g.counters.space || 0) >= 2 || g.year >= 25,
+  { id: 'E108', name: '宇宙ゴミの連鎖衝突', cat: 'tech', w: 10, cond: (g) => (g.counters.space || 0) >= 2 || Y(g) >= 25,
     run: (g, H) => { for (const c of act(g)) if (c.stats.tech >= 70) H.fx(['who.tech-s', 'who.gnp-s'], { who: c.id }); }, ins: ['P90'],
     text: '軌道上のゴミが衛星にぶつかり、その破片がまた別の衛星を壊していく。天気予報も、位置情報も、しばらく使えない。' },
   { id: 'E109', name: '自律型兵器の戦争', cat: 'mil', w: 10, cond: (g) => avg(g, 'tech') >= 72 && g.world.tension >= 45,
@@ -122,7 +122,7 @@ export const EVENTS_MORE = [
   { id: 'E113', name: '人身売買', cat: 'society', w: 8, cond: (g) => g.world.refugees >= 55,
     fx: ['majors.security-s', 'world.trust-s'], ins: ['P42', 'P40'], text: '逃げてきた人々を、売り買いする者たちがいる。国境が閉じられるほど、彼らの商売は繁盛する。' },
   // モチーフ：ナイル川・メコン川のダム
-  { id: 'E114', name: '大河のダム争い', cat: 'fw', w: 6, repeat: 20, cond: (g) => g.year >= 6 && ['B17', 'B24'].some((id) => live(g, id)),
+  { id: 'E114', name: '大河のダム争い', cat: 'fw', w: 6, repeat: 20, cond: (g) => Y(g) >= 6 && ['B17', 'B24'].some((id) => live(g, id)),
     who: (g) => ['B17', 'B24'].find((id) => live(g, id)), run: (g, H, who) => H.spark('dam', who), ins: ['P116', 'P53'],
     text: '大河の上流の{who}が巨大なダムを造った。下流の国々にとって、川の水は命そのものだ。' },
   // モチーフ：ジャカルタの水没と首都移転
@@ -136,7 +136,7 @@ export const EVENTS_MORE = [
     fx: ['majors.gnp-l', 'majors.stability-m', 'bgAll.econ-m', 'world.treaty-m'], run: (g, H) => H.deaths(1), ins: ['P84', 'P05'], next: ['E111'],
     text: '金融の崩壊と関税の殴り合いが重なって、世界中の経済が止まった。失業者の列が、どの国の街角にもできている。' },
   // モチーフ：ニクソン・ショック
-  { id: 'E117', name: '通貨と金の交換停止', cat: 'eco', w: 8, cond: (g) => g.year >= 10 && act(g).some((c) => c.stats.gnp >= 15 && c.stats.fiscal <= -6),
+  { id: 'E117', name: '通貨と金の交換停止', cat: 'eco', w: 8, cond: (g) => Y(g) >= 10 && act(g).some((c) => c.stats.gnp >= 15 && c.stats.fiscal <= -6),
     fx: ['world.wrate+m', 'world.trust-s'], text: '世界の基軸通貨を、金と交換するという約束がなくなった。お金の価値は、信用だけが支えるものになった。' },
   // モチーフ：プラザ合意
   { id: 'E118', name: '通貨の協調介入', cat: 'eco', w: 30, cond: (g) => g.flags.currency != null && g.allies.length >= 2,
@@ -173,11 +173,11 @@ export const EVENTS_MORE = [
     who: (g) => best(act(g), (c) => c.stats.food).id, fx: ['who.stability-s', 'world.biodiv-m'], ins: ['P97'],
     text: '{who}の畑にまかれた農薬で、春になっても鳥が鳴かなくなった。' },
   // モチーフ：ボパール化学工場事故
-  { id: 'E128', name: '化学工場の大事故', cat: 'disaster', w: 5, cond: (g) => g.year >= 5,
+  { id: 'E128', name: '化学工場の大事故', cat: 'disaster', w: 5, cond: (g) => Y(g) >= 5,
     who: (g) => pickBg(g, (b) => b.stats.econ >= 20), run: (g, H) => H.deaths(0.02), fx: ['who.stability-m'],
     text: '{who}の化学工場から毒ガスが漏れた。工場の持ち主は外国の会社で、責任の所在がはっきりしない。' },
   // モチーフ：HIV／エイズ
-  { id: 'E129', name: '静かな感染症', cat: 'health', w: 6, cond: (g) => g.year >= 4 && bgs(g).some((b) => b.region === 'me' && b.stats.stability <= 40),
+  { id: 'E129', name: '静かな感染症', cat: 'health', w: 6, cond: (g) => Y(g) >= 4 && bgs(g).some((b) => b.region === 'me' && b.stats.stability <= 40),
     fx: ['poorBg.stability-s'], run: (g, H) => H.deaths(1), ins: ['P110', 'P81'],
     text: 'ゆっくりと、しかし確実に広がる感染症がある。働き盛りの大人が倒れ、子どもだけが残される村が増えている。' },
   // モチーフ：2000年問題
@@ -186,7 +186,7 @@ export const EVENTS_MORE = [
     text: '古いコンピュータが、日付の桁を数え間違えるかもしれない。備えた国には何も起きず、備えなかった国では銀行が止まった。' },
 
   // ───── 未来の問題 ─────
-  { id: 'E131', name: '人間を超える人工知能', cat: 'future', w: 15, cond: (g) => g.year >= 20 && act(g).some((c) => c.stats.tech >= 96),
+  { id: 'E131', name: '人間を超える人工知能', cat: 'future', w: 15, cond: (g) => Y(g) >= 20 && act(g).some((c) => c.stats.tech >= 96),
     who: (g) => best(act(g), (c) => c.stats.tech).id, run: (g, H, who) => { for (const c of act(g)) if (c.id !== who) H.addRel(who, c.id, -10); g.flags.automation = g.year; },
     fx: ['who.industry+l', 'who.tech+m', 'world.tension+m'], ins: ['P103', 'P102'], next: ['E132'],
     text: '{who}で、人間より賢い機械が生まれたらしい。その機械が、誰の命令を聞くのかはまだわからない。' },
@@ -207,37 +207,37 @@ export const EVENTS_MORE = [
   { id: 'E137', name: '暗号が破られる日', cat: 'future', w: 10, cond: (g) => act(g).some((c) => c.stats.tech >= 95),
     who: (g) => best(act(g), (c) => c.stats.tech).id, run: (g, H, who) => { for (const c of act(g)) if (c.id !== who && !c.flags.cyber) H.fx(['who.security-m', 'who.capital-s'], { who: c.id }); },
     fx: ['world.tension+m'], ins: ['P87'], text: '{who}の新しい計算機が、世界中の暗号を数秒で解けるらしい。銀行も軍隊も、鍵をかけ直さなければならない。' },
-  { id: 'E138', name: '核融合の実用化', cat: 'future', w: 15, cond: (g) => g.year >= 15 && act(g).some((c) => c.stats.tech >= 94),
+  { id: 'E138', name: '核融合の実用化', cat: 'future', w: 15, cond: (g) => Y(g) >= 15 && act(g).some((c) => c.stats.tech >= 94),
     who: (g) => best(act(g), (c) => c.stats.tech).id, run: (g, H) => { for (const c of act(g)) if (c.stats.oil >= 60) H.fx(['who.fiscal-m', 'who.gnp-s'], { who: c.id }); },
     fx: ['who.altE+l', 'who.gnp+m', 'world.co2-m'], text: '{who}で、海の水から無限に近いエネルギーを取り出す炉が動き出した。石油の時代が、終わりかけている。' },
   { id: 'E139', name: '遺伝子編集ベビー', cat: 'future', w: 8, cond: (g) => act(g).reduce((s, c) => s + c.stats.patents, 0) >= 100,
     who: (g) => best(act(g), (c) => c.stats.patents).id, fx: ['who.rep-m', 'world.trust-s'], ins: ['P71'],
     text: '{who}の研究所で、遺伝子を書き換えた子どもが生まれた。病気に強い子だという。次は、頭の良い子を注文できるようになるのかね。' },
-  { id: 'E140', name: '寿命を延ばす治療', cat: 'future', w: 8, cond: (g) => g.year >= 20 && avg(g, 'tech') >= 75,
+  { id: 'E140', name: '寿命を延ばす治療', cat: 'future', w: 8, cond: (g) => Y(g) >= 20 && avg(g, 'tech') >= 75,
     run: (g, H) => { for (const c of act(g)) if (c.stats.tech >= 80) H.fx(['who.inequality+m'], { who: c.id }); }, fx: ['world.trust-s'],
     text: '寿命を二十年延ばす治療ができた。ただし、とても高い。長生きできるかどうかは、財布しだいになった。' },
   { id: 'E141', name: '国土のない国家', cat: 'future', w: 30, coop: true, cond: (g) => Object.values(g.backs).some((b) => b.sunk) && g.world.trust >= 55,
     fx: ['world.trust+m', 'world.refugees-m'], text: '海に沈んだ国が、国民の名簿と文化をネットの上に残し、国土のない国として認められた。国とは何かを、世界が考え直すきっかけになった。' },
-  { id: 'E142', name: 'デジタル通貨の覇権争い', cat: 'future', w: 10, cond: (g) => g.flags.internet != null && g.year >= 12,
+  { id: 'E142', name: 'デジタル通貨の覇権争い', cat: 'future', w: 10, cond: (g) => g.flags.internet != null && Y(g) >= 12,
     run: (g) => { g.flags.digitalCurrency = g.year; }, ins: ['P109', 'P84'], text: '国が発行する電子のお金が、国境を越えて使われ始めた。どの国のお金が世界の標準になるかで、静かな戦争が起きている。' },
   { id: 'E143', name: '消えゆく国', cat: 'future', w: 8, cond: (g) => act(g).some((c) => c.flags.aging && g.year - c.flags.aging >= 10),
     who: (g) => act(g).find((c) => c.flags.aging && g.year - c.flags.aging >= 10).id, fx: ['who.industry-m', 'who.pop-s', 'who.fiscal-s'], ins: ['P42'],
     text: '{who}では、村が一つずつ地図から消えている。このままでは、いつか国そのものがなくなる計算になる。' },
   // モチーフ：疾病X（未知の病原体）
-  { id: 'E144', name: '未知の病原体', cat: 'health', w: 4, repeat: 15, cond: (g) => g.year >= 5 && !g.flags.pandemic,
+  { id: 'E144', name: '未知の病原体', cat: 'health', w: 4, repeat: 15, cond: (g) => Y(g) >= 5 && !g.flags.pandemic,
     who: (g) => pickBg(g, (b) => b.stats.stability <= 50) || pickBg(g, () => true), run: (g, H, who) => H.spark('disease', who), ins: ['P110', 'P111'],
     text: '{who}で、原因のわからない肺炎が広がっている。まだ名前もない病気だ。' },
   // モチーフ：キャリントン・イベント
-  { id: 'E145', name: '巨大な太陽フレア', cat: 'disaster', w: 3, cond: (g) => g.year >= 10,
+  { id: 'E145', name: '巨大な太陽フレア', cat: 'disaster', w: 3, cond: (g) => Y(g) >= 10,
     run: (g, H) => { for (const c of act(g)) if (c.stats.tech >= 75 && !c.flags.cyber) H.fx(['who.gnp-m'], { who: c.id }); },
     text: '太陽で巨大な爆発が起き、地球の電力網と衛星が一斉に止まった。電気に頼る国ほど、被害が大きい。' },
-  { id: 'E146', name: '小惑星の接近', cat: 'disaster', w: 2, cond: (g) => g.year >= 15,
+  { id: 'E146', name: '小惑星の接近', cat: 'disaster', w: 2, cond: (g) => Y(g) >= 15,
     who: (g) => pickBg(g, () => true), run: (g, H, who) => H.spark('asteroid', who), ins: ['P105'],
     text: '巨大な小惑星が地球に向かっている。落ちる場所は{who}のあたりらしい。軌道を変えるには、一国の技術では足りない。' },
-  { id: 'E147', name: '超巨大火山の噴火', cat: 'disaster', w: 1, cond: (g) => g.year >= 20,
+  { id: 'E147', name: '超巨大火山の噴火', cat: 'disaster', w: 1, cond: (g) => Y(g) >= 20,
     fx: ['world.foodPrice+l', 'majors.food-m', 'world.co2-m'], run: (g, H) => H.deaths(2), ins: ['P31'],
     text: '大陸の真ん中にある超巨大火山が噴火した。空が灰に覆われ、数年は夏が来ない。' },
-  { id: 'E148', name: '一国の銀行破綻', cat: 'eco', w: 4, repeat: 15, cond: (g) => g.year >= 4,
+  { id: 'E148', name: '一国の銀行破綻', cat: 'eco', w: 4, repeat: 15, cond: (g) => Y(g) >= 4,
     who: (g) => { const m = act(g).filter((c) => c.stats.debt >= 120 || c.stats.capital <= 30); return m.length ? m[0].id : pickBg(g, (b) => b.stats.econ >= 25 && b.stats.debt >= 60); },
     run: (g, H, who) => H.spark('finance', who), ins: ['P112', 'P113'], text: '{who}の大手銀行が破綻した。世界中の銀行が、その銀行にお金を貸している。' },
   { id: 'E149', name: '内戦の勃発', cat: 'dom', w: 5, repeat: 12, cond: (g) => bgs(g).some((b) => b.stats.stability <= 20),
