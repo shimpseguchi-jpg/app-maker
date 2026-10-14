@@ -44,6 +44,26 @@ const IND = {
   cm18: 'SP.M18.2024.FE.ZS', // 18さいまでに けっこんした じょせい（20〜24さいの うち）
   clab: 'SL.TLF.0714.ZS', // はたらいて いる こども（7〜14さい）
   wage: 'SL.EMP.WORK.ZS', // おきゅうりょうを もらって はたらく ひと（はたらく ひとの うち）
+  // まいとしの できごと よう
+  brtc: 'SH.STA.BRTC.ZS', // いしゃや じょさんしが たちあった しゅっさん %
+  breg: 'SP.REG.BRTH.ZS', // しゅっせいとどけが だされた こども %
+  meas: 'SH.IMM.MEAS', // はしかの ワクチンを うった こども %
+  mal: 'SH.MLR.INCD.P3', // マラリアに かかる ひと（1000にんあたり 1ねん）
+  stunt: 'SH.STA.STNT.ZS', // えいようが たりず せが のびにくい こども %
+  hunger: 'SN.ITK.DEFC.ZS', // たべものが たりない ひと %
+  pre: 'SE.PRE.ENRR', // ようちえん・ほいくえん %（100で うちきり）
+  cook: 'EG.CFT.ACCS.ZS', // ガスや でんきで りょうりが できる %
+  mob: 'IT.CEL.SETS.P2', // けいたいでんわの けいやく（100にんあたり）
+  lit: 'SE.ADT.LITR.ZS', // じが よめる おとな %
+  bank: 'FX.OWN.TOTL.ZS', // ぎんこうなどの こうざを もつ おとな %
+  unemp: 'SL.UEM.TOTL.ZS', // しつぎょうりつ %
+  yunemp: 'SL.UEM.1524.ZS', // わかもの（15〜24さい）の しつぎょうりつ %
+  depart: 'ST.INT.DPRT', // がいこくへ でかけた かいすう（1ねん）→ ひとりあたりに なおす
+  pm25: 'EN.ATM.PM25.MC.M3', // くうきの よごれ PM2.5（µg/m³）
+  flab: 'SL.TLF.CACT.FE.ZS', // はたらく じょせいの わりあい %
+  phys: 'SH.MED.PHYS.ZS', // いしゃの かず（1000にんあたり）
+  slum: 'EN.POP.SLUM.UR.ZS', // まちの なかで せまく まずしい ちいきに すむ ひと %
+  migr: 'SM.POP.TOTL.ZS', // がいこくから きて くらす ひと %
 };
 
 // くにでは ない ちいき（ずかんに でると こどもが まよう）
@@ -100,13 +120,25 @@ async function get(path) {
 const countries = (await get('country')).filter((c) => c.region.value !== 'Aggregates' && !SKIP.has(c.iso2Code));
 const vals = {}; // vals[key][iso3] = { v, y }
 const world = {};
-for (const [key, code] of Object.entries(IND)) {
-  vals[key] = {};
-  for (const row of await get(`country/all/indicator/${code}?mrnev=1`)) {
-    if (row.value == null || +row.date < 2010) continue; // ふるすぎる 値は つかわない
-    if (row.countryiso3code === 'WLD') world[key] = { v: row.value, y: +row.date };
-    vals[key][row.countryiso3code] = { v: row.value, y: +row.date };
-  }
+const sources = {}; // しひょうごとの しゅってん（だれが あつめた とうけいか）
+// 4つずつ ならべて よみこむ
+const keys = Object.entries(IND);
+for (let i = 0; i < keys.length; i += 4) {
+  await Promise.all(keys.slice(i, i + 4).map(async ([key, code]) => {
+    vals[key] = {};
+    // がいこく りょこうは コロナの としを さけて 2017〜2019ねんの いちばん あたらしい 値
+    const q = key === 'depart' ? `country/all/indicator/${code}?date=2017:2019` : `country/all/indicator/${code}?mrnev=1`;
+    const rows = await get(q);
+    rows.sort((a, b) => +a.date - +b.date); // ふるい じゅん → あたらしい 値で うわがき
+    for (const row of rows) {
+      if (row.value == null || +row.date < 2010) continue; // ふるすぎる 値は つかわない
+      if (row.countryiso3code === 'WLD') world[key] = { v: row.value, y: +row.date };
+      vals[key][row.countryiso3code] = { v: row.value, y: +row.date };
+    }
+    const meta = (await get(`indicator/${code}`))[0] || {};
+    sources[key] = { code, name: meta.name || code, org: (meta.sourceOrganization || '').replace(/\s+/g, ' ').trim().slice(0, 160) };
+    console.log('  ', key, Object.keys(vals[key]).length);
+  }));
 }
 
 const r1 = (x) => Math.round(x * 10) / 10;
@@ -142,6 +174,10 @@ for (const c of countries) {
     lef: g('lef') != null ? Math.round(g('lef')) : null,
     ...Object.fromEntries(['imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf', 'pov3', 'pov8', 'cm18', 'clab', 'wage']
       .map((k) => [k, g(k) != null ? r1(g(k)) : null])),
+    ...Object.fromEntries(['brtc', 'breg', 'meas', 'mal', 'stunt', 'hunger', 'cook', 'mob', 'lit', 'bank', 'unemp', 'yunemp', 'pm25', 'flab', 'phys', 'slum', 'migr']
+      .map((k) => [k, g(k) != null ? r1(g(k)) : null])),
+    pre: g('pre') != null ? r1(Math.min(100, g('pre'))) : null,
+    trips: g('depart') != null ? Math.round((g('depart') / pop) * 1000) / 1000 : null, // ひとり 1ねんあたりの がいこく りょこう
     prim: g('prim') != null ? r1(Math.min(100, g('prim'))) : null,
     lsec: g('lsec') != null ? r1(Math.min(100, g('lsec'))) : null,
   });
@@ -157,6 +193,7 @@ const js = `// この ファイルは tools/sekai_data.mjs が 世界銀行の A
 // それぞれの くにの いちばん あたらしい 値。ねん（しひょうごとの ふるい〜あたらしい）：${JSON.stringify(span)}
 export const FETCHED = '${today}';
 export const WORLD = ${JSON.stringify(W)};
+export const SOURCES = ${JSON.stringify(sources)};
 export const STATS = [
 ${out.map((o) => '  ' + JSON.stringify(o)).join(',\n')},
 ];

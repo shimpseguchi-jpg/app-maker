@@ -1,7 +1,7 @@
 // せかいの どこかに うまれたら
 // いま うまれる あかちゃんの ひとりに なって、その くにの くらしを おとなに なるまで たいけんし、
 // その あとの しんがく・しごと・じんせいを みじかく よんで おわる。
-import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, JOBS_FARM, JOBS_TOWN, nameFor, deathAge } from './data.js';
+import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, JOBS_FARM, JOBS_TOWN, nameFor, deathAge, deathProb, SOURCES } from './data.js';
 import { sfx, setMuted, isMuted } from './audio.js';
 
 const app = document.getElementById('app');
@@ -141,22 +141,28 @@ function title() {
 // ルーレットで くにが きまる
 function born() {
   const c = pickCountry();
-  const kids = 1 + Math.min(8, poisson(Math.max(c.tfr - 1, 0)));
-  const g = Math.random() < 0.512 ? 'm' : 'f'; // うまれる あかちゃんは おとこのこが すこし おおい
-  const r = Math.random() * 100;
-  const me = life = {
-    c, g, name: nameFor(c, g),
+  const me = life = { c, lp: 0, count: {}, small: new Set(), simmed: 0, stamp: birthStamp() };
+  addLp(c.births / COUNTRIES.reduce((t, x) => t + x.births, 0));
+  const g = chance(51.2) ? 'm' : 'f'; // うまれる あかちゃんは おとこのこが すこし おおい
+  const m = Math.max(c.tfr - 1, 0);
+  const kids = 1 + Math.min(8, poisson(m));
+  addLp(poissonP(kids - 1, m));
+  const minAge = save.gentle ? c.adult + 1 : 0;
+  Object.assign(me, {
+    g, name: nameFor(c, g),
     order: 1 + rnd(kids), // きょうだいの なんばんめ
-    rural: Math.random() * 100 >= c.urban,
+    rural: !chance(c.urban),
     sibs: Array.from({ length: kids - 1 }, () => pick(['👦', '👧'])),
-    elec: Math.random() * 100 < c.elec,
-    water: Math.random() * 100 < c.water,
-    wealth: r < c.pov3 ? 'very' : r < c.pov8 ? 'poor' : 'ok',
+    elec: chance(c.elec),
+    water: chance(c.water),
     // なくなる ねんれい：生命表から。やさしい モードでは おとなに なるまでは なくならない
-    death: deathAge(c, g, save.gentle ? c.adult + 1 : 0),
+    death: deathAge(c, g, minAge),
     school: 'none', uni: false, dream: null, job: null, wed: null,
     joy: 5, tries: 0, wins: 0, log: [], step: 0,
-  };
+  });
+  addLp(1 / kids);
+  addLp(deathProb(c, g, me.death, minAge));
+  me.wealth = chance(c.pov3) ? 'very' : chance(((c.pov8 - c.pov3) / Math.max(1, 100 - c.pov3)) * 100) ? 'poor' : 'ok';
   show(`${topbar()}
   <div class="hero">
     <p class="lead">どこに うまれるかな…？</p>
@@ -197,6 +203,11 @@ function reveal() {
       ${life.name ? `<p>なまえは <b class="pname">${life.name}</b>。</p>` : ''}
       <p class="wl">${WEALTH[life.wealth]}</p></div>
     </div>
+    <div class="stampcard">
+      <p>🕰️ <b>${life.stamp.when}</b> に うまれた</p>
+      <p class="sub">じんせい ばんごう <b class="num">${life.stamp.id}</b></p>
+      <p class="sub">この <b class="num">1</b>ぷんの あいだに、せかいで やく <b class="num">${fmt(WORLD_BIRTHS / 525600)}</b>にん、${c.name}で やく <b class="num">${c.births / 525600 >= 1 ? fmt(c.births / 525600) : (c.births / 525600).toFixed(2)}</b>にんの あかちゃんが うまれた。<br>でも あなたと おなじ じんせいは ひとつも ない。</p>
+    </div>
     <div class="info">
       <p>🎲 ${c.name}に うまれる かくりつは ${oddsText(c)}</p>
       <p class="rare">めずらしさ ${'★'.repeat(rarity(c))}<span>${'★'.repeat(5 - rarity(c))}</span></p>
@@ -211,7 +222,7 @@ function reveal() {
 // かなうか どうか（かくりつ）と、しあわせかどうかは べつ。けっかごとに よい こと・たいへんな ことが ランダムに おこる。
 function joy(d) { life.joy = Math.max(0, Math.min(10, life.joy + d)); }
 function mood(good, goods, bads) {
-  return Math.random() < good ? { d: 1, why: pick(goods) } : { d: -1, why: pick(bads) };
+  return chance(good * 100) ? { d: 1, why: pickLp(goods) } : { d: -1, why: pickLp(bads) };
 }
 function joyBar() {
   const n = Math.round(life.joy);
@@ -344,7 +355,7 @@ const STEPS = [
     const d = life.dream;
     const age = Math.max(c.adult + (life.uni ? 4 : 1), life.uni ? 22 : 0);
     const pw = life.uni ? Math.min(97, c.wage + 25) : c.wage;
-    const fallback = () => pick(Math.random() * 100 < c.agri ? JOBS_FARM : JOBS_TOWN);
+    const fallback = () => pickLp(chance(c.agri) ? JOBS_FARM : JOBS_TOWN);
     const setJob = (j) => { life.job = j; };
     return {
       age, icon: '💼', title: 'どんな しごとを する？',
@@ -388,6 +399,7 @@ function nextStep() {
     const sp = STEPS[life.step++]();
     if (!sp) continue;
     if (sp.age > life.death) break;
+    sp.between = simYears(life.simmed, sp.age);
     return renderStep(sp);
   }
   ending();
@@ -410,6 +422,8 @@ function renderStep(sp) {
   show(`${stageHead(sp.age)}<div class="card">
     <div class="agebig">${sp.icon} <b class="num">${sp.age}</b>さい</div>
     <h2>${sp.title}</h2>
+    ${sp.between && sp.between.length ? `<details class="between" ${sp.between.length <= 4 ? 'open' : ''}><summary>📅 この あいだの できごと（<b class="num">${sp.between.length}</b>こ）</summary>
+      <ul>${sp.between.map(([a, e, t]) => `<li><span class="age"><b class="num">${a}</b>さい</span> ${e} ${t}</li>`).join('')}</ul></details>` : ''}
     ${sp.body || ''}
     ${sp.options ? `<div class="opts">${sp.options.map((o, k) => optCard(o, k)).join('')}</div>` : ''}
     ${sp.event ? `<div class="opts">${optCard(sp.event, 0, true)}</div>
@@ -427,6 +441,7 @@ function chooseOpt(k) {
   const p = Math.max(0, Math.min(100, o.p));
   const r = Math.random() * 100;
   const ok = r < p;
+  if (p > 0 && p < 100) life.lp += Math.log(ok ? p / 100 : 1 - p / 100);
   app.querySelectorAll('[data-act=opt]').forEach((b) => { b.disabled = true; if (+b.dataset.k === k) b.classList.add('picked'); });
   const after = document.getElementById('after');
   const show2 = () => {
@@ -464,6 +479,118 @@ function chooseOpt(k) {
   tick();
 }
 
+// ───── いちどきりの じんせい ─────
+// この じんせいで おきた ことは ぜんぶ かくりつで きまる。その かくりつを かけあわせて（ログで たして）、
+// 「まったく おなじ じんせいが もう いちど おこる かくりつ」を だす。
+function chance(pct) {
+  const p = Math.max(0, Math.min(1, pct / 100));
+  const ok = Math.random() < p;
+  if (life && p > 0 && p < 1) life.lp += Math.log(ok ? p : 1 - p);
+  return ok;
+}
+const addLp = (p) => { if (life && p > 0 && p < 1) life.lp += Math.log(p); };
+const pickLp = (a) => { addLp(1 / a.length); return pick(a); };
+function poissonP(k, m) { let p = Math.exp(-m); for (let i = 1; i <= k; i++) p *= m / i; return p; }
+
+// 10の n じょう を にほんの かずの なまえで（まん・おく・ちょう …）
+const KANJI = ['', '万', '億', '兆', '京', '垓', '𥝱', '穣', '溝', '澗', '正', '載', '極', '恒河沙', '阿僧祇', '那由他', '不可思議', '無量大数'];
+const UNITS = ['', 'まん', 'おく', 'ちょう', 'けい', 'がい', 'じょ', 'じょう', 'こう', 'かん', 'せい', 'さい', 'ごく', 'ごうがしゃ', 'あそうぎ', 'なゆた', 'ふかしぎ', 'むりょうたいすう'];
+function bigWord(digits) {
+  const d = Math.floor(digits);
+  const u = Math.floor(d / 4);
+  if (u >= UNITS.length) return `むりょうたいすう より ずっと おおきい かず（<b class="num">1</b>の あとに <b class="num">0</b>が <b class="num">${d}</b>こ）`;
+  let lead = Math.round(Math.pow(10, digits - u * 4));
+  let k = u;
+  if (lead >= 10000) { lead = 1; k++; }
+  return `<b class="num">${lead}</b>${UNITS[k]}${KANJI[k] ? `（${KANJI[k]}）` : ''}<br><small>（<b class="num">1</b>の あとに <b class="num">0</b>が <b class="num">${d}</b>こ つく ぐらいの かず）</small>`;
+}
+
+// うまれた とき：ほんとうの とけいの じかんと、じんせいの ばんごう
+function birthStamp() {
+  const d = new Date();
+  const z = (n) => String(n).padStart(2, '0');
+  const id = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  return { when: `${d.getFullYear()}ねん ${d.getMonth() + 1}がつ ${d.getDate()}にち ${d.getHours()}じ ${d.getMinutes()}ふん`, id };
+}
+
+// ───── まいとしの できごと（とうけいの かくりつで おこる） ─────
+// 📊 は 世界銀行に まとめられた とうけい、🎲 は じんせいを ゆたかに する ための ちいさな できごと（ゲームの めやす）
+const SMALL = {
+  kid: ['ともだちと けんかして、なかなおりした。', 'まいごの こいぬを みつけて、かいぬしに かえした。', 'おまつりで みんなと おどった。', 'たかい きに のぼって、とおくまで みえた。', 'はじめて じてんしゃに のれた。', 'おおあめの あと、みずたまりで あそんだ。', 'はが ぬけて、あたらしい はが はえてきた。', 'ほしが きれいな よるに、ながれぼしを みた。'],
+  teen: ['ともだちと ひみつきちを つくった。', 'うたが じょうずだと ほめられた。', 'はじめて ひとりで となりまちへ でかけた。', 'いちばん の しんゆうが できた。', 'たいせつに して いた ものを なくして、ないた。'],
+  adult: ['ひっこしを した。', 'ともだちの けっこんしきで おいわいした。', 'あたらしい りょうりを おぼえた。', 'まちの おまつりの じゅんびを てつだった。', 'いぬを かいはじめた。', 'ねこを かいはじめた。', 'つりが しゅみに なった。', 'おおきな あらしで いえの やねが こわれ、みんなで なおした。', 'むかしの ともだちと ひさしぶりに あった。'],
+  old: ['まごに むかしばなしを した。', 'にわで はなを そだてた。', 'まちの こどもたちに しごとの はなしを した。', 'わかい ころの しゃしんを みて わらった。'],
+};
+
+function yearEvents(age) {
+  const c = life.c;
+  const ev = [];
+  const add = (emoji, text, d = 0) => { ev.push([emoji, text]); addLog(age, text); joy(d); };
+  if (age === 0) {
+    const att = chance(c.brtc);
+    add(att ? '🏥' : '🏠', att ? 'いしゃや じょさんしさんが てつだって うまれた。' : 'いえで、かぞくに みまもられて うまれた。');
+    if (!chance(c.breg)) add('📄', 'しゅっせいとどけは だされなかった。くにの きろくには なまえが のって いない。');
+  }
+  if (age === 1) add('💉', chance(c.meas) ? 'はしかの ワクチンを うった。' : 'はしかの ワクチンは うてなかった。');
+  if (age === 3) {
+    if (chance(c.stunt)) add('🍚', 'たべものが たりず、からだが ちいさめに そだった。', -1);
+    if (!chance(c.cook)) add('🔥', 'いえでは まきや すみで りょうりを して いて、けむりが めに しみた。');
+    if (c.pm25 > 35) add('🌫️', 'そらが かすんで みえる ひが おおかった（くうきの よごれ）。');
+    if (!life.rural && chance(c.slum)) add('🏘️', 'ちいさな いえが ぎっしり ならぶ ちいきで くらした。');
+  }
+  if (age === 4 && chance(c.pre)) add('🧸', 'ようちえんに かよった。', 1);
+  if (age === 9 && chance((1 - Math.pow(1 - c.migr / 100, 10)) * 100)) add('🌐', 'がいこくから きた ともだちが できた。', 1);
+  if (age === 15) {
+    if (chance(Math.min(100, c.mob * 0.8))) add('📱', 'はじめて けいたいでんわを もった。', 1);
+    if (chance(c.net)) add('💻', 'インターネットを つかいはじめた。');
+  }
+  if (age === 20 && life.school === 'none') {
+    const pl = Math.max(0, Math.min(100, ((c.lit - c.prim) / Math.max(1, 100 - c.prim)) * 100));
+    add('📖', chance(pl) ? 'おとなに なってから、じを よめるように なった。' : 'じは よめない まま だった。', 0);
+  }
+  if (age === 25 && chance(c.bank)) add('🏦', 'ぎんこうの こうざを つくった。');
+  // くりかえし おこる こと
+  if (age <= 14 && c.mal > 0 && chance(Math.min(60, c.mal / 10))) { life.count.mal = (life.count.mal || 0) + 1; joy(-1); }
+  if (age >= 5 && chance(c.hunger)) life.count.hunger = (life.count.hunger || 0) + 1;
+  if (life.job && age >= c.adult && age < 65 && (life.count.unemp || 0) < 3 && chance(age < 25 ? c.yunemp : c.unemp)) {
+    life.count.unemp = (life.count.unemp || 0) + 1;
+    add('📉', `しごとが なくなった。${1 + rnd(11)}かげつ さがして、また はたらきはじめた。`, -1);
+  }
+  if (age >= 18 && age <= 75 && chance(Math.min(90, c.trips * 100))) {
+    life.count.trip = (life.count.trip || 0) + 1;
+    if (life.count.trip === 1) {
+      const to = pickLp(COUNTRIES.filter((x) => x.area === c.area && x.id !== c.id && x.rich).concat(COUNTRIES.filter((x) => x.id !== c.id && x.rich).slice(0, 6)));
+      add('✈️', `はじめて がいこくへ りょこうした（${to.flag} ${to.name}）。`, 1);
+    }
+  }
+  // ちいさな できごと（🎲）
+  const band = age < 13 ? 'kid' : age < 20 ? 'teen' : age < 60 ? 'adult' : 'old';
+  if (age >= 3 && chance(12)) {
+    const rest = SMALL[band].filter((t) => !life.small.has(t));
+    if (rest.length) { const t = pickLp(rest); life.small.add(t); add('✨', t, pick([1, 1, 0, -1])); }
+  }
+  return ev;
+}
+
+// from さいから to さいの てまえまでの まいとしを すすめる（なくなる ねんれいの まえまで）
+function simYears(from, to) {
+  const out = [];
+  for (let a = Math.max(from, life.simmed); a < Math.min(to, life.death); a++) {
+    out.push(...yearEvents(a).map((e) => [a, ...e]));
+    life.simmed = a + 1;
+  }
+  return out;
+}
+// くりかえしの できごとの まとめ
+function countLines() {
+  const k = life.count;
+  const out = [];
+  if (k.mal) out.push(`こどもの ころ、マラリアに ${k.mal}かい かかった。`);
+  if (k.hunger) out.push(`たべものが たりない としが ${k.hunger}ねん あった。`);
+  if (k.trip > 1) out.push(`がいこくへの りょこうは ぜんぶで ${k.trip}かい。`);
+  return out;
+}
+
 // ───── そのあとの じんせい（こども・まご・さいご） ─────
 function laterLife() {
   const c = life.c;
@@ -471,12 +598,13 @@ function laterLife() {
   const at = (a, text, d = 0) => { if (a < D) { addLog(a, text); joy(d); } };
   if (life.wed) {
     const want = Math.min(9, poisson(c.tfr));
+    addLp(poissonP(want, c.tfr));
     let kids = 0, lost = 0, gkids = 0;
     for (let k = 0; k < want; k++) {
       const b = life.wed + 1 + k * 2 + rnd(2);
       if (b >= D || b > 45) break;
       kids++;
-      if (Math.random() < c.u5 / 1000) lost++;
+      if (chance(c.u5 / 10)) lost++;
     }
     if (kids > 0) at(life.wed + 1, `こどもが うまれた。こどもは ぜんぶで ${kids}にん。`, 1);
     if (lost > 0) at(life.wed + 3 + rnd(6), lost === 1 ? 'こどもの ひとりが、おさない うちに びょうきで なくなった。とても かなしかった。' : `こどもの うち ${lost}にんが、おさない うちに びょうきで なくなった。とても かなしかった。`, -2);
@@ -508,7 +636,9 @@ function ending() {
   const c = life.c;
   const D = life.death;
   const grown = D >= c.adult;
+  simYears(life.simmed, D);
   laterLife();
+  for (const t of countLines()) addLog(Math.min(D, c.adult), t);
   life.log.sort((x, y) => x[0] - y[0]);
   const last = lastWords(D);
   addLog(D, last.replace(/<[^>]+>/g, ''));
@@ -521,11 +651,11 @@ function ending() {
     ? `${place}、${life.job ? `${life.job.name}として はたらき、` : ''}${D}さいまで いきた${who} じんせい`
     : `${place}、${D}さいで なくなった${who} じんせい`;
   const [vi, vt] = joyVerdict(life.joy);
-  save.past.unshift({ flag: c.flag, g: life.g, job: life.job ? `${life.job.emoji} ${life.job.name}` : '🕊️', old: D, text: headline, joy: Math.round(life.joy) });
+  save.past.unshift({ flag: c.flag, g: life.g, job: life.job ? `${life.job.emoji} ${life.job.name}` : '🕊️', old: D, text: headline, joy: Math.round(life.joy), id: life.stamp.id });
   save.past = save.past.slice(0, 30);
   store(save);
   sfx(grown ? 'fanfare' : 'ng');
-  lastShare = `${c.flag} ${headline}\n${grown ? `しあわせ ${Math.round(life.joy)}/10 ・ かなった えらびかた ${life.wins}/${life.tries}\n` : ''}` + life.log.map(([a, t]) => `${a}さい ${t}`).join('\n') + '\n#せかいのどこかにうまれたら';
+  lastShare = `${c.flag} ${headline}\nじんせい ばんごう ${life.stamp.id}（${life.stamp.when}）\n${grown ? `しあわせ ${Math.round(life.joy)}/10 ・ かなった えらびかた ${life.wins}/${life.tries}\n` : ''}` + life.log.map(([a, t]) => `${a}さい ${t}`).join('\n') + '\n#せかいのどこかにうまれたら';
   const row = (label, a, b, key) => `<tr><th>${label}</th><td>${a}${key && c.estimated.includes(key) ? '<small>※</small>' : ''}</td>${c.id === 'jp' ? '' : `<td>${b}</td>`}</tr>`;
   const per1000 = (v) => `<b class="num">${Math.round(v)}</b>にん`;
   show(`${topbar()}<div class="card pop">
@@ -538,6 +668,11 @@ function ending() {
       <p class="sub">えらんで かなった こと <b class="num">${life.wins}</b> / <b class="num">${life.tries}</b>。${life.wins >= life.tries / 2 === life.joy >= 5 ? 'かなった ことも しあわせも、かさなる ときも あれば かさならない ときも ある。' : life.joy >= 5 ? 'かなわない ことが おおくても、しあわせな じかんは たくさん あったね。' : 'かなった ことが おおくても、しあわせとは かぎらないんだね。'}</p></div></div>`
       : `<div class="info"><p>${c.name}では、うまれた あかちゃん <b class="num">1,000</b>にんの うち、<b class="num">5</b>さいまでに なくなるのは やく ${per1000(c.u5)}。${c.id === 'jp' ? '' : `<br>にほんは やく ${per1000(JAPAN.u5)}。`}</p>
       <p class="sub">びょうきの おおくは、きれいな みず・ワクチン・くすり・びょういんが あれば ふせげるんだよ。</p></div>`}
+    <div class="rarity">
+      <p>🔮 まったく おなじ じんせいが もう いちど おこる かくりつ</p>
+      <p class="big">${bigWord(-life.lp / Math.LN10)}ぶんの <b class="num">1</b></p>
+      <p class="sub">${life.stamp.when}に うまれた じんせい ばんごう <b class="num">${life.stamp.id}</b>。<br>この じんせいは、もう にどと おこらない。</p>
+    </div>
     ${isNew ? `<div class="stamp">${c.flag}<span>ずかんに<br>スタンプ！</span></div>` : ''}
     <h3 class="loghead">📖 じんせいの きろく</h3>
     <ol class="lifelog">${life.log.map(([a, t], k) => `<li style="animation-delay:${Math.min(k * 0.06, 1.2)}s"><span class="age"><b class="num">${a}</b>さい</span><span class="ava">${k === life.log.length - 1 ? '🕊️' : avatar(a, life.g)}</span><p>${t}</p></li>`).join('')}</ol>
@@ -676,6 +811,11 @@ function parents() {
       <li>乳児死亡率・5歳未満死亡率・5〜24歳の5歳きざみの死亡確率・成人死亡率（男女別）・平均寿命（男女別）</li>
       <li>小学校・中学校（前期中等教育）修了率・貧困率（1日3ドル／8.30ドル、2021年PPP）・18歳までに結婚した女性の割合・働いているこども（7〜14歳）の割合</li>
     </ul>
+    <details class="srcs"><summary>使っている統計の出典（${Object.keys(SOURCES).length}指標）</summary>
+      <ul>${Object.values(SOURCES).map((x) => `<li><b>${x.name}</b>（${x.code}）<br><small>${x.org}</small></li>`).join('')}</ul></details>
+    <h3>一度きりの人生</h3>
+    <p>生まれた時刻（端末の時計）と人生番号がつき、毎年、統計の確率で出来事（出産の立ち会い・出生届・はしかのワクチン・発育阻害・調理の燃料・大気汚染・幼稚園・移民の友だち・携帯電話・インターネット・識字・銀行口座・失業・海外旅行・マラリア・食料不足 など）が起こります。
+    起きたことすべての確率を掛け合わせて「まったく同じ人生がもう一度起こる確率」を最後に表示します（出来事は互いに独立と仮定した目安）。人生の途中で抜けると、その人生には戻れません。</p>
     <p>値がない国は、同じ大陸（学校・貧困・結婚・こどもの労働は同じ所得グループ）の国の平均で補っています（画面に ※ がつきます）。成人年齢は各国の民法などの成年年齢です。</p>
     <p>「どうして でんきが ない いえが あるのかな？」「どうして こどもの うちに なくなる ひとが いるのかな？」など、遊んだあとにお子さんと話すきっかけにしてみてください。</p>
     <p class="sub">記録（ずかん）はこの端末のブラウザにだけ保存されます。</p>
@@ -801,7 +941,11 @@ app.addEventListener('click', (e) => {
   if (!b || b.disabled) return;
   const act = b.dataset.act;
   if (act !== 'mute') sfx('tap');
-  if (act === 'title') { life = null; title(); }
+  if (act === 'title') {
+    // いきて いる とちゅうで ぬけると、その じんせいには もどれない
+    if (life && !b.dataset.sure) { b.dataset.sure = '1'; b.textContent = '⚠️ この じんせいには もどれないよ。もう いちど おすと おわる'; return; }
+    life = null; title();
+  }
   else if (act === 'born') born();
   else if (act === 'next') { if (life) nextStep(); }
   else if (act === 'opt') { if (life) chooseOpt(+b.dataset.k); }

@@ -7,8 +7,8 @@
 // ここに かくのは、こどもが よむ せつめい（しゅと・あいさつ・りょうり・スポーツ・まめちしき）と おとなに なる ねんれい。
 // せつめいが ある くに（rich）は 3さいの「いえの くらし」に りょうりや あいさつが でる。ない くには すうじから まめちしきを つくる。
 
-import { STATS, WORLD, FETCHED } from './stats.js';
-export { WORLD, FETCHED };
+import { STATS, WORLD, FETCHED, SOURCES } from './stats.js';
+export { WORLD, FETCHED, SOURCES };
 export const WORLD_BIRTHS = WORLD.births; // せかいで 1ねんに うまれる あかちゃん
 
 export const AREA = {
@@ -162,7 +162,7 @@ const meanBy = (keys, groupOf) => {
   return (k, c) => { const x = m[k][groupOf(c)]; return x ? x[0] / x[1] : WORLD[k] ?? 0; };
 };
 const byArea = meanBy(['wage', 'uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf'], (c) => c.area);
-const byIncome = meanBy(['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab'], (c) => c.income);
+const byIncome = meanBy(['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab', ...['brtc', 'breg', 'meas', 'stunt', 'hunger', 'pre', 'cook', 'mob', 'lit', 'bank', 'unemp', 'yunemp', 'trips', 'pm25', 'flab', 'phys', 'slum', 'migr']], (c) => c.income);
 export const COUNTRIES = STATS.map((st) => {
   const c = { ...st, ...(CONTENT[st.id] || {}), rich: !!CONTENT[st.id], adult: ADULT[st.id] || 18 };
   // ない 値を うめる（estimated に しるしを つける）。ゆたかな くにの こどもの けっこん・こどもの しごとは 0 と みなす
@@ -170,9 +170,11 @@ export const COUNTRIES = STATS.map((st) => {
   for (const k of ['wage', 'uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf']) {
     if (c[k] == null) { c[k] = Math.round(byArea(k, c) * 10) / 10; c.estimated.push(k); }
   }
-  for (const k of ['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab']) {
-    if (c[k] == null) { c[k] = (k === 'cm18' || k === 'clab') && c.income === 'HIC' ? 0 : Math.round(byIncome(k, c) * 10) / 10; c.estimated.push(k); }
+  for (const k of ['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab', ...['brtc', 'breg', 'meas', 'stunt', 'hunger', 'pre', 'cook', 'mob', 'lit', 'bank', 'unemp', 'yunemp', 'trips', 'pm25', 'flab', 'phys', 'slum', 'migr']]) {
+    if (c[k] == null) { c[k] = (k === 'cm18' || k === 'clab') && c.income === 'HIC' ? 0 : Math.round(byIncome(k, c) * 1000) / 1000; c.estimated.push(k); }
   }
+  // マラリアは はやる ちいきの くにだけ データが ある（ない くには 0）
+  if (c.mal == null) c.mal = 0;
   return c;
 });
 
@@ -299,3 +301,10 @@ export const JOBS_TOWN = [
   { emoji: '🧵', name: 'したてやさん', end: 'ミシンで、きれいな ふくを たくさん ぬったよ。' },
 ];
 
+// その ねんれいで なくなる かくりつ（minAge まで いきた ひとの なかで）… 「この じんせいの めずらしさ」に つかう
+export function deathProb(c, g, age, minAge = 0) {
+  const q = lifeTable(c, g);
+  let alive = 1;
+  for (let a = minAge; a < age; a++) alive *= 1 - q[a];
+  return alive * q[age];
+}
