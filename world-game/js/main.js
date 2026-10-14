@@ -140,6 +140,16 @@ function modal(html, cls = '') {
   return back;
 }
 
+// ───── タップで拡大 ─────
+// html を大きく表示する。どこかをタップすると とじる（中のボタンは そのまま動く）
+function zoomView(html, cls = '') {
+  const back = el(`<div class="zoom-back"><div class="zoom-box ${cls}">${html}</div><div class="zoom-hint">${K('タップで閉じる', 'さわると とじる')}</div></div>`);
+  stage.append(back);
+  back.addEventListener('click', (e) => { if (!e.target.closest('button, [data-id]')) back.remove(); });
+  return back;
+}
+const zbtn = (attr) => `<button class="zbtn" ${attr} aria-label="${K('拡大', 'おおきく')}">🔍</button>`;
+
 // ───── 準備（抽選・基本政策） ─────
 function startSetup(seed) {
   g = G.newGame(seed, { kid: settings.mode === 'kid' });
@@ -217,7 +227,7 @@ function dashScreen() {
   mount(el(`<div class="screen dash">
     <div class="top"></div>
     <div class="mid">
-      <div class="pane"><h3>${K('自国', 'きみの くに')}</h3><div class="me"></div></div>
+      <div class="pane"><h3 class="hz">${K('自国', 'きみの くに')}${zbtn('data-zme')}</h3><div class="me"></div></div>
       <div class="center"><div class="mapwrap"></div><div class="pane"><div class="feed"></div></div></div>
       <div class="pane"><h3>${K('各国の元首', 'ほかの くに')}</h3><div class="rivals"></div></div>
     </div>
@@ -228,6 +238,14 @@ function dashScreen() {
 
 function renderDash() {
   renderTop(); renderMe(); renderMap(); renderFeed(); renderRivals(); renderBottom();
+  const d = $('.dash', stage);
+  if (d && !d._zoom) {
+    d._zoom = true;
+    // ニュースと GM の吹き出しは、タップすると大きく読める
+    $('.feed', d).addEventListener('click', (e) => { const it = e.target.closest('.ev, .act, .vote, .sys, .gmline, .ailine'); if (it) zoomView(`<div class="feed">${it.outerHTML}</div>`, 'text'); });
+    $('.gmbox', d).addEventListener('click', () => zoomView($('.gmbox', d).innerHTML, 'text'));
+    $('[data-zme]', d).addEventListener('click', () => zoomView(`<div class="me">${$('.me', d).innerHTML}</div>`, 'me'));
+  }
 }
 
 function renderTop() {
@@ -241,7 +259,7 @@ function renderTop() {
       <div class="year">${G.yearLabel(g)}ねん<small>${g.year}／${G.maxYears(g)}かいめ</small></div>${stages}
       <div class="gauges">
         ${gauge('🌏 ちきゅう', w.env, lvl(w.env, 35, 20, true))}
-        ${gauge('⚔ けんか', w.conflicts, lvl(w.conflicts, 90, 130))}
+        ${gauge('⚔ けんか', Math.round(w.conflicts), lvl(w.conflicts, 90, 130))}
         ${gauge('⚡ ぴりぴり', Math.round(w.tension), lvl(w.tension, 60, 75))}
         ${gauge('🤝 きょうりょく', g.coop.length + '／3')}
       </div>${tools}`;
@@ -255,7 +273,7 @@ function renderTop() {
         ${gauge('氷', Math.round(w.ice), lvl(w.ice, 60, 40, true))}
         ${gauge('水資源', Math.round(w.waterRes), lvl(w.waterRes, 50, 35, true))}
         ${gauge('生態系', Math.round(w.biodiv ?? 70), lvl(w.biodiv ?? 70, 50, 35, true))}
-        ${gauge('紛争', w.conflicts, lvl(w.conflicts, 90, 130))}
+        ${gauge('紛争', Math.round(w.conflicts), lvl(w.conflicts, 90, 130))}
         ${gauge('緊張', Math.round(w.tension), lvl(w.tension, 60, 75))}
         ${gauge('条約有効', Math.round(w.treaty) + '%')}
         ${gauge('破綻国', w.bankrupt ?? 0)}
@@ -300,6 +318,11 @@ function renderMap() {
   const box = $('.mapwrap', stage);
   box.innerHTML = mapSvg(g) + `<div class="legend">${K('<span>● 紛争</span><span>☢ 核保有</span><span>--- 提携</span><span>🔥 火種</span>', '<span>● けんか</span><span>☢ かくへいき</span><span>--- てを くんだ</span><span>🔥 ひだね</span>')}</div><div class="seedtag">SEED ${esc(g.seed)}</div>`;
   $$('[data-id]', box).forEach((p) => p.addEventListener('click', () => countryInfo(p.dataset.id)));
+  box.insertAdjacentHTML('beforeend', zbtn('data-zmap'));
+  $('[data-zmap]', box).addEventListener('click', () => {
+    const z = zoomView(`<div class="mapwrap">${mapSvg(g)}</div><div class="muted">${K('国をタップすると情報が見られます', 'くにを さわると ようすが みられるよ')}</div>`, 'map');
+    $$('[data-id]', z).forEach((p) => p.addEventListener('click', () => { z.remove(); countryInfo(p.dataset.id); }));
+  });
 }
 
 function feedHtml(f) {
@@ -379,7 +402,7 @@ function renderChoices(box) {
       ? `<div class="prob kidprob"><small>でめが</small><b>${pr.p}</b><small>いかなら<br>せいこう</small></div>`
       : `<div class="prob"><b>${pr.p}%</b><small>大成功 ${pr.crit}%<br>大失敗 ${pr.fumble}%</small></div>`;
     return `<div class="card ${ui.sel === o.id ? 'sel' : ''}" style="--cc:var(--${pol.cat})" data-pol="${o.id}">
-      <div class="cat"><span>${kid() ? KID_CATS[pol.cat] : CATS[pol.cat]}</span>${tag}</div>
+      <div class="cat"><span>${kid() ? KID_CATS[pol.cat] : CATS[pol.cat]}</span><span>${tag}${zbtn('data-zcard')}</span></div>
       <h4>${esc(polName(o.id))}</h4>
       ${prob}
       <div class="fx">${K('成功', 'せいこう')}：${okFx || '—'}</div>
@@ -392,6 +415,13 @@ function renderChoices(box) {
     const id = card.dataset.pol;
     $$('[data-t]', card).forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); ui.tgt[id] = b.dataset.t; ui.sel = id; renderChoices(box); }));
     card.querySelector('.prob').addEventListener('click', (e) => { e.stopPropagation(); probDetail(id); });
+    $('[data-zcard]', card).addEventListener('click', (e) => {
+      e.stopPropagation();
+      const clone = card.cloneNode(true);
+      $$('.tg, .go, .zbtn', clone).forEach((n) => n.remove());
+      const z = zoomView(`${clone.outerHTML}<div class="row"><button class="btn primary" data-pick>${K('これにする', 'これに する')}</button></div>`, 'card');
+      $('[data-pick]', z).addEventListener('click', () => { z.remove(); ui.sel = id; renderChoices(box); });
+    });
     $('[data-go]', card).addEventListener('click', (e) => { e.stopPropagation(); if (ui.sel === id) choose(id); else { ui.sel = id; renderChoices(box); } });
     card.addEventListener('click', () => { if (ui.sel !== id) { ui.sel = id; renderChoices(box); } });
   });
@@ -542,23 +572,66 @@ function handlePending() {
 }
 
 // ───── 情報 ─────
+// 仲のよさで、見える情報の くわしさが かわる（提携か関係70以上：くわしい／40以上：おおまか／それ未満：表向きのことだけ）
+function intel(id) {
+  if (id === g.player) return 'full';
+  const r = rel(g, g.player, id);
+  if (allied(g, g.player, id) || r >= 70) return 'full';
+  return r >= 40 ? 'some' : 'little';
+}
+const INTEL_TEXT = {
+  full: ['くわしく分かる（提携・関係が良い）', 'なかよしなので、くわしく わかる'],
+  some: ['おおまかにしか分からない（関係がふつう）。関係が70以上か提携すると、くわしく分かる', 'すこし だけ わかる。もっと なかよく なると、くわしく わかるよ'],
+  little: ['表向きのことしか分からない（関係が悪い）。関係が40以上でおおまかに分かる', 'ほとんど わからない。なかよく なると、わかるように なるよ'],
+};
+// おとな：見える値（some はおおまか、little は表向きの数字だけ）
+const PUBLIC = new Set(['pop', 'gnp', 'soldiers']);
+function intelText(c, k, lv) {
+  if (lv === 'full') return statText(c, k);
+  const v = c.stats[k];
+  if (k === 'nuke') return v >= 4 ? NUKE_STAGES[4] : '不明';
+  if (k === 'gnp') return '約' + fmt(v, v < 10 ? 1 : 0);
+  if (k === 'pop') return '約' + fmt(Math.round(v / (v >= 100 ? 50 : 5)) * (v >= 100 ? 50 : 5), 0);
+  if (k === 'soldiers') return '約' + fmt(Math.max(5, Math.round(v / 10) * 10), 0);
+  if (lv === 'little') return '？';
+  if (['fiscal', 'debt', 'capital', 'patents', 'guerrilla', 'rate', 'bases', 'uranium'].includes(k)) return '？';
+  if (k === 'literacy') return '約' + Math.round(v / 10) * 10 + '%';
+  const x = k === 'food' ? v / 2 : v;
+  return x >= 67 ? '高い' : x >= 34 ? 'ふつう' : '低い';
+}
+// 1ねんせい：バーの くわしさ
+function kidIntelBars(c, lv) {
+  if (lv === 'full') return kidBars(c);
+  const ks = kidStats(c);
+  const open = lv === 'some' ? null : new Set(['money', 'army']);
+  return `<div class="kidstats">${KID_STATS.map((s) => {
+    if (open && !open.has(s.key)) return `<div class="kstat unknown"><span>${s.icon} ${s.name}</span><span class="kbar"><i style="width:100%"></i></span><span class="kq">？</span></div>`;
+    const q = ks[s.key] >= 67 ? 100 : ks[s.key] >= 34 ? 60 : 25;
+    return `<div class="kstat"><span>${s.icon} ${s.name}　<b>${q === 100 ? 'おおい' : q === 60 ? 'ふつう' : 'すくない'}</b></span><span class="kbar rough"><i style="width:${q}%"></i></span></div>`;
+  }).join('')}</div>`;
+}
+
 function countryInfo(id) {
   const c = C(g, id);
   if (!c) return;
   if (isSeat(g, id)) {
+    const lv = intel(id);
+    const note = `<div class="intel ${lv}">🔎 ${esc(K(INTEL_TEXT[lv][0], INTEL_TEXT[lv][1]))}</div>`;
     if (kid()) {
       modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
-        <div class="muted">${c.player ? 'きみの くに' : esc(personaName(c.persona))}　やりかた：${c.bases.map((b) => esc(baseName(b))).join('、')}${c.player ? '' : `　きみと なかよし ${Math.round(rel(g, g.player, id))}`}</div>
-        ${kidBars(c)}
-        <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+        <div class="muted">${c.player ? 'きみの くに' : esc(personaName(c.persona))}${lv === 'little' ? '' : `　やりかた：${c.bases.map((b) => esc(baseName(b))).join('、')}`}${c.player ? '' : `　きみと なかよし ${Math.round(rel(g, g.player, id))}`}</div>
+        ${c.player ? '' : note}
+        ${kidIntelBars(c, lv)}
+        <div class="row"><button class="btn primary" data-close>とじる</button></div>`, 'big');
       return;
     }
     const keys = Object.keys(STAT_INFO).filter((k) => k !== 'power');
     modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
-      <div class="muted">${c.player ? 'あなたの国' : 'AI：' + PERSONAS[c.persona].name}　基本政策：${c.bases.map((b) => BASE[b].name).join('・')}　国力 ${c.power}${c.player ? '' : `　あなたとの関係 ${Math.round(rel(g, g.player, id))}`}</div>
+      <div class="muted">${c.player ? 'あなたの国' : 'AI：' + PERSONAS[c.persona].name}${lv === 'little' ? '' : `　基本政策：${c.bases.map((b) => BASE[b].name).join('・')}`}　国力 ${lv === 'full' ? c.power : '約' + Math.round(c.power / 10) * 10}${c.player ? '' : `　あなたとの関係 ${Math.round(rel(g, g.player, id))}`}</div>
       ${c.origName !== c.name ? `<div class="muted">旧国名：${esc(c.origName)}</div>` : ''}
-      <div class="statgrid">${keys.map((k) => `<div class="stat ${isDanger(c, k) ? 'danger' : ''}"><span>${STAT_INFO[k].name}</span><b>${statText(c, k)}</b></div>`).join('')}</div>
-      <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+      ${c.player ? '' : note}
+      <div class="statgrid">${keys.map((k) => `<div class="stat ${lv === 'full' && isDanger(c, k) ? 'danger' : ''} ${intelText(c, k, lv) === '？' ? 'unknown' : ''}"><span>${STAT_INFO[k].name}</span><b>${intelText(c, k, lv)}</b></div>`).join('')}</div>
+      <div class="row"><button class="btn primary" data-close>とじる</button></div>`, 'big');
   } else {
     const s = c.stats;
     const rows = kid()
@@ -567,7 +640,7 @@ function countryInfo(id) {
     modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
       <div class="muted">${kid() ? '' : esc(c.role || '')}${c.owner ? K(`　${esc(nameOf(c.owner))}に併合`, `　${esc(nameOf(c.owner))}に とられた`) : ''}${c.sunk ? K('　海面上昇で国土を失った', '　うみに しずんで しまった') : ''}</div>
       <div class="statgrid">${rows.map(([l, v], i) => `<div class="stat ${(i === 4 ? v >= 90 : v <= 20) ? 'danger' : ''}"><span>${l}</span><b>${fmt(v, 0)}</b></div>`).join('')}</div>
-      <div class="row"><button class="btn primary" data-close>とじる</button></div>`);
+      <div class="row"><button class="btn primary" data-close>とじる</button></div>`, 'big');
   }
 }
 
