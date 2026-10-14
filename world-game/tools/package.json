@@ -1,0 +1,11 @@
+{
+  "name": "world-game-tools",
+  "private": true,
+  "type": "module",
+  "description": "開発用（地図データの生成・GAS 版のビルド）。ゲーム本体は依存なしで動く。",
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "世界統一ゲーム",
+  "short_name": "世界統一",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0d121c",
+  "theme_color": "#0d121c",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
