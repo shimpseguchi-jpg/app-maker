@@ -11,6 +11,7 @@ import { probability, TIER, rel, allied, C, isSeat, activeSituations } from './e
 import { PERSONAS, AGENDAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
 import { SPARKS } from './engine/sparks.js';
+import { REACTIONS, NEWS_ICON, NEWS_CAT } from './data/reactions.js';
 import {
   KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
   KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF, KID_WORLD, KID_BAD,
@@ -118,6 +119,7 @@ function howTo() {
     <div class="howto">
     <p>きみは ある くにの だいひょうです。まいかい、した に でる かーどから ひとつ えらびます。</p>
     <p>かーどには「でめが 〇〇 いかなら せいこう」と かいて あります。1から100の だいすを ふって、でめが その かず いかなら せいこう。とても ちいさい かずが でたら だいせいこう です。</p>
+    <p>📰 <b>にゅーす</b>：まいかい はじめに、せかいの にゅーすが かーどで でて きます。さわって めくって よもう。かーどを みぎか ひだりに うごかして、きみの くにの こたえを えらびます。どちらにも いい ことと こまる ことが あります。</p>
     <p>ほかの 5つの くにも、それぞれ かーどを えらびます。ある くにが とくを すると、べつの くにが こまる ことも あります。</p>
     <p>🔥 <b>ひだね</b>：ときどき、ある くにで びょうきや けんかの「ひだね」が おきます。みんなで ただしく たすければ おさまります。まちがえたり ほうって おくと、せかいじゅうに ひろがります。どれが ただしいかは かいて ありません。みったーまいやーの ことばを よく きこう。</p>
     <p>😱 <b>おしまい</b>：かくせんそう／ちきゅうが こわれる／ひとつの くにが せかいを のっとる。</p>
@@ -129,6 +131,7 @@ function howTo() {
   <div style="font-size:14px;line-height:1.8">
   <p>あなたは架空の国の元首です。1年に1回、パネルに出た政策から1つを選びます。どの政策にも<b>成功確率</b>が表示され、<b>100面ダイス</b>で判定します。出目が確率以下なら成功、確率の1/10以下なら大成功です。</p>
   <p>ほかの5カ国は性格の違うAI元首です。ある国の成功が、別の国の破綻を生むこともあります。毎年、世界にはイベントが起き、GM（${GM_NAME}）が「さて、どうする？」と迫ります。</p>
+  <p><b>ニュースのカード</b>：毎年のはじめ、世界のニュースがカードで1枚ずつ届きます。タップしてめくり、多くのニュースではカードを左右にスワイプして自国の態度を2択で決めます。どちらにも得と損があります。</p>
   <p><b>火種</b>：ときどき、ある一国で感染症・銀行破綻・飢饉・内戦などの「火種」が起きます。右上の欄に場所と種類が出ますが、深刻度と、いつ世界に広がるか（期限）は知らされません。様子は毎年の GM の言葉から推し量ってください。各国が正しい支援をすれば封じ込められ（協調の成功例になります）、まちがった対応や放置だと世界規模に広がります。どの支援が正しいかはカードに書かれていません。GM のヒントと、現実の知識で見抜いてください。</p>
   <p><b>ゲームオーバー</b>：核戦争／地球環境の破綻（環境が${G.ENV_LIMIT}以下）／一国による世界征服。自国が崩壊するとパネルがオフになり、数年後に復帰できることがあります。</p>
   <p><b>クリア</b>：国際機関を「国連 → 国連の解体 → 世界政府準備委員会 → 世界総選挙 → 世界議会」と進め、世界議会の最初の議題を全会一致で可決すること。協調の成功例を3つ積み重ねれば、国連の解体を経ずに準備委員会へ進めます。50年でタイムアップです。</p>
@@ -372,7 +375,7 @@ function feedHtml(f) {
   const pri = GM_PRI[settings.gm];
   switch (f.k) {
     case 'gm': return f.pri <= pri ? `<div class="gmline">${esc(f.text)}</div>` : '';
-    case 'event': return `<div class="ev"><b>📰 ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}${resHtml(f.res)}${sitHtml(f.id)}</div>`;
+    case 'event': return `<div class="ev"><b>${NEWS_ICON[f.cat] || '📰'} ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}${resHtml(f.res)}${sitHtml(f.id)}${reactLine(f)}</div>`;
     case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
@@ -599,6 +602,128 @@ function renderYearEnd(box) {
   $('[data-next]', box).addEventListener('click', () => { if (g.phase !== 'yearEnd') return; G.beginYear(g); persist(); renderDash(); run(); });
 }
 
+// ───── ニュースのカード（Reigns のように めくって、左右に ふって 自国の態度を決める） ─────
+const reactName = (o) => (kid() ? o.k : o.n);
+// 対象国がない・小国のときは、対象国への効果を出さない
+function reactFx(f, o) {
+  return o.fx.filter((x) => (!x.startsWith('who.') || f.who) && (!x.startsWith('rel.') || (f.who && isSeat(g, f.who) && f.who !== g.player)));
+}
+function reactFxText(f, o) {
+  const who = f.who ? nameOf(f.who).replace(/の くに$|の しま$/, '') : '';
+  const list = kid() ? kidFx(reactFx(f, o)) : describeFx(reactFx(f, o));
+  return list.map((t) => (kid() ? t.replace(/^あいて/, who || 'あいて') : t.replace(/^対象 /, `${who} `).replace(/^相手との/, `${who}との`))).join('　');
+}
+function reactLine(f) {
+  if (f.chosen == null) return '';
+  return `<div class="evreact">✋ ${K('自国の反応', 'きみの こたえ')}：<b>${esc(reactName(REACTIONS[f.react][f.chosen]))}</b>${resHtml(f.rres)}</div>`;
+}
+const unseenNews = () => g.feed.map((f, i) => [f, i]).filter(([f]) => f.k === 'event' && !f.seen);
+
+function newsDeck() {
+  return new Promise((resolve) => {
+    const list = unseenNews();
+    if (!list.length) return resolve();
+    const back = el(`<div class="news-back"><div class="news-last"></div><div class="news-deck"></div><div class="news-ctl"></div></div>`);
+    stage.append(back);
+    const deck = $('.news-deck', back), ctl = $('.news-ctl', back), last = $('.news-last', back);
+    let n = 0, card = null, flipped = false, done = false;
+    const onKey = (e) => {
+      if (!card || done) return;
+      if (!flipped && (e.key === 'Enter' || e.key === ' ')) { flip(); e.preventDefault(); return; }
+      if (!flipped) return;
+      const f = list[n][0];
+      if (e.key === 'ArrowLeft') pick(f.react ? 0 : -1);
+      else if (e.key === 'ArrowRight' || (!f.react && e.key === 'Enter')) pick(f.react ? 1 : -1);
+    };
+    addEventListener('keydown', onKey);
+    const finish = () => { removeEventListener('keydown', onKey); back.remove(); persist(); renderDash(); resolve(); };
+    function show() {
+      if (n >= list.length) { finish(); return; }
+      const [f] = list[n];
+      flipped = false; done = false;
+      const total = list.length;
+      const head = `${NEWS_ICON[f.cat] || '📰'} ${esc(NEWS_CAT[f.cat]?.[kid() ? 1 : 0] || K('ニュース', 'ニュース'))}`;
+      card = el(`<div class="ncard" >
+        <div class="ninner">
+          <div class="nface nback"><div class="nlogo">📰</div><b>${K('ワールド ニュース', 'せかいの ニュース')}</b><span>${G.yearLabel(g)}${K('年', 'ねん')}　${n + 1} / ${total}</span><small>${K('タップしてめくる', 'さわって めくろう')}</small></div>
+          <div class="nface nfront">
+            <div class="ncat"><span>${head}</span><span>${n + 1} / ${total}</span></div>
+            <h3>${esc(f.name)}${f.who ? `<small>${esc(nameOf(f.who))}</small>` : ''}</h3>
+            <p class="ntext">${esc(f.text)}</p>
+            <div class="nby">— ${esc(K(GM_NAME, KID_GM_NAME))}</div>
+            ${resHtml(f.res)}${sitHtml(f.id)}
+            <div class="nlabel l"></div><div class="nlabel r"></div>
+          </div>
+        </div></div>`);
+      deck.innerHTML = '';
+      deck.append(card);
+      ctl.innerHTML = '';
+      drag();
+      card.addEventListener('click', () => { if (!flipped) flip(); });
+    }
+    function flip() {
+      if (flipped) return;
+      flipped = true;
+      card.classList.add('flipped');
+      const [f] = list[n];
+      if (f.react) {
+        const [a, b] = REACTIONS[f.react];
+        ctl.innerHTML = `<div class="nq">${K('あなたの国は、どうする？', 'きみの くには、どうする？')}</div>
+          <div class="nopts"><button class="nopt l" data-side="0"><b>◀ ${esc(reactName(a))}</b><small>${reactFxText(f, a)}</small></button>
+          <button class="nopt r" data-side="1"><b>${esc(reactName(b))} ▶</b><small>${reactFxText(f, b)}</small></button></div>
+          <div class="nhint">${K('カードを左右にスワイプしても選べます', 'カードを みぎか ひだりに うごかしても えらべるよ')}</div>`;
+        $('.nlabel.l', card).textContent = reactName(a);
+        $('.nlabel.r', card).textContent = reactName(b);
+      } else {
+        ctl.innerHTML = `<div class="nopts one"><button class="nopt next" data-side="-1"><b>${n + 1 < list.length ? K('次のニュース ▶', 'つぎの ニュース ▶') : K('とじる ▶', 'とじる ▶')}</b></button></div>`;
+      }
+      $$('[data-side]', ctl).forEach((b) => b.addEventListener('click', () => pick(Number(b.dataset.side))));
+    }
+    function pick(side) {
+      if (done || !flipped) return;
+      done = true;
+      const [f, i] = list[n];
+      f.seen = true;
+      if (side >= 0 && f.react) {
+        G.reactNews(g, i, side);
+        last.innerHTML = reactLine(f);
+      }
+      card.classList.add(side === 0 ? 'out-l' : 'out-r');
+      ctl.innerHTML = '';
+      renderMe(); renderTop(); renderRivals(); renderFeed();
+      setTimeout(() => { n++; show(); }, 380);
+    }
+    // ドラッグ（スワイプ）：めくる前はめくるだけ、めくった後は左右に出しきると選ぶ
+    function drag() {
+      let x0 = null, dx = 0, moved = false;
+      const scale = () => stage.getBoundingClientRect().width / stage.offsetWidth || 1;
+      card.addEventListener('pointerdown', (e) => { x0 = e.clientX; dx = 0; moved = false; card.setPointerCapture?.(e.pointerId); });
+      card.addEventListener('pointermove', (e) => {
+        if (x0 == null || !flipped || done) return;
+        dx = (e.clientX - x0) / scale();
+        if (Math.abs(dx) > 6) moved = true;
+        card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+        const f = list[n][0];
+        card.classList.toggle('lean-l', dx < -50 && !!f.react);
+        card.classList.toggle('lean-r', dx > 50 && !!f.react);
+      });
+      const up = () => {
+        if (x0 == null) return;
+        x0 = null;
+        if (!flipped || done) return;
+        const f = list[n][0];
+        if (Math.abs(dx) > 110) { card.style.transform = ''; pick(f.react ? (dx < 0 ? 0 : 1) : -1); return; }
+        card.style.transform = '';
+        card.classList.remove('lean-l', 'lean-r');
+        if (moved) card.addEventListener('click', (e) => e.stopPropagation(), { once: true, capture: true });
+      };
+      card.addEventListener('pointerup', up);
+      card.addEventListener('pointercancel', up);
+    }
+    show();
+  });
+}
+
 // ───── 進行ループ ─────
 let running = false;
 async function run() {
@@ -607,6 +732,11 @@ async function run() {
   try {
     while (true) {
       if (g.result) { persist(); await wait(600); endingScreen(); return; }
+      // 年のはじめのニュースは、カードで1枚ずつ読んでから（自国が おやすみ中は読まずに進む）
+      if (unseenNews().length) {
+        if (g.majors[g.player].panel) { renderDash(); await newsDeck(); } else for (const [f] of unseenNews()) f.seen = true;
+        continue;
+      }
       if (g.pending) { renderDash(); await handlePending(); persist(); continue; }
       if (g.phase === 'yearEnd') {
         renderDash(); persist();

@@ -63,5 +63,13 @@ const expect = { 'すてらの くに': 'ステラの くに', 'みったーま�
 for (const [a, b] of Object.entries(expect)) ok(kidify(a) === b, `kidify「${a}」→「${kidify(a)}」（よそう「${b}」）`);
 for (const k of ['KID_COUNTRY', 'KID_POLICY', 'KID_EVENT', 'KID_GM', 'KID_SPARK']) { const w = (v) => { if (typeof v === 'string') { for (const ch of kidify(v).match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `${k}: ${kidify(v)}`); } else if (v && typeof v === 'object') Object.values(v).forEach(w); }; w(KID[k]); }
 
+// ニュースへの反応：ニュースの種類ごとに左右2つ、効果の書き方が正しいか
+const { REACTIONS, NEWS_ICON, NEWS_CAT } = await import('../js/data/reactions.js');
+for (const e of EVENTS) ok(NEWS_ICON[e.cat] && NEWS_CAT[e.cat], `ニュースの種類 ${e.id} ${e.cat}`);
+for (const [k, pair] of Object.entries(REACTIONS)) {
+  ok(pair.length === 2, `反応 ${k} は2つ`);
+  for (const o of pair) { const kt = KID.kidFx(o.fx).join(' '); ok(/↑/.test(kt) && /↓/.test(kt), `反応 ${k}「${o.k}」は 1ねんせいの ひょうじでも とくと そんが ある：${kt}`); ok(o.n && o.k && !/[一-龯々ァ-ヺ]/.test(o.k), `反応 ${k} の名前`); for (const f of o.fx) ok(/^(self|who|world|poorBg|rel)\.\w+[+-][sml]$/.test(f), `反応 ${k} の効果 ${f}`); }
+}
+
 console.log(fail ? `${fail} 件の問題` : 'すべて OK');
 process.exit(fail ? 1 : 0);

@@ -282,3 +282,52 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .card .cardsit { font-size: 11.5px; font-weight: 700; }
 .feed .ev .evsit b, .feed .ev .evres b { display: inline; color: inherit; font-size: inherit; }
 .feed .ev .evsit b.good { color: var(--green); } .feed .ev .evsit b.bad { color: var(--red); }
+
+/* ───── ニュースのカード（めくって、左右にふって選ぶ） ───── */
+.news-back { position: absolute; inset: 0; z-index: 45; background: rgba(5,8,14,.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.news-last { min-height: 26px; max-width: 760px; font-size: 13px; color: #cfe; text-align: center; }
+.news-last .evreact { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 14px; }
+.news-last .evres { display: inline; }
+.news-deck { width: 480px; height: 470px; perspective: 1400px; position: relative; }
+.ncard { position: absolute; inset: 0; transition: transform .35s cubic-bezier(.2,.8,.3,1), opacity .35s; touch-action: none; cursor: pointer; }
+.ncard.out-l { transform: translateX(-620px) rotate(-24deg) !important; opacity: 0; }
+.ncard.out-r { transform: translateX(620px) rotate(24deg) !important; opacity: 0; }
+.ninner { position: absolute; inset: 0; transition: transform .55s; transform-style: preserve-3d; }
+.ncard.flipped .ninner { transform: rotateY(180deg); }
+.nface { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.55); overflow: hidden; }
+.nback { background: radial-gradient(circle at 50% 35%, #2b3a58, #141c2c); border: 2px solid var(--gold); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--gold); }
+.nback .nlogo { font-size: 74px; animation: nbob 1.8s ease-in-out infinite; }
+.nback b { font-size: 26px; letter-spacing: .12em; }
+.nback span { color: var(--text); font-size: 16px; }
+.nback small { color: var(--muted); font-size: 14px; margin-top: 16px; }
+@keyframes nbob { 50% { transform: translateY(-8px) rotate(-4deg); } }
+.nfront { transform: rotateY(180deg); background: #f4ecd8; color: #2a2116; padding: 18px 22px 16px; display: flex; flex-direction: column; overflow-y: auto; }
+.nfront .ncat { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #7a5a2a; border-bottom: 3px double #b89a6a; padding-bottom: 6px; }
+.nfront h3 { margin: 10px 0 6px; font-size: 25px; line-height: 1.3; font-weight: 900; }
+.nfront h3 small { display: block; font-size: 15px; color: #8a3a2a; font-weight: 700; margin-top: 2px; }
+.nfront .ntext { margin: 4px 0; font-size: 16.5px; line-height: 1.75; flex: 1; }
+.nfront .nby { text-align: right; font-size: 12px; color: #7a6a50; margin-bottom: 6px; }
+.nfront .evres, .nfront .evsit { font-size: 13.5px; background: #e8dcc0; border-radius: 8px; padding: 6px 10px; margin-top: 5px; color: #2a2116; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.nfront .evsit { display: block; color: #6a3a10; }
+.nfront .evsit b, .nfront .evres b { color: inherit; }
+.nfront .evsit b.good { color: #1f7a4a; } .nfront .evsit b.bad { color: #b0302a; }
+.kid .nfront .ntext { font-size: 19px; line-height: 1.9; }
+.kid .nfront h3 { font-size: 27px; }
+.nlabel { position: absolute; top: 14px; max-width: 60%; padding: 6px 12px; border-radius: 10px; font-weight: 900; font-size: 16px; color: #fff; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.nlabel.l { right: 14px; background: #3a6fb0; } .nlabel.r { left: 14px; background: #2f8a5a; }
+.ncard.lean-l .nlabel.l, .ncard.lean-r .nlabel.r { opacity: 1; }
+.news-ctl { width: 760px; min-height: 120px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.news-ctl .nq { font-weight: 900; font-size: 17px; color: var(--gold); }
+.news-ctl .nopts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
+.news-ctl .nopts.one { grid-template-columns: minmax(0, 320px); justify-content: center; }
+.nopt { background: var(--panel2); border: 2px solid var(--line); border-radius: 14px; padding: 10px 14px; text-align: left; display: flex; flex-direction: column; gap: 4px; transition: transform .08s, border-color .15s; }
+.nopt:active { transform: scale(.97); }
+.nopt b { font-size: 16px; }
+.nopt small { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.nopt.l { border-color: #3a6fb0; } .nopt.r { border-color: #2f8a5a; text-align: right; }
+.nopt.next { text-align: center; border-color: var(--gold); }
+.kid .nopt b { font-size: 18px; } .kid .nopt small { font-size: 14px; }
+.news-ctl .nhint { font-size: 12px; color: var(--muted); }
+.feed .ev .evreact { margin-top: 4px; font-size: 12.5px; color: #bfe3ff; }
+.feed .ev .evreact b { display: inline; color: #fff; font-size: inherit; }
+.feed .ev .evreact .evres { display: inline-flex; margin: 0 0 0 8px; }

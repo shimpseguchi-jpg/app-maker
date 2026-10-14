@@ -49,6 +49,9 @@ for (let t = 0; t < 2000; t++) {
   const year = await page.evaluate(() => window.WG.g?.year || 0);
   if (year >= 3 && await page.$('.card')) break;
   if (await page.$('.dice-back [data-ok]') && await page.evaluate(() => getComputedStyle(document.querySelector('.dice-back [data-ok]')).visibility === 'visible')) await page.click('.dice-back [data-ok]');
+  else if (await page.$('.news-back [data-side]')) await page.click('.news-back [data-side]');
+  else if (await page.$('.ncard:not(.flipped):not(.out-l):not(.out-r)')) await page.click('.ncard');
+  else if (await page.$('.news-back')) continue;
   else if (await page.$('.dice-back')) continue;
   else if (await page.$('.modal')) {
     if (await page.$('[data-hold]')) await page.click('[data-hold]');

@@ -38,6 +38,7 @@ for (; t < 4000; t++) {
   const st = await page.evaluate(() => {
     const q = (s) => document.querySelector(s);
     if (q('.ending')) return 'ending';
+    if (q('.news-back')) return q('.news-back [data-side]') ? 'news-pick' : q('.ncard:not(.flipped):not(.out-l):not(.out-r)') ? 'news-flip' : 'wait';
     if (q('.dice-back [data-ok]') && getComputedStyle(q('.dice-back [data-ok]')).visibility === 'visible') return 'dice';
     if (q('.dice-back')) return 'rolling';
     const m = q('.modal');
@@ -49,7 +50,19 @@ for (; t < 4000; t++) {
   const year = await page.evaluate(() => window.WG.g?.year || 0);
   if (t % 5 === 0 || st !== 'wait') await checkKana();
   if (st === 'ending') break;
-  if (st === 'dice') {
+  if (st === 'news-flip') {
+    if (!shot.has('news')) { shot.add('news'); await page.screenshot({ path: `${out}/wg-10-news-back.png` }); }
+    await page.click('.ncard');
+  } else if (st === 'news-pick') {
+    if (!shot.has('news2')) { shot.add('news2'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-11-news-front.png` }); }
+    const opts = await page.$$('.news-back [data-side]');
+    // ときどきスワイプで選ぶ
+    if (opts.length === 2 && Math.random() < 0.4) {
+      const b = await page.$('.ncard'); const r = await b.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down();
+      await page.mouse.move(r.x + r.width / 2 + (Math.random() < 0.5 ? -200 : 200), r.y + r.height / 2, { steps: 6 }); await page.mouse.up();
+    } else await opts[Math.floor(Math.random() * opts.length)].click();
+  } else if (st === 'dice') {
     if (!shot.has('dice')) { shot.add('dice'); await page.screenshot({ path: `${out}/wg-04-dice.png` }); }
     await page.click('.dice-back [data-ok]');
   } else if (st.startsWith('modal:')) {

@@ -1,4 +1,5 @@
 // ゲームの進行：世界の生成 → 基本政策 → 毎年（イベント → 各国の手番 → 年末処理）→ 終了
+import { REACTIONS } from '../data/reactions.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
 import { MAJORS, BACKS, REGIONS } from '../data/countries.js';
 import { POLICIES, POLICY_LIST, BASE, targetsFor } from '../data/policies.js';
@@ -301,7 +302,7 @@ function fireEvent(g, ev, H) {
   try { who = ev.who ? ev.who(g, H) : null; } catch (err) { who = null; }
   const whoName = who ? C(g, who)?.name : '';
   const [evName, evText] = g.kid && KID_EVENT[ev.id] ? KID_EVENT[ev.id] : [ev.name, ev.text || ''];
-  const entry = { k: 'event', id: ev.id, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) };
+  const entry = { k: 'event', id: ev.id, cat: ev.cat, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) };
   g.feed.push(entry);
   chron(g, `${evName}${whoName ? `（${whoName}）` : ''}`);
   // このニュースで動いた数値を集めて、ニュースの下に「→ どこの何が上下したか」を出す
@@ -311,6 +312,9 @@ function fireEvent(g, ev, H) {
   if (ev.run) { try { ev.run(g, HE, who); } catch (err) { console.warn(ev.id, err); } }
   entry.res = summarizeChanges(g, evChanges);
   addSituations(g, ev, who, evName);
+  // ニュースへの反応（左右の2択）。自国が動いていて、核・投票など別の決定があるニュースでなければ
+  const me = g.majors[g.player];
+  if (me?.panel && !ev.special && REACTIONS[ev.cat]) entry.react = who === g.player ? 'self' : ev.cat;
   for (const n of ev.next || []) g.boost[n] = (g.boost[n] || 0) + 3;
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
@@ -319,6 +323,18 @@ function fireEvent(g, ev, H) {
   }
   if (ev.special === 'nuke') nukeCrisis(g, H);
   if (ev.special === 'vote') startVote(g, H);
+}
+
+// プレイヤーがニュースのカードで左右を選んだ（side：0＝左、1＝右）
+export function reactNews(g, i, side) {
+  const e = g.feed[i];
+  if (!e || !e.react || e.chosen != null) return null;
+  const opt = REACTIONS[e.react][side];
+  const changes = [];
+  applyFx(g, opt.fx, { self: g.player, who: e.who, tgt: e.who }, evScale(g), changes);
+  e.chosen = side;
+  e.rres = summarizeChanges(g, changes);
+  return e;
 }
 
 // 情勢（data/situations.js）をはじめる。期限は暦の年で持つ
