@@ -1,5 +1,5 @@
 // オフラインでも あそべるように（ネットが つながる ときは さいしんばんを つかう）
-const CACHE = 'sekai-v6';
+const CACHE = 'sekai-v7';
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
 self.addEventListener('fetch', (e) => {
