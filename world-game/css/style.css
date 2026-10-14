@@ -102,7 +102,10 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .mapwrap .legend { position: absolute; left: 8px; bottom: 6px; display: flex; gap: 8px; font-size: 10.5px; color: var(--muted); }
 .mapwrap .seedtag { position: absolute; right: 8px; bottom: 6px; font-size: 10.5px; color: var(--muted); letter-spacing: .1em; }
 .land { stroke: #0b1a2c; stroke-width: .6; cursor: pointer; }
-.land.bg { fill: #3a4558; } .land.bg.owned { opacity: .9; } .land.bg.sunk { fill: #1e3550; }
+/* 塗りと同じ色でふちを描いて、まとまりの中のすきまを消す。境界線は .borders で上から描く */
+#stage .mapwrap .land, .setup .land { stroke-width: .5; }
+.land.bg { fill: #3a4558; stroke: #3a4558; }
+.borders { fill: none; stroke: #0b1a2c; stroke-width: .7; pointer-events: none; stroke-linejoin: round; } .land.bg.owned { opacity: .9; } .land.bg.sunk { fill: #1e3550; stroke: #1e3550; }
 .land.off { fill-opacity: .45 !important; }
 .land.ant { fill: #c9d6e6; cursor: default; }
 .maplabel { font-size: 11px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 3px; pointer-events: none; }
@@ -212,6 +215,9 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 /* ── 1ねんせいモード ── */
 .title .modes { display: flex; gap: 6px; justify-content: center; }
 .title .modes .btn { flex: 1; }
+.title .sizerow { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.title .sizerow input { flex: 1; accent-color: var(--gold); }
+.title .sizerow b { color: var(--gold); font-size: 18px; min-width: 2em; text-align: right; }
 .kid { --kidfs: 15px; }
 .kid .gm .bubble { font-size: 16px; line-height: 1.75; }
 .kid .feed { font-size: 14.5px; line-height: 1.7; }
@@ -367,3 +373,4 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .news-ctl { width: 900px; }
 .news-ctl .nopts.three { grid-template-columns: 1fr 1fr 1fr; }
 .nopt.u { border-color: #8a5ab0; text-align: center; background: #241c30; }
+.title .sizerow span { white-space: nowrap; }

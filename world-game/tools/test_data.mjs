@@ -93,5 +93,19 @@ gv.year = 30;
 const ao = (await import('../js/engine/game.js')).agendaOptions(gv);
 ok(ao.options.length === 3 && new Set(ao.options).size === 3, '議題の候補は3つ（重なりなし）');
 
+// 世界の国の数（10〜46）：背景国のまとまり
+const GM_ = await import('../js/engine/game.js');
+const CORE = await import('../js/engine/core.js');
+for (let n = GM_.WORLD_MIN; n <= GM_.WORLD_MAX; n++) {
+  const gs = GM_.newGame('SIZE' + n, { size: n });
+  const bg = Object.keys(gs.backs);
+  ok(bg.length === n - 6 && gs.worldSize === n, `国の数 ${n}：背景国 ${bg.length}`);
+  if (n < 46) {
+    ok(Object.keys(gs.unitOf).length === 40 && Object.values(gs.unitOf).every((u) => gs.backs[u]), `国の数 ${n}：元の国はすべてどこかのまとまりに入る`);
+    for (const id of bg) ok(CORE.neighbors(id).every((x) => x !== id && (gs.backs[x] || gs.majors[x]) && CORE.neighbors(x).includes(id)), `国の数 ${n}：${id} のとなりが正しい`);
+  }
+}
+CORE.setUnits(null);
+
 console.log(fail ? `${fail} 件の問題` : 'すべて OK');
 process.exit(fail ? 1 : 0);

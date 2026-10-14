@@ -2,11 +2,12 @@
 import { REACTIONS, SPECIAL, OPTION_BY_ID } from '../data/reactions.js';
 import { secAfterReact, secYearEnd, secBack, addMood, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
-import { MAJORS, BACKS, REGIONS } from '../data/countries.js';
+import { MAJORS, BACKS, REGIONS, POLAR_LINKS } from '../data/countries.js';
+import { AREAS, CENTERS } from '../data/mapdata.js';
 import { POLICIES, POLICY_LIST, BASE, targetsFor } from '../data/policies.js';
 import { EVENTS, EVENT_BY_ID, nukePair } from '../data/events.js';
 import { GM, AI_LINES } from '../data/gm.js';
-import { registerBases, neighbors, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active, allied } from './core.js';
+import { registerBases, neighbors, rawNeighbors, setUnits, unitOf, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active, allied } from './core.js';
 import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { AGENDA_BASE, AGENDA_LOSE_FX, AGENDA_GAIN_FX } from '../data/agendas.js';
@@ -44,7 +45,8 @@ function validDraw(ids) {
   if (Object.keys(reg).length < 3 || Object.values(reg).some((n) => n > 2)) return false;
   if (!ids.some((id) => OIL.includes(id))) return false;
   if (!ids.some((id) => POLAR.includes(id))) return false;
-  return ids.some((a) => ids.some((b) => a < b && (neighbors(a).includes(b) || polarNeighbors(a).includes(b))));
+  const polar = (a, b) => POLAR_LINKS.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  return ids.some((a) => ids.some((b) => a < b && (rawNeighbors(a).includes(b) || polar(a, b))));
 }
 export function drawWorld(seed) {
   const rng = makeRng(hashSeed(seed));
@@ -60,9 +62,52 @@ export function drawWorld(seed) {
   return { seats, player, persona };
 }
 
-export function newGame(seed, { rerolled = false, diceSeed, kid = false } = {}) {
+// 世界の国の数（自国＋AI の6カ国をふくむ）。減らすと背景国が近くの国とまとまって、大きな地域になる
+export const WORLD_MIN = 10, WORLD_MAX = 46;
+
+// 背景国をまとめる：いちばん小さいまとまりを、となり（なければいちばん近く）の、同じ地域で小さいまとまりにくっつける。を、数が目標になるまでくりかえす
+// 代表（名前・旗・ID）は、抽選外の主要国 → 面積の大きい国の順。数値は面積で重みをつけた平均
+function mergeBacks(backs, target) {
+  const unit = Object.fromEntries(Object.keys(backs).map((id) => [id, id]));
+  const members = Object.fromEntries(Object.keys(backs).map((id) => [id, [id]]));
+  const area = (u) => members[u].reduce((sum, m) => sum + (AREAS[m] || 1), 0);
+  const dist = (a, b) => Math.hypot(CENTERS[a][0] - CENTERS[b][0], CENTERS[a][1] - CENTERS[b][1]);
+  while (Object.keys(members).length > target) {
+    const list = Object.keys(members).sort((a, b) => area(a) - area(b) || (a < b ? -1 : 1));
+    const small = list[0];
+    const nbs = new Set();
+    for (const m of members[small]) for (const n of rawNeighbors(m)) { const u = unit[n]; if (u && u !== small) nbs.add(u); }
+    const cands = nbs.size ? [...nbs] : list.slice(1);
+    const score = (u) => (backs[u].region === backs[small].region ? 0 : 400) + area(u) / 40 + dist(u, small);
+    const into = cands.sort((a, b) => score(a) - score(b) || (a < b ? -1 : 1))[0];
+    members[into].push(...members[small]);
+    for (const m of members[small]) unit[m] = into;
+    delete members[small];
+  }
+  const out = {}, unitOfMap = {};
+  for (const ms of Object.values(members)) {
+    const rep = ms.slice().sort((a, b) => (backs[b].big ? 1 : 0) - (backs[a].big ? 1 : 0) || (AREAS[b] || 0) - (AREAS[a] || 0))[0];
+    const b = backs[rep];
+    if (ms.length > 1) {
+      const w = ms.map((m) => AREAS[m] || 1), tw = w.reduce((x, y) => x + y, 0);
+      for (const st of Object.keys(b.stats)) b.stats[st] = Math.round(ms.reduce((sum, m, i) => sum + (backs[m].stats[st] ?? b.stats[st]) * w[i], 0) / tw);
+      b.big = ms.some((m) => backs[m].big);
+      if (b.big) b.co2 = ms.reduce((sum, m) => sum + (backs[m].big ? backs[m].co2 || 0 : 0), 0);
+      b.merged = ms.slice().sort();
+    }
+    out[rep] = b;
+    for (const m of ms) unitOfMap[m] = rep;
+  }
+  return { backs: out, unitOf: unitOfMap };
+}
+// セーブから再開したときなどに、そのゲームの背景国のまとまりを使うようにする
+export function attachWorld(g) { setUnits(g.unitOf || null); return g; }
+
+export function newGame(seed, { rerolled = false, diceSeed, kid = false, size = WORLD_MAX } = {}) {
   const d = drawWorld(seed);
-  const majors = {}, backs = {};
+  setUnits(null);
+  const majors = {};
+  let backs = {};
   for (const m of MAJORS) {
     if (d.seats.includes(m.id)) {
       majors[m.id] = { ...clone(m), panel: true, persona: d.persona[m.id] || null, player: m.id === d.player, bases: [], flags: {}, laws: {}, origName: m.name, lastAct: null };
@@ -84,10 +129,16 @@ export function newGame(seed, { rerolled = false, diceSeed, kid = false } = {}) 
       if (c.role) c.role = '';
     }
   }
+  const worldSize = Math.max(WORLD_MIN, Math.min(WORLD_MAX, Math.round(size) || WORLD_MAX));
+  const bgTarget = worldSize - 6;
+  let unitOfMap = null;
+  if (bgTarget < Object.keys(backs).length) ({ backs, unitOf: unitOfMap } = mergeBacks(backs, bgTarget));
+  setUnits(unitOfMap);
   const g = {
     v: 1, seed, rerolled, kid, maxYears: kid ? 20 : MAX_YEARS, cal: 0, year: 0, phase: 'setup', seats: d.seats, player: d.player, majors, backs,
     world: { biodiv: 70, conflicts: 70, treaty: 40, wrate: 5, tension: 35, co2: 40, ice: 80, rain: 60, oilRes: 70, forestRes: 70, waterRes: 70, foodPrice: 50, refugees: 30, trust: 50, stage: 0, temp: 0 },
     bgStatic: Object.fromEntries(Object.values(backs).filter((b) => b.big).map((b) => [b.id, b.co2])),
+    worldSize, unitOf: unitOfMap || undefined, bgScale: 40 / Object.keys(backs).length,
     rel: {}, allies: [], bloc: [], laws: {}, flags: {}, counters: { deaths: 0 }, boost: {}, fired: {}, coop: [],
     rngState: (diceSeed ?? (Math.random() * 2 ** 32)) >>> 0, order: [], turn: 0, offers: null, inserts: [], feed: [], chron: [], hist: [], pending: null, result: null, voteTries: 0,
   };
@@ -143,7 +194,7 @@ function helpers(g) {
     rename: (id, why) => rename(g, id, why),
     collapse: (id, why) => collapse(g, id, why),
     war: (a, b, tier) => war(g, a, b, tier, H),
-    spark: (type, where) => { const s = startSpark(g, H, type, where); fixChronYears(g); return s; },
+    spark: (type, where) => { const s = startSpark(g, H, type, where && unitOf(where)); fixChronYears(g); return s; },
   };
   return H;
 }
@@ -304,6 +355,7 @@ function fireEvent(g, ev, H) {
   delete g.boost[ev.id];
   let who = null;
   try { who = ev.who ? ev.who(g, H) : null; } catch (err) { who = null; }
+  if (who) who = unitOf(who); // まとまった背景国は代表で
   const whoName = who ? C(g, who)?.name : '';
   const [evName, evText] = g.kid && KID_EVENT[ev.id] ? KID_EVENT[ev.id] : [ev.name, ev.text || ''];
   const entry = { k: 'event', id: ev.id, cat: ev.cat, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) };

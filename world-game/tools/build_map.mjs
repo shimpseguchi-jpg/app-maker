@@ -80,7 +80,7 @@ function ringCentroid(ring) {
   return a ? [cx / (3 * a), cy / (3 * a)] : ring[0];
 }
 
-const shapes = {}, centers = {};
+const shapes = {}, centers = {}, areas = {};
 for (const id of Object.keys(GROUPS)) {
   const members = geoms.filter((g) => owner.get(g.properties.name) === id);
   const merged = topo.merge(world, members);
@@ -98,6 +98,7 @@ for (const id of Object.keys(GROUPS)) {
   }
   shapes[id] = d;
   centers[id] = ringCentroid(best).map(r1);
+  areas[id] = Math.round(polys.reduce((sum, poly) => sum + Math.abs(ringArea(poly[0].map(px))), 0));
 }
 // 見た目の調整：ラベル位置（重心が海に落ちる・極端に寄る国）
 const CENTER_FIX = { M01: [205, 120], M06: [520, 62], M07: [700, 68], M15: [820, 232], M03: [300, 340], M04: [488, 85] };
@@ -118,11 +119,35 @@ geoms.forEach((g, i) => {
 });
 const landNb = Object.fromEntries(Object.entries(land).map(([k, v]) => [k, [...v].sort()]));
 
+// 境界線：国と国（または海岸線）の線を、どの2国の間の線かといっしょに出す。
+// 背景国をまとめたときは、同じまとまりの中の線を描かないことで、大きな地域に見せる（js/ui/art.js）
+const lineD = (lines) => lines.map((line) => {
+  const crosses = line.some((p, i) => i && Math.abs(p[0] - line[i - 1][0]) > 180);
+  const pts = (crosses ? line.map(([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat]) : line).map(px);
+  return 'M' + pts.map((p) => r1(p[0]) + ' ' + r1(Math.min(H + 2, p[1]))).join('L');
+}).join('');
+const borders = [];
+const unitIds = Object.keys(GROUPS).filter((id) => id !== 'ANT');
+const nameOwner = (geo) => owner.get(geo.properties.name);
+for (const a of unitIds) {
+  const coast = topo.mesh(world, world.objects.countries, (x, y) => x === y && nameOwner(x) === a);
+  if (coast.coordinates.length) borders.push([a, '', lineD(coast.coordinates)]);
+  for (const b of unitIds) {
+    if (b <= a) continue;
+    const m = topo.mesh(world, world.objects.countries, (x, y) => x !== y && ((nameOwner(x) === a && nameOwner(y) === b) || (nameOwner(x) === b && nameOwner(y) === a)));
+    if (m.coordinates.length) borders.push([a, b, lineD(m.coordinates)]);
+  }
+}
+
 const out = `// 自動生成：tools/build_map.mjs（Natural Earth 110m をもとに 46 カ国へまとめたもの）。手で編集しない
 export const MAP_W = ${W}, MAP_H = ${H};
 export const SHAPES = ${JSON.stringify(shapes)};
 export const CENTERS = ${JSON.stringify(centers)};
 export const LAND_NEIGHBORS = ${JSON.stringify(landNb)};
+// 面積（画面上の大きさ）：背景国をまとめるときの代表選びに使う
+export const AREAS = ${JSON.stringify(areas)};
+// 境界線 [国A, 国B（海岸線は ''）, パス]
+export const BORDERS = ${JSON.stringify(borders)};
 `;
 writeFileSync(new URL('../js/data/mapdata.js', import.meta.url), out);
 console.log('mapdata.js', (out.length / 1024).toFixed(0) + 'KB', 'H=' + H);

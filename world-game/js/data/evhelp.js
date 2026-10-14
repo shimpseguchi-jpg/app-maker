@@ -11,7 +11,10 @@ export const since = (g, id) => (fired(g, id) ? g.year - g.fired[id] : 99);
 export const flagSince = (g, f) => (g.flags[f] != null ? g.year - g.flags[f] : 99);
 export const best = (arr, f) => arr.reduce((a, b) => (f(b) > f(a) ? b : a), arr[0]);
 export const ai = (g) => act(g).filter((c) => !c.player);
-export const live = (g, id) => (g.majors[id] ? g.majors[id].panel : g.backs[id] && !g.backs[id].owner && !g.backs[id].sunk);
+// 背景国がまとまっているゲームでは、元の国の ID でも、まとまり（代表）で答える
+const bk = (g, id) => g.backs[id] || (g.unitOf ? g.backs[g.unitOf[id]] : undefined);
+export const live = (g, id) => (g.majors[id] ? g.majors[id].panel : !!bk(g, id) && !bk(g, id).owner && !bk(g, id).sunk);
+export { bk };
 
 // 核を持つ国どうしで、関係が冷え切った組
 export function nukePair(g, th = 20) {

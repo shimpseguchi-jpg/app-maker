@@ -37,22 +37,39 @@ export function addStat(obj, stat, size, sign, factor = 1, isBg = false) {
 }
 
 // ───── 隣接 ─────
-export function neighbors(id) {
+// 地図どおりの隣接（46カ国のまま）
+export function rawNeighbors(id) {
   const set = new Set(LAND_NEIGHBORS[id] || []);
   for (const [a, b] of SEA_LINKS) { if (a === id) set.add(b); if (b === id) set.add(a); }
   return [...set];
 }
+// 世界の国の数を減らしたゲームでは、背景国がまとまっている（g.unitOf：元の国 → まとまりの代表）。
+// いま遊んでいるゲームのまとまりを覚えておき、隣接はまとまりどうしで答える
+let UNITS = null, MEMBERS = null, nbCache = {};
+export function setUnits(unitOf) {
+  UNITS = unitOf || null;
+  MEMBERS = null; nbCache = {};
+  if (UNITS) { MEMBERS = {}; for (const [m, u] of Object.entries(UNITS)) (MEMBERS[u] ||= []).push(m); }
+}
+export const unitOf = (id) => (UNITS && UNITS[id]) || id;
+export function neighbors(id) {
+  if (!UNITS) return rawNeighbors(id);
+  if (nbCache[id]) return nbCache[id];
+  const set = new Set();
+  for (const m of MEMBERS[id] || [id]) for (const n of rawNeighbors(m)) { const u = unitOf(n); if (u !== id) set.add(u); }
+  return (nbCache[id] = [...set]);
+}
 export function polarNeighbors(id) {
   const out = [];
   for (const [a, b] of POLAR_LINKS) { if (a === id) out.push(b); if (b === id) out.push(a); }
-  return out;
+  return out.map(unitOf).filter((x) => x !== id);
 }
 
 // ───── 国の状態 ─────
 export const isMajor = (id) => id && id[0] === 'M';
 // 席についている国（自国＋AI）か。抽選外の主要国は背景国として g.backs にいる
 export const isSeat = (g, id) => !!(id && g.majors[id]);
-export const C = (g, id) => g.majors[id] || g.backs[id];
+export const C = (g, id) => g.majors[id] || g.backs[id] || (g.unitOf ? g.backs[g.unitOf[id]] : undefined);
 export const active = (g) => g.seats.filter((id) => g.majors[id].panel);
 export const others = (g, id) => active(g).filter((x) => x !== id);
 export const rel = (g, a, b) => (a === b ? 100 : g.rel[[a, b].sort().join('-')] ?? 50);

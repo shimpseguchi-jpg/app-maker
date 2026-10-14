@@ -1,7 +1,7 @@
 // 追加の世界イベント（POLICIES_EVENTS.md の 4.5〜4.9）：南極・北極、いまの問題、過去の問題、未来の問題、火種
 // 書き方は events.js と同じ。「モチーフ」はコメントに書き、ゲーム画面には出さない
 import { neighbors, isSeat, rel } from '../engine/core.js';
-import { Y, act, bgs, avg, fired, since, flagSince, best, ai, live } from './evhelp.js';
+import { Y, act, bgs, avg, fired, since, flagSince, best, ai, live, bk } from './evhelp.js';
 
 const north = (g) => act(g).filter((c) => c.polar === 'N');
 const coastalBig = (g) => act(g).filter((c) => ['M13', 'M15', 'M14', 'M01', 'M12', 'M11', 'M04'].includes(c.id));
@@ -115,8 +115,8 @@ export const EVENTS_MORE = [
     who: (g) => best(act(g).filter((c) => c.stats.inequality >= 60), (c) => c.stats.inequality).id,
     run: (g, H, who) => { for (const c of act(g)) if (c.id !== who) H.addRel(who, c.id, -8); }, fx: ['who.stability-s', 'who.rep-s'], ins: ['P41', 'P43'],
     text: '{who}で、「悪いのは外国だ」と叫ぶ候補が支持を集めている。わかりやすい答えほど、よく売れる。' },
-  { id: 'E112', name: '麻薬カルテル', cat: 'society', w: 10, cond: (g) => ['B01', 'B07', 'B04'].some((id) => live(g, id) && g.backs[id].stats.stability <= 45),
-    who: (g) => ['B01', 'B07', 'B04'].find((id) => live(g, id) && g.backs[id].stats.stability <= 45),
+  { id: 'E112', name: '麻薬カルテル', cat: 'society', w: 10, cond: (g) => ['B01', 'B07', 'B04'].some((id) => live(g, id) && bk(g, id).stats.stability <= 45),
+    who: (g) => ['B01', 'B07', 'B04'].find((id) => live(g, id) && bk(g, id).stats.stability <= 45),
     run: (g, H, who) => { for (const id of neighbors(who)) if (g.majors[id]?.panel) H.fx(['who.security-s'], { who: id }); }, fx: ['who.stability-m'], ins: ['P40', 'P53'],
     text: '{who}では、麻薬組織が軍隊より強い武器を持っている。役人も警察も、組織に給料をもらっている。' },
   { id: 'E113', name: '人身売買', cat: 'society', w: 8, cond: (g) => g.world.refugees >= 55,

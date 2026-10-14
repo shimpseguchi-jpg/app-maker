@@ -103,7 +103,8 @@ export function tickWorld(g) {
   const avgFood = act.length ? act.reduce((s, c) => s + c.stats.food, 0) / act.length : 100;
   w.foodPrice = clamp(rev(w.foodPrice, 50, 0.1) + (avgFood < 90 ? 1 : 0) + (g.flags.altE != null ? 0.5 : 0), 10, 300);
   const backs = Object.values(g.backs).filter((b) => !b.owner);
-  const unstable = backs.filter((b) => b.stats.stability <= 25).length;
+  // 背景国をまとめて数が減ったゲームでも、世界全体への効き方が変わらないように数をならす（bgScale＝40÷背景国の数）
+  const unstable = backs.filter((b) => b.stats.stability <= 25).length * (g.bgScale || 1);
   w.refugees = clamp(rev(w.refugees + (w.conflicts - 50) / 25 + unstable * 0.3 - 1, 30, 0.05), 0, 100);
   const majUnstable = act.filter((c) => c.stats.stability < 35).length + all.filter((c) => !c.panel).length;
   const natC = 30 + 3 * unstable + 5 * majUnstable + w.tension / 6 + (w.refugees - 30) / 6;

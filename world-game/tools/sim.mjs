@@ -9,6 +9,7 @@ const N = Number(process.argv[2] || 300);
 const VERBOSE = !!process.env.V;
 const PERSONA = process.env.P || null; // 自国の打ち方（未指定ならランダム）
 const KID = !!process.env.KID; // 1ねんせいモード（20かい）
+const SIZE = Number(process.env.SIZE || 46); // 世界の国の数（10〜46）
 const rng = makeRng(12345);
 const PERS = ['tech', 'edu', 'trade', 'order', 'finance', 'ambition'];
 
@@ -16,7 +17,7 @@ const PERS = ['tech', 'edu', 'trade', 'order', 'finance', 'ambition'];
 const bestAgenda = (g, opts) => opts.map((a) => [a, g.seats.filter((id) => id !== g.player && g.majors[id].panel).reduce((m, id) => Math.min(m, voteChance(g, g.majors[id], a)), 100)]).sort((x, y) => y[1] - x[1])[0][0];
 function playOne(i) {
   const seed = 'SIM' + i;
-  const g = G.newGame(seed, { diceSeed: 1000 + i, kid: KID });
+  const g = G.newGame(seed, { diceSeed: 1000 + i, kid: KID, size: SIZE });
   const pl = g.majors[g.player];
   pl.persona = PERSONA || PERS[Math.floor(rng() * PERS.length)];
   const bases = Object.keys(BASE).filter((b) => b !== 'B10');

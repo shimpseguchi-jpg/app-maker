@@ -4,7 +4,7 @@ import { onGas, cloud, cloudLoad, cloudPush } from './cloud.js';
 import { $, $$, el, esc, fmt, newSeed, normSeed, wait } from './util.js';
 import * as G from './engine/game.js';
 import { POLICIES, BASE, CATS } from './data/policies.js';
-import { STAT_INFO, STAT_CATS, NUKE_STAGES } from './data/countries.js';
+import { STAT_INFO, STAT_CATS, NUKE_STAGES, MAJORS, BACKS } from './data/countries.js';
 import { GM_NAME } from './data/gm.js';
 import { describeFx, STAT_JA } from './engine/effects.js';
 import { probability, TIER, rel, allied, C, isSeat, activeSituations } from './engine/core.js';
@@ -18,7 +18,7 @@ import { AGENDAS } from './data/agendas.js';
 import { getMood } from './engine/secretary.js';
 import { voteChance } from './engine/ai.js';
 import {
-  KID_EVENT, KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
+  KID_EVENT, KID_COUNTRY, KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
   KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF, KID_WORLD, KID_BAD,
 } from './data/kid.js';
 
@@ -64,6 +64,8 @@ const persist = () => {
   cloudPush({ save: JSON.stringify(g), meta: saveMeta(g) });
 };
 
+// 世界の国の数（モードごとに覚える。はじめは おとな46・1ねんせい20）
+const worldSize = () => settings.size?.[settings.mode] ?? (settings.mode === 'kid' ? 20 : G.WORLD_MAX);
 // 1ねんせいモードかどうか（ゲーム中はゲームの設定、タイトルでは選んだモード）
 const kid = () => (g ? !!g.kid : settings.mode === 'kid');
 const K = (adult, k) => (kid() ? k : adult);
@@ -74,6 +76,8 @@ const SPEED = { slow: 1100, normal: 550, fast: 180 };
 const GM_PRI = { few: 1, normal: 2, many: 3 };
 const mount = (node) => { setKidClass(); $$('.screen', stage).forEach((s) => s.remove()); $$('.modal-back, .dice-back', stage).forEach((s) => s.remove()); stage.prepend(node); };
 const gmBubble = (text) => `<div class="gm"><div class="face">${K('GM', '🎩')}</div><div class="bubble"><b class="name">${K(GM_NAME, KID_GM_NAME)}</b>${esc(text)}</div></div>`;
+// まとまった背景国の、元の国の名前
+const memberName = (m) => (kid() ? KID_COUNTRY[m]?.[0] : (MAJORS.find((x) => x.id === m) || BACKS.find((x) => x.id === m))?.name) || m;
 const nameOf = (id) => (id ? C(g, id)?.name || '' : '');
 const polName = (id) => (kid() ? KID_POLICY[id] : POLICIES[id].name);
 const tierName = (t) => (kid() ? KID_TIERS[t] : TIER[t].name);
@@ -109,6 +113,7 @@ function titleScreen() {
     <h1>${K('世界統一ゲーム', 'せかい とういつ げーむ')}<small>${K('WORLD UNIFICATION GAME — 一人用', 'ひとりで あそぶ せかいの げーむ')}</small></h1>
     <div class="menu">
       <div class="modes"><button class="btn small ${settings.mode === 'adult' ? 'primary' : ''}" data-mode="adult">おとな</button><button class="btn small ${settings.mode === 'kid' ? 'primary' : ''}" data-mode="kid">1ねんせい</button></div>
+      <div class="sizerow"><span>${K('世界の国の数', 'せかいの くにの かず')}</span><input type="range" data-size min="${G.WORLD_MIN}" max="${G.WORLD_MAX}" step="1" value="${worldSize()}"><b data-sizev>${worldSize()}</b></div>
       ${sk ? `<button class="btn primary" data-cont>${K('つづきから', 'つづきから')}（${sk.kid ? '1ねんせい' : 'おとな'}・${G.yearLabel(sk)}${K('年', 'ねん')}）</button>` : ''}
       <button class="btn ${sk ? '' : 'primary'}" data-new>${K('新しいゲーム', 'あたらしく はじめる')}</button>
       <div class="seedrow"><input data-seed maxlength="12" placeholder="${K('シード値', 'せかいの ばんごう')}" autocomplete="off"><button class="btn" data-seedgo>${K('この世界で', 'この せかいで')}</button></div>
@@ -120,6 +125,9 @@ function titleScreen() {
   </div>`);
   mount(node);
   $$('[data-mode]', node).forEach((b) => b.addEventListener('click', () => { settings.mode = b.dataset.mode; saveSettings(); titleScreen(); }));
+  const sz = $('[data-size]', node);
+  sz.addEventListener('input', () => { $('[data-sizev]', node).textContent = sz.value; });
+  sz.addEventListener('change', () => { (settings.size ||= {})[settings.mode] = Number(sz.value); saveSettings(); });
   $('[data-cont]', node)?.addEventListener('click', () => { g = migrate(saved); resume(); });
   $('[data-new]', node).addEventListener('click', () => startSetup(newSeed()));
   $('[data-seedgo]', node).addEventListener('click', () => { const s = normSeed($('[data-seed]', node).value); if (s) startSetup(s); });
@@ -131,7 +139,7 @@ function titleScreen() {
 function migrate(sv) {
   sv.world.biodiv ??= 70;
   sv.sparks ||= [];
-  return sv;
+  return G.attachWorld(sv);
 }
 
 function howTo() {
@@ -193,7 +201,7 @@ const zbtn = (attr) => `<button class="zbtn" ${attr} aria-label="${K('拡大', '
 
 // ───── 準備（抽選・基本政策） ─────
 function startSetup(seed) {
-  g = G.newGame(seed, { kid: settings.mode === 'kid' });
+  g = G.newGame(seed, { kid: settings.mode === 'kid', size: worldSize() });
   setupScreen();
 }
 function kidBars(c, small = false) {
@@ -236,7 +244,7 @@ function setupScreen() {
   }));
   $('[data-back]', node).addEventListener('click', titleScreen);
   $('[data-reroll]', node).addEventListener('click', () => {
-    g = G.newGame(newSeed(), { rerolled: true, kid: g.kid });
+    g = G.newGame(newSeed(), { rerolled: true, kid: g.kid, size: g.worldSize });
     G.say(g, 'setup.reroll');
     g.feed.reverse();
     setupScreen();
@@ -941,6 +949,7 @@ function countryInfo(id) {
       ? [['💰 おかね', s.econ], ['🏠 あんしん', s.stability], ['💧 みず', s.water], ['🍚 たべもの', s.food], ['📉 しゃっきん', s.debt]]
       : [['経済', s.econ], ['政情', s.stability], ['水', s.water], ['食糧', s.food], ['負債', s.debt]];
     modal(`<h2>${flagSvg(c.flag, 36, 24)} ${esc(c.name)}</h2>
+      ${c.merged ? `<div class="muted">${K('まとまっている地域', 'まとまって いる ところ')}：${c.merged.filter((m) => m !== c.id).map((m) => esc(memberName(m))).join(K('・', '、'))}</div>` : ''}
       <div class="muted">${kid() ? '' : esc(c.role || '')}${c.owner ? K(`　${esc(nameOf(c.owner))}に併合`, `　${esc(nameOf(c.owner))}に とられた`) : ''}${c.sunk ? K('　海面上昇で国土を失った', '　うみに しずんで しまった') : ''}</div>
       <div class="statgrid">${rows.map(([l, v], i) => `<div class="stat ${(i === 4 ? v >= 90 : v <= 20) ? 'danger' : ''}"><span>${l}</span><b>${fmt(v, 0)}</b></div>`).join('')}</div>
       <div class="row"><button class="btn primary" data-close>とじる</button></div>`, 'big');

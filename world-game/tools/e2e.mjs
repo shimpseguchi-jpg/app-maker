@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 const url = process.env.URL || 'http://localhost:8124/';
 const out = process.env.OUT || (await import('os')).tmpdir();
 const SEED = process.env.SEED || 'TEST01';
+const SIZE = Number(process.env.SIZE || 0); // 世界の国の数（指定しなければ設定どおり）
 const KID = !!process.env.KID; // 1ねんせいモード：画面に 1年生で ならわない かん字が ないか しらべる
 const G1 = '一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六';
 const exe = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -13,7 +14,7 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 await page.goto(url);
-await page.evaluate((kid) => { localStorage.clear(); localStorage.setItem('worldgame.settings', JSON.stringify({ gm: 'many', speed: 'fast', mode: kid ? 'kid' : 'adult' })); }, KID);
+await page.evaluate(([kid, size]) => { localStorage.clear(); localStorage.setItem('worldgame.settings', JSON.stringify({ gm: 'many', speed: 'fast', mode: kid ? 'kid' : 'adult', ...(size ? { size: { [kid ? 'kid' : 'adult']: size } } : {}) })); }, [KID, SIZE]);
 await page.reload();
 await page.waitForTimeout(800);
 await page.screenshot({ path: `${out}/wg-01-title.png` });

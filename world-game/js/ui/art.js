@@ -1,5 +1,5 @@
 // 国旗・地図・ダイスの絵（SVG）
-import { SHAPES, CENTERS, MAP_W, MAP_H } from '../data/mapdata.js';
+import { SHAPES, CENTERS, MAP_W, MAP_H, BORDERS } from '../data/mapdata.js';
 import { isSeat, neighbors } from '../engine/core.js';
 
 export function flagSvg(f, w = 30, h = 20) {
@@ -31,13 +31,31 @@ export function seatColor(g, id) {
   return SEAT_COLORS[others.indexOf(id) % SEAT_COLORS.length];
 }
 
+// 背景国の塗り分け：となりあう背景国がちがう色になるように、くすんだ色を順にあてる（まとまって大きくなっても見分けられるように）
+const BG_SHADES = ['#3a4558', '#4a4560', '#384f57', '#4d4b44', '#44506a'];
+function bgShades(g) {
+  const ids = Object.keys(g.backs).sort();
+  const out = {};
+  for (const id of ids) {
+    const used = new Set(neighbors(id).map((n) => out[n]).filter((x) => x != null));
+    let k = 0;
+    while (used.has(k)) k++;
+    out[id] = k % BG_SHADES.length;
+  }
+  return out;
+}
+
 // 地図。opts.highlight：強調する国（準備画面）
 export function mapSvg(g, opts = {}) {
   const parts = [];
   parts.push(`<rect width="${MAP_W}" height="${MAP_H}" fill="#0b1a2c"/>`);
   parts.push(`<g opacity=".08" stroke="#9cc" stroke-width=".5">${[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `<path d="M${(i * MAP_W) / 9} 0V${MAP_H}"/>`).join('')}${[1, 2, 3].map((i) => `<path d="M0 ${(i * MAP_H) / 4}H${MAP_W}"/>`).join('')}</g>`);
-  for (const [id, d] of Object.entries(SHAPES)) {
-    if (id === 'ANT') { parts.push(`<path class="land ant" d="${d}" opacity="${0.35 + g.world.ice / 200}"/>`); continue; }
+  // 背景国がまとまっているときは、元の国（地図の形）をまとまりの代表の色で塗り、まとまりの中の境界線は描かない
+  const U = (id) => (g.unitOf && g.unitOf[id]) || id;
+  const shade = bgShades(g);
+  for (const [sid, d] of Object.entries(SHAPES)) {
+    if (sid === 'ANT') { parts.push(`<path class="land ant" d="${d}" opacity="${0.35 + g.world.ice / 200}"/>`); continue; }
+    const id = U(sid);
     let fill = '', cls = 'land';
     if (isSeat(g, id)) {
       const c = g.majors[id];
@@ -48,11 +66,13 @@ export function mapSvg(g, opts = {}) {
       const b = g.backs[id];
       cls += ' bg';
       if (b?.owner) { fill = seatColor(g, b.owner); cls += ' owned'; }
-      if (b?.sunk) cls += ' sunk';
+      else if (b?.sunk) cls += ' sunk';
+      else fill = BG_SHADES[shade[id] ?? 0];
     }
-    if (opts.highlight && !opts.highlight.includes(id)) { fill = ''; cls = 'land bg'; }
-    parts.push(`<path class="${cls}" data-id="${id}" d="${d}"${fill ? ` style="fill:${fill}"` : ''}/>`);
+    if (opts.highlight && !opts.highlight.includes(id)) { fill = g.backs[id] ? BG_SHADES[shade[id] ?? 0] : ''; cls = 'land bg'; }
+    parts.push(`<path class="${cls}" data-id="${id}" d="${d}"${fill ? ` style="fill:${fill};stroke:${fill}"` : ''}/>`);
   }
+  parts.push(`<g class="borders">${BORDERS.filter(([a, b]) => !b || U(a) !== U(b)).map(([, , d]) => `<path d="${d}"/>`).join('')}</g>`);
   // 提携の線
   for (const k of g.allies || []) {
     const [a, b] = k.split('-');
