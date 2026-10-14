@@ -1,5 +1,6 @@
 // 世界統一ゲーム（仮）：画面と進行（おとなモード／1ねんせいモード）
-import { watchKid } from './ui/kidify.js';
+import { watchKid, kidify } from './ui/kidify.js';
+import { onGas, cloud, cloudLoad, cloudPush } from './cloud.js';
 import { $, $$, el, esc, fmt, newSeed, normSeed, wait } from './util.js';
 import * as G from './engine/game.js';
 import { POLICIES, BASE, CATS } from './data/policies.js';
@@ -35,16 +36,27 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 $('[data-portrait]')?.addEventListener('click', () => document.body.classList.add('allow-portrait'));
 
 // ───── 保存 ─────
-const KEY = 'worldgame.save', SKEY = 'worldgame.settings';
+// GAS 版では、学校のアカウントごとに先生のスプレッドシートにも保存する（cloud.js）
+let KEY = 'worldgame.save', SKEY = 'worldgame.settings';
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 保存できない環境でも遊べる */ } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } },
 };
-const settings = Object.assign({ gm: 'normal', speed: 'normal', mode: 'adult' }, store.get(SKEY) || {});
-const saveSettings = () => store.set(SKEY, settings);
+const settings = { gm: 'normal', speed: 'normal', mode: 'adult' };
+const loadSettings = () => Object.assign(settings, store.get(SKEY) || {});
+loadSettings();
+const saveSettings = () => { store.set(SKEY, settings); cloudPush({ settings: JSON.stringify(settings) }); };
 let g = null;
-const persist = () => { if (g) { if (g.result) store.del(KEY); else store.set(KEY, g); } };
+// 先生の一覧に出す見出し（モード・年・国・状態・点数）
+const saveMeta = (x) => ({ mode: x.kid ? '1ねんせい' : 'おとな', year: G.yearLabel(x), country: (x.kid ? kidify : String)(x.majors?.[x.player]?.name || ''), status: x.result ? x.result.type : 'playing', score: x.result?.score ?? '' });
+const persist = () => {
+  if (!g) return;
+  if (g.result) { store.del(KEY); cloudPush({ save: null, meta: saveMeta(g) }); return; }
+  g.savedAt = Date.now();
+  store.set(KEY, g);
+  cloudPush({ save: JSON.stringify(g), meta: saveMeta(g) });
+};
 
 // 1ねんせいモードかどうか（ゲーム中はゲームの設定、タイトルでは選んだモード）
 const kid = () => (g ? !!g.kid : settings.mode === 'kid');
@@ -81,6 +93,7 @@ function titleScreen() {
       <button class="btn" data-how>あそびかた</button>
       <button class="btn" data-set>せってい</button>
     </div>
+    ${onGas() ? `<div class="cloudnote">${{ ok: K('☁ セーブ：学校のアカウントに自動で保存', '☁ セーブ：がっこうの あかうんとに じどうで ほぞん'), guest: K('セーブ：この端末だけ（アカウントが確認できません）', 'セーブ：この たんまつだけ'), error: K('セーブ：いまは通信できません（この端末には保存）', 'セーブ：いまは この たんまつだけ') }[cloud.state] || ''}</div>` : ''}
     <div class="note">${K('原作：冲方丁『スプライトシュピーゲルIV テンペスト』の作中ゲームをもとにした個人制作のファン作品です。国名・事件名は架空です。', 'くにの なまえや できごとは、つくりものです。')}</div>
   </div>`);
   mount(node);
@@ -788,5 +801,23 @@ function endingScreen() {
 // 開発・テスト用
 window.WG = { get g() { return g; }, G, settings };
 
-titleScreen();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+// はじめに：GAS 版ならクラウドのセーブを読みこみ、この端末のものと新しいほうを使う
+async function boot() {
+  if (onGas()) {
+    mount(el(`<div class="screen title"><div class="menu"><p class="loading">${K('セーブを読みこみ中…', 'セーブを よみこみちゅう…')}</p></div></div>`));
+    const r = await cloudLoad();
+    if (r) {
+      KEY += '.' + r.user; SKEY += '.' + r.user;
+      const parse = (t) => { try { return JSON.parse(t); } catch (e) { return null; } };
+      const local = store.get(KEY), remote = r.save ? parse(r.save) : null;
+      if (local && !local.result && (local.savedAt || 0) > (r.updated || 0)) cloudPush({ save: JSON.stringify(local), meta: saveMeta(local) });
+      else if (remote) store.set(KEY, remote);
+      else store.del(KEY);
+      if (r.settings) { const st = parse(r.settings); if (st) store.set(SKEY, st); }
+      loadSettings();
+    }
+  }
+  titleScreen();
+}
+boot();
+if (!onGas() && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
