@@ -60,6 +60,7 @@ for (; t < 4000; t++) {
     if (!shot.has('player')) { shot.add('player'); await page.screenshot({ path: `${out}/wg-03-player.png` }); }
     if (year === 20 && !shot.has('y20')) { shot.add('y20'); await page.screenshot({ path: `${out}/wg-05-year20.png` }); }
     if (!shot.has('spark') && await page.$('.sparkcard')) { shot.add('spark'); await page.screenshot({ path: `${out}/wg-08-spark.png` }); }
+    if (!shot.has('sit') && await page.$('.sitcard') && await page.$('.evres')) { shot.add('sit'); await page.screenshot({ path: `${out}/wg-09-situation.png` }); }
     const cards = await page.$$('.card h4');
     const i = Math.floor(Math.random() * cards.length);
     await cards[i].click();
@@ -73,6 +74,7 @@ await page.waitForTimeout(500);
 await page.screenshot({ path: `${out}/wg-07-ending.png` });
 await checkKana();
 const res = await page.evaluate(() => window.WG.g?.result);
+if (process.env.DEBUG) console.log(await page.evaluate(() => JSON.stringify({ kid: window.WG.g.kid, max: window.WG.g.maxYears, hist: window.WG.g.hist.map((h) => h.year) })));
 if (KID) { console.log(badText.size ? 'かんじ・かたかな:\n' + [...badText.keys()].slice(0, 60).join('\n') : 'ひらがなのみ OK'); }
 console.log('steps', t, 'result', JSON.stringify(res));
 console.log(errors.length ? 'ERRORS:\n' + errors.join('\n') : 'no errors');

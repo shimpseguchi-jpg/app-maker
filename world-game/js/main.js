@@ -5,13 +5,13 @@ import { POLICIES, BASE, CATS } from './data/policies.js';
 import { STAT_INFO, STAT_CATS, NUKE_STAGES } from './data/countries.js';
 import { GM_NAME } from './data/gm.js';
 import { describeFx, STAT_JA } from './engine/effects.js';
-import { probability, TIER, rel, allied, C, isSeat } from './engine/core.js';
+import { probability, TIER, rel, allied, C, isSeat, activeSituations } from './engine/core.js';
 import { PERSONAS, AGENDAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
 import { SPARKS } from './engine/sparks.js';
 import {
   KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
-  KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF,
+  KID_BASE, KID_SPARK, KID_POLICY, KID_GM_NAME, KID_STAT_OF, KID_WORLD, KID_BAD,
 } from './data/kid.js';
 
 const stage = $('#stage');
@@ -325,11 +325,39 @@ function renderMap() {
   });
 }
 
+// ニュースで動いた数値（engine/game.js の summarizeChanges）
+const BG_JA = { econ: '経済', stability: '政情', water: '水', food: '食糧', debt: '負債' };
+const BG_KID = { econ: ['💰'], stability: ['🏠'], water: ['💧'], food: ['🍚'], debt: ['💰', true] };
+const KID_ICON = Object.fromEntries(KID_STATS.map((s) => [s.key, s.icon]));
+Object.assign(KID_ICON, { earth: '🌏', fight: '⚔', world: '🕊' });
+function resHtml(res) {
+  if (!res || !res.length) return '';
+  const groups = new Map();
+  for (const r of res) {
+    const who = r.id === 'world' ? K('世界', 'せかい') : r.id === 'bg' ? K(`小国${r.n}カ国`, `ちいさな くに ${r.n}こ`) : r.id === 'majors' ? K('各国', 'みんなの くに') : nameOf(r.id);
+    let label, up = r.a > 0;
+    if (kid()) {
+      let icon, bad = false;
+      if (r.id === 'world') { const w = KID_WORLD[r.stat]; if (!w) continue; icon = KID_ICON[w[0]]; bad = !!w[1]; }
+      else if (BG_KID[r.stat] && !isSeat(g, r.id) && r.id !== 'majors') { [icon, bad] = BG_KID[r.stat]; }
+      else { const k = KID_STAT_OF[r.stat]; if (!k) continue; icon = KID_ICON[k]; bad = KID_BAD.has(r.stat); }
+      if (bad) up = !up;
+      label = `${icon}${(up ? '↑' : '↓').repeat(Math.abs(r.a))}`;
+    } else {
+      const name = r.id !== 'world' && r.id !== 'majors' && !isSeat(g, r.id) && BG_JA[r.stat] ? BG_JA[r.stat] : STAT_INFO[r.stat]?.name || STAT_JA[r.stat] || BG_JA[r.stat] || r.stat;
+      label = `${name}${(up ? '↑' : '↓').repeat(Math.abs(r.a))}`;
+    }
+    (groups.get(who) || groups.set(who, []).get(who)).push(label);
+  }
+  if (!groups.size) return '';
+  return `<div class="evres">→ ${[...groups].map(([w, ls]) => `<span>${esc(w)}：${ls.join(' ')}</span>`).join('　')}</div>`;
+}
+
 function feedHtml(f) {
   const pri = GM_PRI[settings.gm];
   switch (f.k) {
     case 'gm': return f.pri <= pri ? `<div class="gmline">${esc(f.text)}</div>` : '';
-    case 'event': return `<div class="ev"><b>📰 ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}</div>`;
+    case 'event': return `<div class="ev"><b>📰 ${esc(f.name)}${f.who ? `（${esc(nameOf(f.who))}）` : ''}</b>${esc(f.text)}${resHtml(f.res)}${sitHtml(f.id)}</div>`;
     case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
@@ -352,7 +380,8 @@ function renderRivals() {
     return `<div class="sparkcard" data-id="${s.where}"><div class="row"><b>${t.icon} ${esc(nameOf(s.where))}</b><span class="chip">${g.year - s.start + 1}${K('年目', 'かいめ')}</span></div>
       <div class="meta">${esc(sparkName(s.type))}</div><div class="meta">${K('状況は不明。いつ世界に広がるかもわからない', 'ようすは わからない。いつ ひろがるかも わからない')}</div></div>`;
   }).join('');
-  $('.rivals', stage).innerHTML = (sparks ? `<div class="sparks"><h3>🔥 ${K('火種', 'ひだね')}</h3>${sparks}</div>` : '') + g.seats.filter((id) => id !== me).map((id) => {
+  const sits = sitList();
+  $('.rivals', stage).innerHTML = (sparks ? `<div class="sparks"><h3>🔥 ${K('火種', 'ひだね')}</h3>${sparks}</div>` : '') + (sits ? `<div class="sits"><h3>📰 ${K('情勢', 'いまの ようす')}</h3>${sits}</div>` : '') + g.seats.filter((id) => id !== me).map((id) => {
     const c = g.majors[id];
     const r = rel(g, me, id);
     const last = c.lastAct && c.lastAct.year === g.year ? `${esc(polName(c.lastAct.pol))} <span class="tier ${c.lastAct.tier}">${tierName(c.lastAct.tier)}</span>` : c.lastAct ? `<span class="muted">${K('昨年', 'まえ')}：${esc(polName(c.lastAct.pol))}</span>` : '';
@@ -364,6 +393,40 @@ function renderRivals() {
     </div>`;
   }).join('');
   $$('.rival, .sparkcard', stage).forEach((n) => n.addEventListener('click', () => countryInfo(n.dataset.id)));
+}
+
+// 情勢：どの政策が上下するかの説明
+function sitTarget(s) {
+  const cats = (s.cats || []).map((c) => (kid() ? KID_CATS[c] : CATS[c]));
+  const pols = (s.pols || []).slice(0, 2).map((p) => polName(p)) ;
+  const more = (s.pols || []).length > 2 ? K('など', 'など') : '';
+  return [...cats.map((c) => K(`${c}の政策`, `${c}の かーど`)), pols.length ? `「${pols.join('」「')}」${more}` : ''].filter(Boolean).join(K('・', '、'));
+}
+function sitScope(s) {
+  if (s.scope === 'who') return K(`${nameOf(s.who)}だけ`, `${nameOf(s.who)}だけ`);
+  if (s.scope === 'others') return K(`${nameOf(s.who)}以外`, `${nameOf(s.who)}いがい`);
+  return '';
+}
+function sitLeft(s) {
+  const left = s.until - (g.cal ?? g.year - 1);
+  return kid() ? `あと ${Math.max(1, Math.ceil(left / 2.5))}かい` : `あと${left}年`;
+}
+// 「経済の政策の成功率 −10（〇〇だけ）」／「おかねの かーどが せいこう しにくく なる（−10）」
+function sitLine(s) {
+  const n = `<b class="${s.mod > 0 ? 'good' : 'bad'}">${s.mod > 0 ? '+' : ''}${s.mod}</b>`;
+  const sc = sitScope(s) ? `（${esc(sitScope(s))}）` : '';
+  return kid()
+    ? `${esc(sitTarget(s))}が せいこう ${s.mod > 0 ? 'しやすく' : 'しにくく'} なる（${n}）${sc}`
+    : `${esc(sitTarget(s))}の成功率 ${n}${sc}`;
+}
+function sitHtml(evId) {
+  const list = activeSituations(g).filter((s) => s.ev === evId);
+  if (!list.length) return '';
+  return `<div class="evsit">${list.map((s) => `📰 ${sitLine(s)}　${sitLeft(s)}`).join('<br>')}</div>`;
+}
+function sitList() {
+  return activeSituations(g).map((s) => `<div class="sitcard"><div class="row"><b>${esc(kid() ? s.kname : s.name)}</b><span class="chip">${sitLeft(s)}</span></div>
+    <div class="meta">${sitLine(s)}</div></div>`).join('');
 }
 
 function lastGmLine() {
@@ -398,13 +461,15 @@ function renderChoices(box) {
     const ngFx = (kid() ? kidFx(pol.ng) : describeFx(pol.ng)).slice(0, kid() ? 2 : 3).join('　');
     const isSpark = (g.sparks || []).some((s) => SPARKS[s.type].fx[o.id] != null);
     const tag = isSpark ? `<span class="ins">🔥 ${K('火種', 'ひだね')}</span>` : g.inserts.includes(o.id) ? `<span class="ins">📰 ${K('情勢', 'にゅーす')}</span>` : '';
+    const sitSum = pr.parts.filter((x) => x[3] === 'sit').reduce((a, x) => a + x[1], 0);
+    const sitTag = sitSum ? `<div class="cardsit ${sitSum > 0 ? 'good' : 'bad'}">📰 ${K('情勢', 'いまの ようす')} ${sitSum > 0 ? '+' : ''}${sitSum}</div>` : '';
     const prob = kid()
       ? `<div class="prob kidprob"><small>でめが</small><b>${pr.p}</b><small>いかなら<br>せいこう</small></div>`
       : `<div class="prob"><b>${pr.p}%</b><small>大成功 ${pr.crit}%<br>大失敗 ${pr.fumble}%</small></div>`;
     return `<div class="card ${ui.sel === o.id ? 'sel' : ''}" style="--cc:var(--${pol.cat})" data-pol="${o.id}">
       <div class="cat"><span>${kid() ? KID_CATS[pol.cat] : CATS[pol.cat]}</span><span>${tag}${zbtn('data-zcard')}</span></div>
       <h4>${esc(polName(o.id))}</h4>
-      ${prob}
+      ${prob}${sitTag}
       <div class="fx">${K('成功', 'せいこう')}：${okFx || '—'}</div>
       ${ngFx ? `<div class="fx ng">${K('失敗', 'しっぱい')}：${ngFx}</div>` : ''}
       ${tg ? `<div class="tg">${[...new Set([tg, ...o.tgts])].slice(0, 6).map((t) => `<button data-t="${t}" class="${t === tg ? 'on' : ''}">${esc(nameOf(t).replace(/の くに$|の しま$/, '').slice(0, 7))}</button>`).join('')}</div>` : '<div class="tg"></div>'}
@@ -431,7 +496,7 @@ function probDetail(polId) {
   const c = g.majors[g.player];
   const pol = POLICIES[polId];
   const pr = probability(g, c, pol, ui.tgt[polId]);
-  const parts = `<div class="chron">${pr.parts.map(([l, v]) => `<div><span>${v > 0 && l !== '基本' ? '+' : ''}${v}</span><span>${esc(kid() ? KID_MOD[l] || l : l)}</span></div>`).join('')}</div>`;
+  const parts = `<div class="chron">${pr.parts.map(([l, v]) => `<div><span>${v > 0 && l !== '基本' ? '+' : ''}${v}</span><span>${esc(kid() ? (pr.parts.find((x) => x[0] === l)?.[2] || KID_MOD[l] || l) : l)}</span></div>`).join('')}</div>`;
   if (kid()) {
     modal(`<h2>${esc(polName(polId))}：でめ ${pr.p} いかで せいこう</h2>${parts}
       <div class="muted">でめが ${pr.crit} いかなら だいせいこう。96 いじょうで しっぱいすると だいしっぱい。</div>
@@ -514,7 +579,9 @@ function renderYearEnd(box) {
     ? `<b style="color:var(--text);font-size:17px">${g.year}かいめが おわった（${G.yearLabel(g)}ねん）</b><br>🌏 ちきゅうの げんき ${h.env}（${sign(diff('env'))}）　⚔ せかいの けんか ${h.conflicts}（${sign(diff('conflicts'), true)}）`
     : `<b style="color:var(--text);font-size:15px">${G.yearLabel(g)}年が終わった</b><br>自国の国力 ${me.power}（${sign(diff('power'))}）　GNP成長率 ${fmt(me.growth || 0, 1)}%　地球環境 ${h.env}（${sign(diff('env'))}）　紛争 ${h.conflicts}カ所（${sign(diff('conflicts'), true)}）`;
   box.innerHTML = `<div class="yearend"><div class="sum">${sum}</div><button class="btn primary" data-next>${K('次の年へ ▶', 'つぎへ ▶')}</button></div>`;
-  $('[data-next]', box).addEventListener('click', () => { G.beginYear(g); persist(); renderDash(); run(); });
+  // 自国が崩壊中は自動で進むので、ボタンは出さない（二重に年が進まないように）
+  if (!me.panel) { box.innerHTML = `<div class="waiting">${K('世界の動きを見守っています……', 'せかいを みまもろう……')}</div>`; return; }
+  $('[data-next]', box).addEventListener('click', () => { if (g.phase !== 'yearEnd') return; G.beginYear(g); persist(); renderDash(); run(); });
 }
 
 // ───── 進行ループ ─────
@@ -526,7 +593,12 @@ async function run() {
     while (true) {
       if (g.result) { persist(); await wait(600); endingScreen(); return; }
       if (g.pending) { renderDash(); await handlePending(); persist(); continue; }
-      if (g.phase === 'yearEnd') { renderDash(); persist(); return; }
+      if (g.phase === 'yearEnd') {
+        renderDash(); persist();
+        // 自国が崩壊中なら自動で次の年へ（つづきから再開したときも）
+        if (!g.majors[g.player].panel) { await wait(SPEED[settings.speed] * 2); if (g.phase === 'yearEnd') G.beginYear(g); continue; }
+        return;
+      }
       if (g.phase === 'player') { renderDash(); persist(); return; }
       const r = G.step(g);
       if (r.type === 'ai') {
@@ -536,7 +608,7 @@ async function run() {
       } else if (r.type === 'yearEnd') {
         renderDash();
         // 自国が崩壊中は自動で進める（早送り）
-        if (!g.majors[g.player].panel && !g.result) { await wait(SPEED[settings.speed] * 2); G.beginYear(g); continue; }
+        if (!g.majors[g.player].panel && !g.result) { await wait(SPEED[settings.speed] * 2); if (g.phase === 'yearEnd') G.beginYear(g); continue; }
       }
     }
   } finally { running = false; }

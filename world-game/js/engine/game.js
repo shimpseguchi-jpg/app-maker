@@ -9,6 +9,7 @@ import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { tickMajor, tickBack, tickWorld, envIndex, bankruptCount } from './tick.js';
 import { SPARKS, startSpark, sparkEffect, tickSparks } from './sparks.js';
+import { SITUATIONS } from '../data/situations.js';
 import { KID_COUNTRY, KID_GM, KID_AI_LINES, KID_EVENT, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS, KID_BASE, KID_POLICY, KID_SPARK } from '../data/kid.js';
 const KID_SPARK_NAME = (t) => KID_SPARK[t][0];
 
@@ -249,6 +250,7 @@ export function beginYear(g) {
   g.feed = [];
   g.inserts = [];
   g.yearActs = [];
+  if (g.situations) { const cal = g.cal ?? g.year - 1; g.situations = g.situations.filter((s) => cal < s.until); }
   if (g.world.stage === 3) setStage(g, 4);
   say(g, 'year.start');
   const H = helpers(g);
@@ -299,10 +301,16 @@ function fireEvent(g, ev, H) {
   try { who = ev.who ? ev.who(g, H) : null; } catch (err) { who = null; }
   const whoName = who ? C(g, who)?.name : '';
   const [evName, evText] = g.kid && KID_EVENT[ev.id] ? KID_EVENT[ev.id] : [ev.name, ev.text || ''];
-  g.feed.push({ k: 'event', id: ev.id, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) });
+  const entry = { k: 'event', id: ev.id, name: evName, who, text: fill(evText, { who: whoName, year: yearLabel(g) }) };
+  g.feed.push(entry);
   chron(g, `${evName}${whoName ? `（${whoName}）` : ''}`);
-  if (ev.fx) applyFx(g, ev.fx, { who, self: null }, evScale(g));
-  if (ev.run) { try { ev.run(g, H, who); } catch (err) { console.warn(ev.id, err); } }
+  // このニュースで動いた数値を集めて、ニュースの下に「→ どこの何が上下したか」を出す
+  const evChanges = [];
+  const HE = { ...H, fx: (list, ctx, f = 1) => applyFx(g, list, ctx, f, evChanges) };
+  if (ev.fx) applyFx(g, ev.fx, { who, self: null }, evScale(g), evChanges);
+  if (ev.run) { try { ev.run(g, HE, who); } catch (err) { console.warn(ev.id, err); } }
+  entry.res = summarizeChanges(g, evChanges);
+  addSituations(g, ev, who, evName);
   for (const n of ev.next || []) g.boost[n] = (g.boost[n] || 0) + 3;
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
@@ -311,6 +319,53 @@ function fireEvent(g, ev, H) {
   }
   if (ev.special === 'nuke') nukeCrisis(g, H);
   if (ev.special === 'vote') startVote(g, H);
+}
+
+// 情勢（data/situations.js）をはじめる。期限は暦の年で持つ
+function addSituations(g, ev, who, evName) {
+  const defs = SITUATIONS[ev.id];
+  if (!defs) return;
+  const cal = g.cal ?? g.year - 1;
+  g.situations = (g.situations || []).filter((s) => s.ev !== ev.id);
+  for (const d of defs) {
+    g.situations.push({ ev: ev.id, name: ev.name, kname: KID_EVENT[ev.id]?.[0] || ev.name, who, cats: d.cats, pols: d.pols, mod: d.mod, scope: d.scope, until: cal + d.years });
+  }
+}
+
+// 動いた数値をまとめる（同じ数値が3カ国以上で同じ向きに動いたら「小国◯カ国」「各国」にまとめる）
+const PCT_STATS = new Set(['gnp', 'pop', 'soldiers']);
+function arrows(g, id, stat, d) {
+  if (PCT_STATS.has(stat) && id !== 'world') {
+    const now = C(g, id)?.stats?.[stat] ?? 1;
+    const r = Math.abs(d) / Math.max(0.01, now - d);
+    return r >= 0.08 ? 3 : r >= 0.04 ? 2 : r >= 0.005 ? 1 : 0;
+  }
+  const a = Math.abs(d);
+  if (id === 'world' && stat === 'co2') return a >= 5 ? 3 : a >= 2 ? 2 : a >= 0.3 ? 1 : 0;
+  return a >= 12 ? 3 : a >= 6 ? 2 : a >= 0.5 ? 1 : 0;
+}
+export function summarizeChanges(g, changes) {
+  const sum = new Map();
+  for (const c of changes) { const k = `${c.id}|${c.stat}`; sum.set(k, (sum.get(k) || 0) + c.d); }
+  const items = [];
+  for (const [k, d] of sum) {
+    const [id, stat] = k.split('|');
+    const a = arrows(g, id, stat, d);
+    if (a) items.push({ id, stat, a: d > 0 ? a : -a });
+  }
+  const out = [], used = new Set();
+  for (const kind of ['bg', 'majors']) {
+    const isKind = (id) => id !== 'world' && (kind === 'majors' ? isSeat(g, id) : !isSeat(g, id));
+    const groups = new Map();
+    for (const it of items) if (isKind(it.id)) { const k = `${it.stat}|${Math.sign(it.a)}`; (groups.get(k) || groups.set(k, []).get(k)).push(it); }
+    for (const [k, list] of groups) if (list.length >= 3) {
+      const [stat] = k.split('|');
+      out.push({ id: kind, n: list.length, stat, a: list.reduce((m, x) => (Math.abs(x.a) > Math.abs(m) ? x.a : m), list[0].a) });
+      list.forEach((x) => used.add(x));
+    }
+  }
+  for (const it of items) if (!used.has(it)) out.push(it);
+  return out.slice(0, 10);
 }
 
 // ───── 核のボタン ─────

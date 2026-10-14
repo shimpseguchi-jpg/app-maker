@@ -106,9 +106,21 @@ export function probability(g, c, pol, tgt) {
     if (bonus && bonus.includes(pol.id)) { parts.push(['基本政策', 10]); p += 10; break; }
   }
   if (pol.pAdj) { const v = Math.round(pol.pAdj(g, c, tgt)); if (v) { parts.push(['状況', v]); p += v; } }
+  // 情勢：ニュースのあと、しばらく成功率が上下する（data/situations.js）
+  for (const s of activeSituations(g)) {
+    if (s.scope === 'who' && s.who !== c.id) continue;
+    if (s.scope === 'others' && s.who === c.id) continue;
+    if (!(s.cats || []).includes(pol.cat) && !(s.pols || []).includes(pol.id)) continue;
+    parts.push([`情勢：${s.name}`, s.mod, `いまの ようす：${s.kname}`, 'sit']); p += s.mod;
+  }
   const lo = pol.pMin ?? 1, hi = pol.pMax ?? 95;
   p = clamp(Math.round(p), lo, hi);
   return { p, crit: Math.max(1, Math.floor(p / 10)), fumble: p >= 96 ? 0 : 5, parts };
+}
+
+export function activeSituations(g) {
+  const cal = g.cal ?? g.year - 1;
+  return (g.situations || []).filter((s) => cal < s.until);
 }
 
 // d100 の判定

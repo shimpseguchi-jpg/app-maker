@@ -267,3 +267,16 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .kstat.unknown .kbar i { background: repeating-linear-gradient(45deg, #3a4558 0 6px, #2a3448 6px 12px); }
 .kstat .kq { position: absolute; right: 6px; bottom: -2px; font-weight: 900; }
 .kbar.rough i { background: linear-gradient(90deg, #6c7a8a, #9aa8b8); }
+
+/* ── 情勢とニュースの結果 ── */
+.feed .ev .evres { margin-top: 4px; font-size: 12px; color: #cfe; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.feed .ev .evsit { margin-top: 3px; font-size: 12px; color: #ffcc80; }
+.kid .feed .ev .evres, .kid .feed .ev .evsit { font-size: 13.5px; }
+.sits { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
+.sits h3 { padding: 2px 0; color: #ffcc80; }
+.sitcard { background: #23180f; border: 1px solid #5a3e1e; border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.sitcard .row { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; gap: 6px; }
+.sitcard .meta { font-size: 11px; color: var(--muted); }
+.card .cardsit { font-size: 11.5px; font-weight: 700; }
+.feed .ev .evsit b, .feed .ev .evres b { display: inline; color: inherit; font-size: inherit; }
+.feed .ev .evsit b.good { color: var(--green); } .feed .ev .evsit b.bad { color: var(--red); }
