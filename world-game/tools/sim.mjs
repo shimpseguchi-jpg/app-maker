@@ -36,7 +36,7 @@ function playOne(i) {
 }
 
 const res = {}, byCountry = {}, years = [], fired = {}, traj = {};
-let alliesSum = 0, collapses = 0, stageMax = [0, 0, 0, 0, 0], coopN = 0;
+let sparkStart = 0, sparkOk = 0, sparkNg = 0, alliesSum = 0, collapses = 0, stageMax = [0, 0, 0, 0, 0], coopN = 0;
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
   const g = playOne(i);
@@ -46,6 +46,7 @@ for (let i = 0; i < N; i++) {
   stageMax[g.world.stage]++;
   for (const h of g.hist) { const y = h.year - 2004; if (y % 10) continue; const t = (traj[y] ||= { n: 0, env: 0, co2: 0, conflicts: 0, tension: 0 }); t.n++; for (const k of ['env', 'co2', 'conflicts', 'tension']) t[k] += h[k]; }
   coopN += g.coop.length; alliesSum += g.allies.length;
+  for (const c of g.chron) { if (c.text.startsWith('火種：')) sparkStart++; if (c.text.includes('封じ込め')) sparkOk++; if (c.text.includes('世界に拡大')) sparkNg++; }
   for (const id of Object.keys(g.fired)) fired[id] = (fired[id] || 0) + 1;
   // 自国になった国ごとの成績（国力の順位・崩壊・クリア）
   const pid = g.player;
@@ -65,6 +66,7 @@ const pct = (n) => ((100 * n) / N).toFixed(1) + '%';
 console.log(`${N}回 (${((Date.now() - t0) / N).toFixed(0)}ms/回)`);
 console.log('結末:', Object.entries(res).map(([k, v]) => `${k} ${pct(v)}`).join(' / '));
 console.log('平均年数:', (years.reduce((a, b) => a + b, 0) / N).toFixed(1), ' 崩壊/ゲーム:', (collapses / N).toFixed(2), ' 協調の成功例/ゲーム:', (coopN / N).toFixed(2), ' 提携/ゲーム終了時:', (alliesSum / N).toFixed(1));
+console.log('火種/ゲーム:', (sparkStart / N).toFixed(2), ' 封じ込め:', (sparkOk / N).toFixed(2), ' 拡大:', (sparkNg / N).toFixed(2));
 console.log('到達した段階:', stageMax.map((n, i) => `${G.STAGES[i]} ${pct(n)}`).join(' / '));
 console.log('推移（その年まで続いたゲームの平均）:', Object.entries(traj).map(([y, t]) => `${y}年目 環境${(t.env / t.n).toFixed(0)} CO₂${(t.co2 / t.n).toFixed(0)} 紛争${(t.conflicts / t.n).toFixed(0)} 緊張${(t.tension / t.n).toFixed(0)} (n=${t.n})`).join('\n  '));
 console.log('\n自国になった国ごと（国力の順位 1〜6、自国の崩壊率、クリア率、征服率）');

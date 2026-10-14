@@ -78,7 +78,7 @@ export function bankruptCount(g) {
 }
 
 export function envIndex(w) {
-  return Math.round(100 - Math.max(0, w.co2 - 30) - (100 - w.forestRes) * 0.25 - (100 - w.ice) * 0.25 - (100 - w.waterRes) * 0.2);
+  return Math.round(100 - Math.max(0, w.co2 - 30) - (100 - w.forestRes) * 0.2 - (100 - w.ice) * 0.2 - (100 - w.waterRes) * 0.2 - (100 - (w.biodiv ?? 70)) * 0.15);
 }
 
 export function tickWorld(g) {
@@ -91,6 +91,7 @@ export function tickWorld(g) {
   w.rain = clamp(rev(w.rain - Math.max(0, w.co2 - 50) / 20, 60, 0.02), 0, 100);
   w.waterRes = clamp(w.waterRes - 0.25 - Math.max(0, w.co2 - 50) / 25 + (w.rain - 60) / 40, 0, 100);
   w.forestRes = clamp(w.forestRes + 0.1, 0, 100);
+  w.biodiv = clamp(w.biodiv - 0.1 - (100 - w.forestRes) / 400 - Math.max(0, w.co2 - 50) / 50, 0, 100);
   w.oilRes = clamp(w.oilRes - 0.35, 0, 100);
   const avgFood = act.length ? act.reduce((s, c) => s + c.stats.food, 0) / act.length : 100;
   w.foodPrice = clamp(rev(w.foodPrice, 50, 0.1) + (avgFood < 90 ? 1 : 0) + (g.flags.altE != null ? 0.5 : 0), 10, 300);

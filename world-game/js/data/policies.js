@@ -3,6 +3,7 @@
 // tgt：対象の種類（major 他国／bg 小国／poorBg 貧困国／nbAny 隣国／unstable 紛争地／collapsed 崩壊国）
 // tags：AI の判断用（coop 協調／selfish 自国優先／aggr 攻撃的／nuke 核）
 import { neighbors, isSeat, allyCount, others } from '../engine/core.js';
+import { SPARKS } from '../engine/sparks.js';
 
 export const CATS = {
   eco: '経済', edu: '教育・技術', res: '資源・エネルギー', fw: '食糧・水', dom: '治安・内政', dip: '外交', mil: '軍事', intl: '国際機関',
@@ -24,6 +25,8 @@ export const BASE = {
 
 const has = (g, f) => g.flags[f] != null;
 const myLaw = (c, k) => !!c.laws?.[k];
+// 火種に関係する政策は、その種類の火種が起きているときだけ出る
+const sparkOn = (id) => (g) => (g.sparks || []).some((s) => SPARKS[s.type].fx[id] != null);
 const anyCollapsed = (g) => g.seats.some((id) => !g.majors[id].panel && !g.majors[id].annexedBy);
 
 const P = [
@@ -97,6 +100,36 @@ const P = [
   { id: 'P89', name: '経済圏から離脱する', cat: 'dip', p: 50, mods: ['power'], ok: ['self.stability+m', 'self.gnp-m', 'rel.all-s'], ng: ['self.gnp-m'], tags: ['selfish'], avail: (g, c) => g.bloc.includes(c.id), run: (g, ctx, tier) => { if (tier !== 'ng' && tier !== 'fumble') g.bloc = g.bloc.filter((x) => x !== ctx.self); } },
   { id: 'P90', name: '国際共同研究・宇宙開発に参加', cat: 'edu', p: 45, mods: ['tech', 'allies'], ok: ['self.tech+m', 'rel.all+s', 'self.fiscal-s', 'boost:E80'], ng: ['self.fiscal-s'], tags: ['coop'], avail: (g, c) => c.stats.tech >= 50, run: (g, ctx, tier) => { if (tier !== 'ng' && tier !== 'fumble') g.counters.space = (g.counters.space || 0) + 1; } },
   { id: 'P91', name: '国際環境条約に署名する', cat: 'intl', p: 50, mods: ['rep'], ok: ['self.co2-m', 'world.co2-s', 'self.rep+s', 'self.industry-s', 'world.treaty+s'], ng: ['self.industry-s'], tags: ['coop'], avail: (g, c) => !myLaw(c, 'envTreaty'), after: { ok: ['mylaw:envTreaty'] } },
+  // ── 追加（南極・北極、いま・過去・未来の問題） ──
+  { id: 'P93', name: '北極航路に投資する', cat: 'res', p: 50, mods: ['tech'], ok: ['self.gnp+m', 'self.mobility+m', 'world.biodiv-s'], ng: ['self.fiscal-s'], tags: ['selfish'], avail: (g, c) => has(g, 'arcticRoute') && c.polar === 'N' },
+  { id: 'P94', name: '南極の資源開発を解禁する', cat: 'res', p: 45, mods: ['power'], ok: ['self.oil+m', 'world.biodiv-m', 'world.co2+s', 'rel.all-s'], ng: ['self.rep-s'], tags: ['selfish'], avail: (g) => g.flags.antarcticReview != null && g.year - g.flags.antarcticReview <= 4, run: (g, ctx, tier) => { if (tier !== 'ng' && tier !== 'fumble') g.counters.antOpen = (g.counters.antOpen || 0) + 1; } },
+  { id: 'P95', name: '南極条約の延長を提案する', cat: 'intl', p: 50, mods: ['rep'], ok: ['world.trust+s', 'self.rep+s', 'rel.all+s'], ng: [], tags: ['coop'], avail: (g) => g.flags.antarcticReview != null && g.year - g.flags.antarcticReview <= 4, run: (g, ctx, tier) => { if (tier !== 'ng' && tier !== 'fumble') g.counters.antKeep = (g.counters.antKeep || 0) + 1; } },
+  { id: 'P96', name: '年金制度を改革する', cat: 'eco', p: 50, mods: ['stability'], ok: ['self.fiscal+m', 'self.stability-s'], ng: ['self.stability-m'], avail: (g, c) => !!c.flags.aging },
+  { id: 'P97', name: '自然保護区を設ける', cat: 'res', p: 60, ok: ['world.biodiv+m', 'self.forest+s', 'self.gnp-s', 'self.rep+s'], ng: [], tags: ['coop'] },
+  { id: 'P98', name: '漁獲枠の国際協定を結ぶ', cat: 'intl', p: 45, mods: ['allies'], ok: ['world.biodiv+m', 'self.food-s', 'rel.all+s', 'world.treaty+s'], ng: [], tags: ['coop'], avail: (g) => has(g, 'fishCrisis') || g.world.biodiv < 60 },
+  { id: 'P99', name: '抗生物質の使用を規制する', cat: 'dom', p: 60, ok: ['world.trust+s', 'self.industry-s', 'self.rep+s'], ng: [], tags: ['coop'], avail: (g) => has(g, 'amr') },
+  { id: 'P100', name: '国際課税ルールを作る', cat: 'intl', p: 40, mods: ['allies'], ok: ['all.fiscal+s', 'self.fiscal+s', 'world.treaty+s'], ng: [], tags: ['coop'], avail: (g) => has(g, 'taxHaven') },
+  { id: 'P101', name: '情報リテラシー教育を進める', cat: 'edu', p: 60, ok: ['self.stability+s', 'self.literacy+s'], ng: [], avail: (g) => has(g, 'internet') },
+  { id: 'P102', name: '自律兵器の禁止条約を提案する', cat: 'intl', p: 40, mods: ['rep'], ok: ['world.tension-m', 'world.trust+s', 'rel.all+s'], ng: ['self.rep-s'], tags: ['coop'], avail: (g) => has(g, 'drones') || g.flags.automation != null || g.world.tension >= 55 },
+  { id: 'P103', name: 'ベーシックインカムを導入する', cat: 'eco', p: 45, mods: ['fiscal'], ok: ['self.inequality-l', 'self.stability+m', 'self.fiscal-l'], ng: ['self.fiscal-m'], avail: (g) => has(g, 'automation') },
+  { id: 'P104', name: '気候工学を実施する', cat: 'res', p: 40, mods: ['tech'], ok: ['world.co2-l', 'world.rain-m', 'rel.all-l', 'self.rep-m'], ng: ['self.rep-s', 'world.rain-s'], tags: ['selfish'], avail: (g, c) => has(g, 'geoeng') && c.stats.tech >= 65 },
+  { id: 'P105', name: '小惑星防衛に協力する', cat: 'intl', p: 55, mods: ['tech'], ok: ['self.rep+s', 'self.fiscal-s'], ng: ['self.fiscal-s'], tags: ['coop'], avail: sparkOn('P105') },
+  { id: 'P106', name: '併合した地域の独立を認める', cat: 'dom', p: 60, mods: ['stability'], tgt: 'owned', ok: ['self.rep+l', 'self.ethnic-m', 'rel.all+s'], ng: ['self.stability-s'], tags: ['coop'], run: (g, ctx, tier) => { if (tier !== 'ng' && tier !== 'fumble' && g.backs[ctx.tgt]) { g.backs[ctx.tgt].owner = null; g.backs[ctx.tgt].stats.stability = 45; } } },
+  { id: 'P107', name: '宇宙軍を創設する', cat: 'mil', p: 55, mods: ['tech'], ok: ['self.bases+s', 'self.tech+s', 'world.tension+m', 'self.fiscal-m'], ng: ['self.fiscal-m'], tags: ['aggr'], avail: (g, c) => c.stats.tech >= 75 },
+  { id: 'P108', name: '海底資源を採掘する', cat: 'res', p: 50, mods: ['tech'], ok: ['self.oil+m', 'self.gnp+s', 'world.biodiv-m'], ng: ['self.fiscal-s'], tags: ['selfish'], avail: (g, c) => has(g, 'seabed') && c.stats.tech >= 60 },
+  { id: 'P109', name: 'デジタル通貨圏を作る', cat: 'eco', p: 45, mods: ['tech'], ok: ['self.capital+m', 'self.gnp+s', 'rel.all-s'], ng: [], tags: ['selfish'], avail: (g) => has(g, 'digitalCurrency') },
+  // ── 火種への対応（正しいかどうかはカードに出さない。sparks.js の fx で決まる） ──
+  { id: 'P110', name: '医療チームを派遣する', cat: 'dip', p: 60, mods: ['tech'], tgt: 'spark', ok: ['self.rep+s', 'self.fiscal-s'], ng: [], tags: ['coop'], avail: sparkOn('P110') },
+  { id: 'P111', name: '情報の公開を求める', cat: 'intl', p: 55, mods: ['rep'], tgt: 'spark', ok: ['self.rep+s', 'rel.tgt-s'], ng: [], tags: ['coop'], avail: sparkOn('P111') },
+  { id: 'P112', name: '緊急融資を行う', cat: 'eco', p: 60, mods: ['capital'], tgt: 'spark', ok: ['self.fiscal-m', 'self.rep+s', 'rel.tgt+m'], ng: ['self.fiscal-s'], tags: ['coop'], avail: sparkOn('P112') },
+  { id: 'P113', name: '資本を引き揚げる', cat: 'eco', p: 75, tgt: 'spark', ok: ['self.capital+m', 'self.gnp+s', 'rel.tgt-m'], ng: [], tags: ['selfish'], avail: sparkOn('P113') },
+  { id: 'P114', name: '農業技術を支援する', cat: 'edu', p: 55, mods: ['tech'], tgt: 'spark', ok: ['self.rep+s', 'self.fiscal-s', 'tgt.food+s'], ng: [], tags: ['coop'], avail: sparkOn('P114') },
+  { id: 'P115', name: '食糧の輸出を規制する', cat: 'fw', p: 75, ok: ['self.food+m', 'self.stability+s', 'world.foodPrice+m', 'rel.all-s'], ng: [], tags: ['selfish'], avail: sparkOn('P115') },
+  { id: 'P116', name: '停戦・調停の席を用意する', cat: 'dip', p: 45, mods: ['rep'], tgt: 'spark', ok: ['self.rep+m', 'world.tension-s'], ng: [], tags: ['coop'], avail: sparkOn('P116') },
+  { id: 'P117', name: '武器を供与する', cat: 'mil', p: 70, tgt: 'spark', ok: ['self.gnp+m', 'self.industry+s', 'tgt.stability-m', 'world.conflicts+s'], ng: [], tags: ['selfish', 'aggr'], avail: sparkOn('P117') },
+  { id: 'P118', name: '専門家チームを派遣する', cat: 'edu', p: 55, mods: ['tech'], tgt: 'spark', ok: ['self.rep+s', 'self.fiscal-s'], ng: [], tags: ['coop'], avail: sparkOn('P118') },
+  { id: 'P119', name: '核物質を共同で回収する', cat: 'intl', p: 40, mods: ['tech', 'allies'], tgt: 'spark', ok: ['world.tension-s', 'self.rep+s'], ng: [], tags: ['coop'], avail: sparkOn('P119') },
+  { id: 'P120', name: '債務を再編する', cat: 'eco', p: 50, mods: ['capital'], tgt: 'spark', ok: ['self.capital-s', 'self.rep+m', 'rel.tgt+m'], ng: [], tags: ['coop'], avail: sparkOn('P120') },
   { id: 'P92', name: '国号を改める', cat: 'dom', p: 70, mods: ['stability'], ok: ['self.stability+s'], ng: ['self.stability-s'], w: 0.25, run: (g, ctx, tier, H) => { if (tier !== 'ng' && tier !== 'fumble') H.rename(ctx.self, 'policy'); } },
 ];
 
@@ -106,13 +139,16 @@ export function targetsFor(g, c, pol) {
   switch (pol.tgt) {
     case 'major': return others(g, c.id);
     case 'bg': return backs;
-    case 'poorBg': return backs.filter((id) => g.backs[id].stats.econ <= 35 || g.backs[id].stats.stability <= 30);
+    case 'poorBg': return backs.filter((id) => g.backs[id].stats.econ <= 35 || g.backs[id].stats.stability <= 30 || (g.sparks || []).some((s) => s.where === id));
     case 'nbAny': return neighbors(c.id).filter((id) => (isSeat(g, id) ? g.majors[id]?.panel : !g.backs[id].owner));
     case 'unstable': return [
-      ...backs.filter((id) => g.backs[id].stats.stability <= 35),
+      ...backs.filter((id) => g.backs[id].stats.stability <= 35 || (g.sparks || []).some((s) => s.where === id && s.type === 'civilwar')),
       ...others(g, c.id).filter((id) => g.majors[id].stats.stability <= 35 || g.majors[id].stats.guerrilla >= 45),
     ];
     case 'collapsed': return g.seats.filter((id) => id !== c.id && !g.majors[id].panel && !g.majors[id].annexedBy);
+    case 'owned': return Object.keys(g.backs).filter((id) => g.backs[id].owner === c.id);
+    case 'spark': return (g.sparks || []).filter((s) => SPARKS[s.type].fx[pol.id] != null).map((s) => s.where)
+      .filter((id) => (g.majors[id] ? g.majors[id].panel || id === c.id : g.backs[id] && !g.backs[id].sunk));
     default: return [null];
   }
 }

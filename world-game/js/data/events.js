@@ -3,15 +3,8 @@
 // ins：その年に差し込む政策、next：連鎖先（起きやすくなる）、coop：協調の成功例、repeat：何年おきに再発しうるか
 // text：GM（ミッターマイヤー）の語り。{who} は対象国の名前
 import { neighbors, isSeat, rel } from '../engine/core.js';
-
-const act = (g) => g.seats.filter((id) => g.majors[id].panel).map((id) => g.majors[id]);
-const bgs = (g) => Object.values(g.backs).filter((b) => !b.owner);
-const avg = (g, k) => { const a = act(g); return a.length ? a.reduce((s, c) => s + c.stats[k], 0) / a.length : 0; };
-const fired = (g, id) => g.fired[id] != null;
-const since = (g, id) => (fired(g, id) ? g.year - g.fired[id] : 99);
-const flagSince = (g, f) => (g.flags[f] != null ? g.year - g.flags[f] : 99);
-const best = (arr, f) => arr.reduce((a, b) => (f(b) > f(a) ? b : a), arr[0]);
-const ai = (g) => act(g).filter((c) => !c.player);
+import { act, bgs, avg, fired, since, flagSince, best, ai, nukePair, spaceRivals } from './evhelp.js';
+import { EVENTS_MORE } from './events_more.js';
 
 export const EVENTS = [
   // ───── 序盤：自国を豊かにする時代 ─────
@@ -157,9 +150,9 @@ export const EVENTS = [
     who: (g) => { const m = act(g).filter((c) => c.stats.debt >= 150 && c.stats.fiscal <= -8 && c.stats.capital <= 45); return m.length ? m[0].id : 'B07'; },
     fx: ['who.stability-l', 'who.gnp-m', 'who.guerrilla+m'], ins: ['P07'], next: ['E09', 'E62'],
     text: '{who}の物価が毎日倍になっている。パン一つ買うのに札束が要る。こういうとき、過激な者ほど声が大きくなる。' },
-  { id: 'E36', name: '国家のデフォルト', cat: 'eco', w: 15, repeat: 8, cond: (g) => bgs(g).some((b) => b.stats.debt >= 95),
-    who: (g) => best(bgs(g), (b) => b.stats.debt).id, fx: ['who.econ-l', 'who.stability-m'], run: (g, H) => { for (const c of act(g)) if (c.stats.capital >= 70) H.fx(['who.capital-s'], { who: c.id }); },
-    ins: ['P53'], next: ['E08'], text: '{who}が借金を踏み倒した。貸した側は、貸したときの笑顔を思い出しているだろう。' },
+  { id: 'E36', name: '国家のデフォルト', cat: 'eco', w: 10, repeat: 12, cond: (g) => bgs(g).some((b) => b.stats.debt >= 95),
+    who: (g) => best(bgs(g), (b) => b.stats.debt).id, fx: ['who.econ-l', 'who.stability-m'], run: (g, H, who) => { for (const c of act(g)) if (c.stats.capital >= 70) H.fx(['who.capital-s'], { who: c.id }); H.spark('debt', who); },
+    ins: ['P53'], next: ['E08'], text: '{who}が借金を踏み倒した。貸した側は、貸したときの笑顔を思い出しているだろう。取り立てるか、立て直しを手伝うか。放っておけば、同じように借りている国が次々と倒れるぞ。' },
   { id: 'E37', name: '関税戦争', cat: 'eco', w: 15, cond: (g) => { const a = act(g).sort((x, y) => y.stats.gnp - x.stats.gnp); return a.length >= 2 && rel(g, a[0].id, a[1].id) < 45; },
     run: (g, H) => { const a = act(g).sort((x, y) => y.stats.gnp - x.stats.gnp); H.fx(['who.gnp-s'], { who: a[0].id }); H.fx(['who.gnp-s'], { who: a[1].id }); H.addRel(a[0].id, a[1].id, -15); H.say(`${a[0].name}と${a[1].name}が、互いに関税を上げ合っている。`); },
     fx: ['world.treaty-s', 'bgAll.econ-s'], ins: ['P05', 'P54'], next: ['E38'], text: '世界の二大経済国が、関税の殴り合いを始めた。巻き添えになるのは、いつも周りの国だ。' },
@@ -180,15 +173,16 @@ export const EVENTS = [
     ins: ['P24', 'P12'], next: ['E37'], text: '{who}が希少金属の輸出を止めた。ハイテク製品の心臓部が、他国の手の内にあったということだ。' },
 
   // ───── 現実モチーフ：感染症・健康 ─────
-  { id: 'E43', name: '世界的大流行', cat: 'health', w: 6, cond: (g) => g.year >= 6 && !g.flags.pandemic && !fired(g, 'E43'),
-    run: (g, H) => { g.flags.pandemic = g.year; H.deaths(4); }, fx: ['majors.gnp-m', 'majors.pop-s', 'majors.mobility-m'],
+  // 世界的大流行は、火種（未知の感染症）を封じ込められなかったときに起きる
+  { id: 'E43', name: '世界的大流行', cat: 'health', w: 100, cond: (g) => flagSince(g, 'sparkPandemic') <= 1 && !g.flags.pandemic,
+    run: (g, H) => { g.flags.pandemic = g.year; H.deaths(8); }, fx: ['majors.gnp-m', 'majors.pop-s', 'majors.mobility-m'],
     ins: ['P80', 'P81', 'P82'], next: ['E44'], text: '未知の感染症が世界中に広がっている。人の往来が多い国ほど早く、深く。国境を閉じるか、手を取り合うか。さて、どうする？' },
   { id: 'E44', name: '治療薬の奪い合い', cat: 'health', w: 30, cond: (g) => g.flags.pandemic != null && since(g, 'E43') >= 1,
     fx: ['poorBg.stability-m'], run: (g, H) => H.deaths(1), ins: ['P81', 'P82', 'P31'], next: ['E47'],
     text: '治療薬ができた。だが豊かな国が買い占め、貧しい国では流行が終わらない。感染症は国境を気にしないのだがね。' },
-  { id: 'E45', name: '致死性の高い風土病', cat: 'health', w: 8, cond: (g) => g.year >= 4 && bgs(g).some((b) => b.stats.stability <= 30 && b.stats.water <= 40),
-    who: (g) => best(bgs(g).filter((b) => b.stats.water <= 40), (b) => -b.stats.stability).id, fx: ['who.stability-m'], run: (g, H) => H.deaths(0.1),
-    ins: ['P31', 'P80'], next: ['E43'], text: '{who}で致死性の高い風土病が流行している。人が行き来すれば、病も行き来する。' },
+  { id: 'E45', name: '致死性の高い風土病', cat: 'health', w: 5, cond: (g) => g.year >= 4 && bgs(g).some((b) => b.stats.stability <= 30 && b.stats.water <= 40),
+    who: (g) => best(bgs(g).filter((b) => b.stats.water <= 40), (b) => -b.stats.stability).id, fx: ['who.stability-m'], run: (g, H, who) => { H.deaths(0.1); H.spark('disease', who); },
+    ins: ['P31', 'P80'], next: ['E43'], text: '{who}で致死性の高い風土病が流行している。人が行き来すれば、病も行き来する。国境を閉じても時間稼ぎにしかならない。現地で止められるかどうかだ。' },
   { id: 'E46', name: '食の安全パニック', cat: 'health', w: 5, cond: (g) => g.year >= 5 && act(g).some((c) => c.stats.food >= 120),
     who: (g) => best(act(g), (c) => c.stats.food).id, fx: ['who.gnp-s', 'world.foodPrice+s'], ins: ['P30'],
     text: '{who}産の食肉から病原体が見つかった。各国が一斉に輸入を止めている。' },
@@ -204,7 +198,7 @@ export const EVENTS = [
     ins: ['P31', 'P64'], next: ['E49'], text: '{who}を巨大地震と津波が襲った。自然は、国力の順番を考慮してくれない。' },
   { id: 'E49', name: '原子力発電所の事故', cat: 'disaster', w: 10, cond: (g) => flagSince(g, 'quakePlant') <= 1 || act(g).some((c) => c.flags.plant && c.stats.tech < 60),
     who: (g) => (flagSince(g, 'quakePlant') <= 1 ? g.quakePlantId : act(g).find((c) => c.flags.plant && c.stats.tech < 60).id),
-    fx: ['who.stability-m', 'who.altE-m', 'who.rep-s', 'who.gnp-s'], run: (g) => { g.flags.nukeAccident = g.year; },
+    fx: ['who.stability-m', 'who.altE-m', 'who.rep-s', 'who.gnp-s'], run: (g, H, who) => { g.flags.nukeAccident = g.year; H.spark('meltdown', who); },
     ins: ['P86'], next: ['E31'], text: '{who}の原子力発電所で事故が起きた。周辺の土地は、長いあいだ使えなくなる。各国で脱原発の声が上がっている。' },
   { id: 'E50', name: '巨大ハリケーン', cat: 'disaster', w: 8, repeat: 10, cond: (g) => g.world.co2 >= 50,
     who: (g) => (g.majors.M01?.panel ? 'M01' : 'B03'), fx: ['who.gnp-s', 'who.inequality+s', 'who.stability-s'], run: (g, H) => H.deaths(0.002),
@@ -239,10 +233,10 @@ export const EVENTS = [
     text: '分断の象徴だった壁が崩れ、{who}は一つになった。統一の喜びと、統一の請求書が、同時に届く。' },
   { id: 'E60', name: '超大国の解体', cat: 'dom', w: 20, cond: (g) => act(g).some((c) => c.stats.nuke >= 4 && c.stats.stability <= 28 && c.stats.fiscal <= -6),
     who: (g) => act(g).find((c) => c.stats.nuke >= 4 && c.stats.stability <= 28 && c.stats.fiscal <= -6).id,
-    fx: ['who.soldiers-l', 'who.gnp-m'], run: (g, H, who) => { g.flags.looseNukes = g.year; H.rename(who, 'breakup'); },
+    fx: ['who.soldiers-l', 'who.gnp-m'], run: (g, H, who) => { g.flags.looseNukes = g.year; g.looseNukesId = who; H.rename(who, 'breakup'); },
     next: ['E61'], text: '{who}が解体した。地図は描き直され、核のありかは曖昧になった。' },
   { id: 'E61', name: '行方不明の核', cat: 'mil', w: 40, cond: (g) => flagSince(g, 'looseNukes') <= 2,
-    fx: ['world.tension+l', 'majors.guerrilla+s'], ins: ['P24'], next: ['E14', 'E29'],
+    who: (g) => g.looseNukesId, run: (g, H, who) => H.spark('looseNuke', who), fx: ['world.tension+l', 'majors.guerrilla+s'], ins: ['P24'], next: ['E14', 'E29'],
     text: '解体のどさくさで、核物質が闇市場に流れた。テロ組織が核を持つ。最悪の想像が、最悪の現実になりかけている。' },
   { id: 'E62', name: '民主化の連鎖', cat: 'dom', w: 15, cond: (g) => act(g).some((c) => (c.flags.censor || 0) >= 2 && c.stats.inequality >= 55),
     who: (g) => act(g).find((c) => (c.flags.censor || 0) >= 2 && c.stats.inequality >= 55).id,
@@ -317,17 +311,7 @@ export const EVENTS = [
     text: '国境のない研究所が完成した。宇宙からは、地図の国境線は見えない。' },
 ];
 
-// 核を持つ国どうしで、関係が冷え切った組
-export function nukePair(g, th = 20) {
-  const n = act(g).filter((c) => c.stats.nuke >= 4);
-  let pair = null, low = th;
-  for (const a of n) for (const b of n) if (a.id < b.id && rel(g, a.id, b.id) < low) { low = rel(g, a.id, b.id); pair = [a.id, b.id]; }
-  return pair;
-}
-function spaceRivals(g) {
-  const t = act(g).filter((c) => c.stats.tech >= 80);
-  for (const a of t) for (const b of t) if (a.id < b.id && rel(g, a.id, b.id) < 45) return [a.id, b.id];
-  return null;
-}
+EVENTS.push(...EVENTS_MORE);
+export { nukePair };
 
 export const EVENT_BY_ID = Object.fromEntries(EVENTS.map((e) => [e.id, e]));

@@ -8,6 +8,7 @@ import { describeFx, STAT_JA } from './engine/effects.js';
 import { probability, TIER, rel, allied, C, isSeat } from './engine/core.js';
 import { PERSONAS, AGENDAS } from './engine/ai.js';
 import { flagSvg, mapSvg, plainMapSvg, diceSvg, seatColor } from './ui/art.js';
+import { SPARKS } from './engine/sparks.js';
 
 const stage = $('#stage');
 
@@ -74,6 +75,7 @@ function howTo() {
   <div style="font-size:14px;line-height:1.8">
   <p>あなたは架空の国の元首です。1年に1回、パネルに出た政策から1つを選びます。どの政策にも<b>成功確率</b>が表示され、<b>100面ダイス</b>で判定します。出目が確率以下なら成功、確率の1/10以下なら大成功です。</p>
   <p>ほかの5カ国は性格の違うAI元首です。ある国の成功が、別の国の破綻を生むこともあります。毎年、世界にはイベントが起き、GM（${GM_NAME}）が「さて、どうする？」と迫ります。</p>
+  <p><b>火種</b>：ときどき、ある一国で感染症・銀行破綻・飢饉・内戦などの「火種」が起きます。右上の欄に場所と種類が出ますが、深刻度と、いつ世界に広がるか（期限）は知らされません。様子は毎年の GM の言葉から推し量ってください。各国が正しい支援をすれば封じ込められ（協調の成功例になります）、まちがった対応や放置だと世界規模に広がります。どの支援が正しいかはカードに書かれていません。GM のヒントと、現実の知識で見抜いてください。</p>
   <p><b>ゲームオーバー</b>：核戦争／地球環境の破綻（環境が${G.ENV_LIMIT}以下）／一国による世界征服。自国が崩壊するとパネルがオフになり、数年後に復帰できることがあります。</p>
   <p><b>クリア</b>：国際機関を「国連 → 国連の解体 → 世界政府準備委員会 → 世界総選挙 → 世界議会」と進め、世界議会の最初の議題を全会一致で可決すること。協調の成功例を3つ積み重ねれば、国連の解体を経ずに準備委員会へ進めます。50年でタイムアップです。</p>
   </div><div class="row"><button class="btn primary" data-close>とじる</button></div>`);
@@ -199,7 +201,8 @@ function renderTop() {
       ${gauge('気温', '+' + fmt(w.temp || 0, 1) + '℃')}
       ${gauge('氷', Math.round(w.ice), lvl(w.ice, 60, 40, true))}
       ${gauge('水資源', Math.round(w.waterRes), lvl(w.waterRes, 50, 35, true))}
-      ${gauge('紛争', w.conflicts + 'カ所', lvl(w.conflicts, 90, 130))}
+      ${gauge('生態系', Math.round(w.biodiv ?? 70), lvl(w.biodiv ?? 70, 50, 35, true))}
+      ${gauge('紛争', w.conflicts, lvl(w.conflicts, 90, 130))}
       ${gauge('緊張', Math.round(w.tension), lvl(w.tension, 60, 75))}
       ${gauge('条約有効', Math.round(w.treaty) + '%')}
       ${gauge('破綻国', w.bankrupt ?? 0)}
@@ -233,7 +236,7 @@ function renderMe() {
 
 function renderMap() {
   const box = $('.mapwrap', stage);
-  box.innerHTML = mapSvg(g) + `<div class="legend"><span>● 紛争</span><span>☢ 核保有</span><span>--- 提携</span></div><div class="seedtag">SEED ${esc(g.seed)}</div>`;
+  box.innerHTML = mapSvg(g) + `<div class="legend"><span>● 紛争</span><span>☢ 核保有</span><span>--- 提携</span><span>🔥 火種</span></div><div class="seedtag">SEED ${esc(g.seed)}</div>`;
   $$('[data-id]', box).forEach((p) => p.addEventListener('click', () => countryInfo(p.dataset.id)));
 }
 
@@ -248,6 +251,7 @@ function feedHtml(f) {
     }
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
+    case 'spark': return `<div class="ev spark"><b>${SPARKS[f.type].icon} 火種：${esc(nameOf(f.where))}で${esc(SPARKS[f.type].name)}</b>${esc(SPARKS[f.type].hint)}</div>`;
     case 'vote': return `<div class="vote"><b>世界議会の投票：「${esc(f.name)}」</b><br>${f.votes.map((v) => `${esc(nameOf(v.id))} ${v.yes ? '<span class="good">賛成</span>' : '<span class="bad">反対</span>'}`).join('　')}</div>`;
     default: return '';
   }
@@ -260,7 +264,13 @@ function renderFeed() {
 
 function renderRivals() {
   const me = g.player;
-  $('.rivals', stage).innerHTML = g.seats.filter((id) => id !== me).map((id) => {
+  const sparks = (g.sparks || []).map((s) => {
+    const t = SPARKS[s.type];
+    // 深刻度と期限は秘匿。見えるのは場所・種類・経過年数だけで、様子は GM の言葉から推し量る
+    return `<div class="sparkcard" data-id="${s.where}"><div class="row"><b>${t.icon} ${esc(nameOf(s.where))}</b><span class="chip">${g.year - s.start + 1}年目</span></div>
+      <div class="meta">${esc(t.name)}</div><div class="meta">状況は不明。いつ世界に広がるかもわからない</div></div>`;
+  }).join('');
+  $('.rivals', stage).innerHTML = (sparks ? `<div class="sparks"><h3>🔥 火種</h3>${sparks}</div>` : '') + g.seats.filter((id) => id !== me).map((id) => {
     const c = g.majors[id];
     const r = rel(g, me, id);
     const last = c.lastAct && c.lastAct.year === g.year ? `${POLICIES[c.lastAct.pol].name} <span class="tier ${c.lastAct.tier}">${TIER[c.lastAct.tier].name}</span>` : c.lastAct ? `<span class="muted">昨年：${POLICIES[c.lastAct.pol].name}</span>` : '';
@@ -271,7 +281,7 @@ function renderRivals() {
       <div class="last">${last}</div>
     </div>`;
   }).join('');
-  $$('.rival', stage).forEach((n) => n.addEventListener('click', () => countryInfo(n.dataset.id)));
+  $$('.rival, .sparkcard', stage).forEach((n) => n.addEventListener('click', () => countryInfo(n.dataset.id)));
 }
 
 function lastGmLine() {
@@ -298,18 +308,19 @@ function renderChoices(box) {
   const list = g.offers.list;
   box.innerHTML = list.map((o, i) => {
     const pol = POLICIES[o.id];
-    const tg = o.tgts[0] == null ? null : (ui.tgt[o.id] && o.tgts.includes(ui.tgt[o.id]) ? ui.tgt[o.id] : o.tgts[0]);
+    const sparkTgt = (g.sparks || []).map((s) => s.where).find((w) => o.tgts.includes(w));
+    const tg = o.tgts[0] == null ? null : (ui.tgt[o.id] && o.tgts.includes(ui.tgt[o.id]) ? ui.tgt[o.id] : sparkTgt || o.tgts[0]);
     ui.tgt[o.id] = tg;
     const pr = probability(g, c, pol, tg);
     const okFx = describeFx(pol.ok).slice(0, 5).join('　');
     const ngFx = describeFx(pol.ng).slice(0, 3).join('　');
     return `<div class="card ${ui.sel === o.id ? 'sel' : ''}" style="--cc:var(--${pol.cat})" data-pol="${o.id}">
-      <div class="cat"><span>${CATS[pol.cat]}</span>${g.inserts.includes(o.id) ? '<span class="ins">📰 情勢</span>' : ''}</div>
+      <div class="cat"><span>${CATS[pol.cat]}</span>${(g.sparks || []).some((s) => SPARKS[s.type].fx[o.id] != null) ? '<span class="ins">🔥 火種</span>' : g.inserts.includes(o.id) ? '<span class="ins">📰 情勢</span>' : ''}</div>
       <h4>${esc(pol.name)}</h4>
       <div class="prob"><b>${pr.p}%</b><small>大成功 ${pr.crit}%<br>大失敗 ${pr.fumble}%</small></div>
       <div class="fx">成功：${okFx || '—'}</div>
       ${ngFx ? `<div class="fx ng">失敗：${ngFx}</div>` : ''}
-      ${tg ? `<div class="tg">${o.tgts.slice(0, 6).map((t) => `<button data-t="${t}" class="${t === tg ? 'on' : ''}">${esc(nameOf(t).slice(0, 6))}</button>`).join('')}</div>` : '<div class="tg"></div>'}
+      ${tg ? `<div class="tg">${[...new Set([tg, ...o.tgts])].slice(0, 6).map((t) => `<button data-t="${t}" class="${t === tg ? 'on' : ''}">${esc(nameOf(t).slice(0, 6))}</button>`).join('')}</div>` : '<div class="tg"></div>'}
       <button class="btn small ${ui.sel === o.id ? 'primary' : ''} go" data-go>${ui.sel === o.id ? 'ダイスを振る' : 'これにする'}</button>
     </div>`;
   }).join('');

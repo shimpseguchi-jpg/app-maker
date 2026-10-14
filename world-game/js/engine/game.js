@@ -8,6 +8,7 @@ import { registerBases, neighbors, polarNeighbors, isSeat, C, power, probability
 import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { tickMajor, tickBack, tickWorld, envIndex, bankruptCount } from './tick.js';
+import { SPARKS, startSpark, sparkEffect, tickSparks } from './sparks.js';
 
 registerBases(BASE);
 export const START_YEAR = 2005;
@@ -61,7 +62,7 @@ export function newGame(seed, { rerolled = false, diceSeed } = {}) {
   for (const b of BACKS) backs[b.id] = { ...clone(b), owner: null };
   const g = {
     v: 1, seed, rerolled, year: 0, phase: 'setup', seats: d.seats, player: d.player, majors, backs,
-    world: { conflicts: 70, treaty: 40, wrate: 5, tension: 35, co2: 40, ice: 80, rain: 60, oilRes: 70, forestRes: 70, waterRes: 70, foodPrice: 50, refugees: 30, trust: 50, stage: 0, temp: 0 },
+    world: { biodiv: 70, conflicts: 70, treaty: 40, wrate: 5, tension: 35, co2: 40, ice: 80, rain: 60, oilRes: 70, forestRes: 70, waterRes: 70, foodPrice: 50, refugees: 30, trust: 50, stage: 0, temp: 0 },
     bgStatic: Object.fromEntries(Object.values(backs).filter((b) => b.big).map((b) => [b.id, b.co2])),
     rel: {}, allies: [], bloc: [], laws: {}, flags: {}, counters: { deaths: 0 }, boost: {}, fired: {}, coop: [],
     rngState: (diceSeed ?? (Math.random() * 2 ** 32)) >>> 0, order: [], turn: 0, offers: null, inserts: [], feed: [], chron: [], hist: [], pending: null, result: null, voteTries: 0,
@@ -113,6 +114,7 @@ function helpers(g) {
     rename: (id, why) => rename(g, id, why),
     collapse: (id, why) => collapse(g, id, why),
     war: (a, b, tier) => war(g, a, b, tier, H),
+    spark: (type, where) => startSpark(g, H, type, where),
   };
   return H;
 }
@@ -228,6 +230,14 @@ export function beginYear(g) {
   const H = helpers(g);
   const evs = pickEvents(g, H);
   for (const ev of evs) fireEvent(g, ev, H);
+  // 火種への対応策を、その年の選択肢に差し込む。様子は GM がほのめかすだけ（深刻度と期限は秘匿）
+  for (const s of g.sparks || []) {
+    for (const p of Object.keys(SPARKS[s.type].fx)) if (!g.inserts.includes(p)) g.inserts.push(p);
+    if (s.start < g.year) {
+      const lv = s.sev <= 25 ? 'low' : s.sev <= 55 ? 'mid' : s.sev <= 80 ? 'high' : 'crit';
+      say(g, `spark.hint.${lv}`, { name: C(g, s.where).name, what: SPARKS[s.type].name });
+    }
+  }
   // 席順に時計回り。毎年ひとつずつ開始位置がずれる
   const start = (g.year - 1) % g.seats.length;
   g.order = [...g.seats.slice(start), ...g.seats.slice(0, start)];
@@ -371,8 +381,12 @@ export function offersFor(g, id) {
   const avail = [];
   for (const pol of POLICY_LIST) { const t = ok(pol); if (t) avail.push({ id: pol.id, tgts: t }); }
   const out = [];
-  const ins = shuffle(rng, avail.filter((o) => g.inserts.includes(o.id)));
-  for (const o of ins.slice(0, 2)) out.push(o);
+  // 火種への対応を優先して2つまで、ほかの情勢の政策を合わせて最大3つ
+  const sparkIds = new Set((g.sparks || []).flatMap((s) => Object.keys(SPARKS[s.type].fx)));
+  const insS = shuffle(rng, avail.filter((o) => g.inserts.includes(o.id) && sparkIds.has(o.id)));
+  const insO = shuffle(rng, avail.filter((o) => g.inserts.includes(o.id) && !sparkIds.has(o.id)));
+  for (const o of insS.slice(0, 2)) out.push(o);
+  for (const o of insO.slice(0, (sparkIds.size ? 3 : 2) - out.length)) out.push(o);
   // 国際機関の段階を進める政策は、条件を満たしていれば必ず出す
   for (const o of avail) if ((o.id === 'P72' || o.id === 'P73') && !out.includes(o)) out.push(o);
   const rest = avail.filter((o) => !out.includes(o));
@@ -453,10 +467,13 @@ export function act(g, id, polId, tgt) {
   if (succ && pol.after?.ok) applyFx(g, pol.after.ok, ctx, 1, changes);
   if (pol.run) pol.run(g, ctx, tier, helpers(g));
   if (succ && polId === 'P43') g.flags.harmony = g.year;
+  if (succ && polId === 'P31') g.counters.foodAid = (g.counters.foodAid || 0) + 1;
+  if (succ && polId === 'P53') g.counters.lowAid = (g.counters.lowAid || 0) + 1;
+  const spk = sparkEffect(g, id, pol, tgt, tier);
   if (succ && polId === 'P54') g.counters.sanction = (g.counters.sanction || 0) + 1;
   if (c.stats.nuke >= 4 && changes.some((x) => x.stat === 'nuke')) { g.flags.newNuke = g.year; g.newNukeId = id; chron(g, `${c.name}、核兵器を保有`); }
   c.power = power(c);
-  const rec = { k: 'act', id, pol: polId, tgt, p: pr.p, crit: pr.crit, roll, tier, changes, year: g.year };
+  const rec = { k: 'act', id, pol: polId, tgt, p: pr.p, crit: pr.crit, roll, tier, changes, spark: spk, year: g.year };
   c.lastAct = rec;
   g.feed.push(rec);
   g.yearActs.push(rec);
@@ -495,6 +512,7 @@ export function endYear(g) {
     if (g.year > g.flags.pandemic) H.deaths(0.5);
     if (g.year - g.flags.pandemic >= 3 || g.flags.vaccineCoop != null) { delete g.flags.pandemic; for (const c of Object.values(g.majors)) { delete c.flags.sealed; delete c.flags.cured; } }
   }
+  tickSparks(g, H, (tag, vars) => say(g, tag, vars));
   const prevEnv = g.world.env;
   tickWorld(g);
   g.hist.push({ year: yearLabel(g), env: g.world.env, co2: Math.round(g.world.co2), conflicts: g.world.conflicts, tension: Math.round(g.world.tension), power: g.majors[g.player].power, stage: g.world.stage });

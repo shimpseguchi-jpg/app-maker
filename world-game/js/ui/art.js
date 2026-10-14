@@ -69,6 +69,7 @@ export function mapSvg(g, opts = {}) {
     if (c.panel && c.stats.stability <= 30) marks.push(`<circle class="mk" cx="${x + 14}" cy="${y - 10}" r="4" fill="#e5534b"/>`);
     if (c.stats.nuke >= 4) marks.push(`<text class="mk" x="${x - 26}" y="${y - 6}" font-size="13">☢</text>`);
   }
+  for (const s of g.sparks || []) { const [x, y] = CENTERS[s.where]; marks.push(`<circle class="mk" cx="${x}" cy="${y}" r="9" fill="none" stroke="#ff7a3a" stroke-width="2.5"><animate attributeName="r" values="7;13;7" dur="1.2s" repeatCount="indefinite"/></circle><text class="mk" x="${x - 7}" y="${y - 12}" font-size="13">🔥</text>`); }
   if (g.flags?.polarOil != null) marks.push(`<text class="mk" x="${MAP_W / 2 - 8}" y="${MAP_H - 6}" font-size="14">🛢</text><text class="mk" x="${MAP_W / 2 - 8}" y="16" font-size="14">🛢</text>`);
   parts.push(marks.join(''));
   // 国名

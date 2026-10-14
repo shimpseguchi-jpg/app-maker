@@ -1,6 +1,7 @@
 // AI 元首：性格ごとの重みで政策と対象を選ぶ（POLICIES_EVENTS.md 5 章）
 import { POLICIES } from '../data/policies.js';
 import { probability, rel, isSeat, C } from './core.js';
+import { SPARKS } from './sparks.js';
 
 export const PERSONAS = {
   tech: { name: '技術立国', base: 'B01' },
@@ -55,6 +56,8 @@ function need(c, pol) {
 
 export function chooseTarget(g, c, pol, tgts) {
   if (!tgts.length || tgts[0] == null) return null;
+  // 協調的な元首は、火種の国に効く支援ならそこを選ぶ
+  if (COOP[c.persona] >= 0.2) for (const sp of g.sparks || []) if ((SPARKS[sp.type].fx[pol.id] ?? 0) < 0 && tgts.includes(sp.where)) return sp.where;
   const coop = (pol.tags || []).includes('coop');
   const aggr = (pol.tags || []).includes('aggr');
   const score = (id) => {
@@ -86,10 +89,17 @@ export function choosePolicy(g, c, offers, rng) {
     if (crisisWorld && (pol.cat === 'dip' || pol.cat === 'intl')) cw += 1;
     const tags = pol.tags || [];
     let v = cw * (0.35 + pr) * gain(pol) * 0.5 + need(c, pol);
-    if (tags.includes('coop')) v += COOP[c.persona] + (crisisWorld ? 0.6 : 0);
+    if (tags.includes('coop')) v += COOP[c.persona] + (crisisWorld ? 0.6 : 0) + (pol.tgt === 'spark' || pol.id === 'P105' ? 0.5 : 0);
     if (tags.includes('aggr')) v += c.persona === 'ambition' || c.persona === 'order' ? 0.3 : -0.6;
     if (tags.includes('nuke')) v += c.persona === 'ambition' ? 0.4 : c.persona === 'order' && g.world.tension > 60 ? 0 : -2;
     if (pol.id === 'P63') v -= 1.2; // 戦争は最後の手段
+    // 火種：協調的な元首は、何が効くかをある程度わかっている（野心家・秩序型は自国の得を優先する）
+    for (const s of g.sparks || []) {
+      const d = SPARKS[s.type].fx[pol.id];
+      if (d == null || (pol.tgt && tgt !== s.where)) continue;
+      const wise = COOP[c.persona] >= 0.2;
+      if (wise) v += d < 0 ? 1.2 : -1.5;
+    }
     if (pol.id === 'P72' || pol.id === 'P73') v += 1.5 + COOP[c.persona];
     if (pol.id === 'P45') v += 0.5;
     if (pol.id === 'P92') v -= 1;

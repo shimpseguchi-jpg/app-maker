@@ -51,6 +51,7 @@ for (; t < 4000; t++) {
   } else if (st === 'player') {
     if (!shot.has('player')) { shot.add('player'); await page.screenshot({ path: `${out}/wg-03-player.png` }); }
     if (year === 20 && !shot.has('y20')) { shot.add('y20'); await page.screenshot({ path: `${out}/wg-05-year20.png` }); }
+    if (!shot.has('spark') && await page.$('.sparkcard')) { shot.add('spark'); await page.screenshot({ path: `${out}/wg-08-spark.png` }); }
     const cards = await page.$$('.card h4');
     const i = Math.floor(Math.random() * cards.length);
     await cards[i].click();

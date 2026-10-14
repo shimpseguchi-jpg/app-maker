@@ -6,13 +6,17 @@ import { SHAPES, CENTERS } from '../js/data/mapdata.js';
 import { GM } from '../js/data/gm.js';
 import { drawWorld, newGame } from '../js/engine/game.js';
 import { neighbors } from '../js/engine/core.js';
+import { SPARKS } from '../js/engine/sparks.js';
 
 let fail = 0;
 const ok = (cond, msg) => { if (!cond) { fail++; console.log('NG:', msg); } };
 const FX = /^(\w+)\.(\w+)([+-])([sml]|\d+(?:\.\d+)?)$|^(flag|unflag|boost|law|mylaw|unmylaw):\w+$|^(ally|nuke\+)$/;
 
-ok(POLICY_LIST.length === 62, `政策は62種（${POLICY_LIST.length}）`);
-ok(EVENTS.length === 80, `イベントは80種（${EVENTS.length}）`);
+ok(POLICY_LIST.length === 90, `政策は90種（${POLICY_LIST.length}）`);
+ok(EVENTS.length === 149, `イベントは149種（${EVENTS.length}）`);
+ok(new Set(EVENTS.map((e) => e.id)).size === EVENTS.length && new Set(POLICY_LIST.map((p) => p.id)).size === POLICY_LIST.length, 'ID の重複なし');
+for (const t of Object.values(SPARKS)) for (const id of Object.keys(t.fx)) ok(POLICIES[id], `火種 ${t.name} の対応策 ${id}`);
+for (const t of Object.values(SPARKS)) { ok(Object.values(t.fx).some((d) => d < 0), `火種 ${t.name} に正しい支援がある`); }
 ok(MAJORS.length === 16 && BACKS.length === 30, '国は主要国16＋背景国30');
 for (const p of POLICY_LIST) for (const f of [...p.ok, ...p.ng, ...(p.after?.ok || [])]) ok(FX.test(f), `${p.id} の効果 ${f}`);
 for (const p of POLICY_LIST) for (const f of p.ok.filter((x) => x.startsWith('boost:'))) ok(EVENT_BY_ID[f.slice(6)], `${p.id} の boost 先 ${f}`);

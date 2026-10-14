@@ -2,7 +2,7 @@
 import { addStat, C, isSeat, others, neighbors, addRel, allied } from './core.js';
 
 const RE = /^(\w+)\.(\w+)([+-])([sml]|\d+(?:\.\d+)?)$/;
-const WORLD_KEYS = new Set(['conflicts', 'treaty', 'wrate', 'tension', 'co2', 'ice', 'rain', 'oilRes', 'forestRes', 'waterRes', 'foodPrice', 'refugees', 'trust']);
+const WORLD_KEYS = new Set(['biodiv', 'conflicts', 'treaty', 'wrate', 'tension', 'co2', 'ice', 'rain', 'oilRes', 'forestRes', 'waterRes', 'foodPrice', 'refugees', 'trust']);
 
 function scopeIds(g, scope, ctx) {
   const self = ctx.self;
@@ -71,7 +71,7 @@ const STAT_JA = {
   oil: '石油', altE: '代替エネ', food: '食糧', water: '水', forest: '森林', uranium: 'ウラン', co2: 'CO₂', soldiers: '兵士',
   bases: '基地', guerrilla: 'ゲリラ', rep: '評価', econ: '経済',
   conflicts: '紛争', treaty: '条約', wrate: '金利', tension: '緊張', ice: '氷', rain: '降雨', oilRes: '石油', forestRes: '森林',
-  waterRes: '水', foodPrice: '食糧価格', refugees: '難民', trust: '国際機関の信頼',
+  waterRes: '水', biodiv: '生物多様性', foodPrice: '食糧価格', refugees: '難民', trust: '国際機関の信頼',
 };
 export function describeFx(list) {
   const out = [];
