@@ -5,7 +5,7 @@
 //   toilet トイレ % / uni だいがくなど（そうしゅうがくりつ、100で うちきり）% / agri のうぎょうで はたらく ひと % /
 //   kids 0〜14さい % / urban まちに すむ ひと % / net インターネット % / forest もり % / land りくちの ひろさ km2
 // ここに かくのは、こどもが よむ せつめい（しゅと・あいさつ・りょうり・スポーツ・まめちしき）と おとなに なる ねんれい。
-// せつめいが ある くに（rich）は クイズが ふえる。ない くにも うまれる ことが できる（すうじの クイズに なる）。
+// せつめいが ある くに（rich）は 3さいの「いえの くらし」に りょうりや あいさつが でる。ない くには すうじから まめちしきを つくる。
 
 import { STATS, WORLD, FETCHED } from './stats.js';
 export { WORLD, FETCHED };
@@ -161,13 +161,13 @@ const meanBy = (keys, groupOf) => {
   }
   return (k, c) => { const x = m[k][groupOf(c)]; return x ? x[0] / x[1] : WORLD[k] ?? 0; };
 };
-const byArea = meanBy(['uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf'], (c) => c.area);
+const byArea = meanBy(['wage', 'uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf'], (c) => c.area);
 const byIncome = meanBy(['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab'], (c) => c.income);
 export const COUNTRIES = STATS.map((st) => {
   const c = { ...st, ...(CONTENT[st.id] || {}), rich: !!CONTENT[st.id], adult: ADULT[st.id] || 18 };
   // ない 値を うめる（estimated に しるしを つける）。ゆたかな くにの こどもの けっこん・こどもの しごとは 0 と みなす
   c.estimated = [];
-  for (const k of ['uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf']) {
+  for (const k of ['wage', 'uni', 'agri', 'toilet', 'net', 'kids', 'urban', 'forest', 'lem', 'lef', 'imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf']) {
     if (c[k] == null) { c[k] = Math.round(byArea(k, c) * 10) / 10; c.estimated.push(k); }
   }
   for (const k of ['prim', 'lsec', 'pov3', 'pov8', 'cm18', 'clab']) {
@@ -299,4 +299,3 @@ export const JOBS_TOWN = [
   { emoji: '🧵', name: 'したてやさん', end: 'ミシンで、きれいな ふくを たくさん ぬったよ。' },
 ];
 
-export const PLAYS = ['かくれんぼ', 'おにごっこ', 'なわとび', 'たこあげ', 'ボールあそび', 'おえかき'];

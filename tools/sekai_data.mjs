@@ -43,6 +43,7 @@ const IND = {
   pov8: 'SI.POV.UMIC', // 1にち 8.30ドル みまんで くらす ひと
   cm18: 'SP.M18.2024.FE.ZS', // 18さいまでに けっこんした じょせい（20〜24さいの うち）
   clab: 'SL.TLF.0714.ZS', // はたらいて いる こども（7〜14さい）
+  wage: 'SL.EMP.WORK.ZS', // おきゅうりょうを もらって はたらく ひと（はたらく ひとの うち）
 };
 
 // くにでは ない ちいき（ずかんに でると こどもが まよう）
@@ -139,7 +140,7 @@ for (const c of countries) {
     land: g('land') != null ? Math.round(g('land')) : null,
     lem: g('lem') != null ? Math.round(g('lem')) : null,
     lef: g('lef') != null ? Math.round(g('lef')) : null,
-    ...Object.fromEntries(['imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf', 'pov3', 'pov8', 'cm18', 'clab']
+    ...Object.fromEntries(['imr', 'u5', 'm0509', 'm1014', 'm1519', 'm2024', 'amm', 'amf', 'pov3', 'pov8', 'cm18', 'clab', 'wage']
       .map((k) => [k, g(k) != null ? r1(g(k)) : null])),
     prim: g('prim') != null ? r1(Math.min(100, g('prim'))) : null,
     lsec: g('lsec') != null ? r1(Math.min(100, g('lsec'))) : null,

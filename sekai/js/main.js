@@ -1,7 +1,7 @@
 // せかいの どこかに うまれたら
 // いま うまれる あかちゃんの ひとりに なって、その くにの くらしを おとなに なるまで たいけんし、
 // その あとの しんがく・しごと・じんせいを みじかく よんで おわる。
-import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, PLAYS, JOBS_FARM, JOBS_TOWN, nameFor, deathAge } from './data.js';
+import { COUNTRIES, AREA, WORLD, WORLD_BIRTHS, FETCHED, JAPAN, DREAMS, JOBS_FARM, JOBS_TOWN, nameFor, deathAge } from './data.js';
 import { sfx, setMuted, isMuted } from './audio.js';
 
 const app = document.getElementById('app');
@@ -86,11 +86,6 @@ function rarity(c) {
   return p >= 5 ? 1 : p >= 1 ? 2 : p >= 0.3 ? 3 : p >= 0.05 ? 4 : 5;
 }
 const addLog = (age, text) => life.log.push([age, text]);
-// きまって いた できごとを、その ねんれいに なったら きろくに うつす
-function flush(upto) {
-  life.plan.sort((x, y) => x[0] - y[0]);
-  while (life.plan.length && life.plan[0][0] <= upto) life.log.push(life.plan.shift());
-}
 const WEALTH = {
   very: 'いえは とても まずしく、ひとり 1にち <b class="num">3</b>ドル（やく <b class="num">450</b>えん）より すくない おかねで くらして いる。',
   poor: 'いえの くらしは ゆとりが ない。',
@@ -105,27 +100,6 @@ function tenKids(n, on = '🧒', off = '🧒') {
 
 // ───── がめん ─────
 let life = null;
-const STAGES = [
-  { key: 'family', age: 0 },
-  { key: 'food', age: 3 },
-  { key: 'hello', age: 5 },
-  { key: 'home', age: 6 },
-  { key: 'play', age: 8 },
-  { key: 'area', age: 10 },
-  { key: 'dream', age: 12 },
-  { key: 'teen', age: 15 },
-  { key: 'adult', age: 'adult' }, // その くにで おとなに なる ねんれい
-];
-const ageOf = (s) => (s.age === 'adult' ? life.c.adult : s.age);
-const SUBJECTS = [
-  { name: 'さんすう', emoji: '🔢', msg: 'かずの パズルが だいとくい！' },
-  { name: 'こくご', emoji: '📚', msg: 'ほんを たくさん よんだよ。' },
-  { name: 'りか', emoji: '🔬', msg: 'じっけんが だいすき！' },
-  { name: 'たいいく', emoji: '🏃', msg: 'うんどうかいで おおかつやく！' },
-  { name: 'おんがく', emoji: '🎵', msg: 'うたや がっきが じょうずに なったよ。' },
-  { name: 'ずこう', emoji: '✂️', msg: 'すてきな さくひんを つくったよ。' },
-  { name: 'がいこくご', emoji: '🌐', msg: 'ほかの くにの ことばも はなせるように なったよ。' },
-];
 
 function show(html, cls = '') {
   app.className = `screen ${cls}`;
@@ -139,10 +113,6 @@ function topbar(back = true) {
     <button class="mini" data-act="mute" aria-label="おと">${isMuted() ? '🔇' : '🔊'}</button>
   </div>`;
 }
-function ageBar(i) {
-  return `<div class="agebar">${STAGES.map((s, j) =>
-    `<span class="${j < i ? 'done' : j === i ? 'now' : ''}"><b class="num">${ageOf(s)}</b>さい</span>`).join('')}</div>`;
-}
 
 function title() {
   const met = Object.keys(save.met).length;
@@ -151,7 +121,7 @@ function title() {
     <div class="globe spin">🌏</div>
     <h1>せかいの どこかに<br>うまれたら</h1>
     <p class="lead">いま、せかいでは <b class="num">1</b>びょうに やく <b class="num">${Math.round(WORLD_BIRTHS / (365 * 24 * 3600))}</b>にんの あかちゃんが うまれて いるよ。<br>
-    あなたも その ひとりに なって、どこかの くにで おおきく なって みよう！</p>
+    あなたも その ひとりに なって、どこかの くにで いっしょうを いきて みよう！</p>
     <button class="btn big" data-act="born">👶 うまれる！</button>
     <div class="row">
       <button class="btn" data-act="zukan">📖 ずかん <small>${met}/${COUNTRIES.length}</small></button>
@@ -162,7 +132,7 @@ function title() {
       <button class="mini ${save.auto ? 'on' : ''}" data-act="auto">🎲 おまかせ：${save.auto ? 'オン' : 'オフ'}</button>
       <button class="mini" data-act="speed">⏩ はやさ：<b class="num">${save.speed}</b>ばい</button>
     </div>
-    <p class="sub">えらべるのは「うまれる」ことだけ。どこの だれに なるかは わからない。<br>おまかせに すると、えらぶのも ぜんぶ おまかせで じんせいを ながめられるよ。</p>
+    <p class="sub">うまれる ばしょは えらべない。じんせいの とちゅうでは えらべる ことも あるけど、<br>えらんでも かなうとは かぎらないし、かなっても しあわせに なるとは かぎらない。</p>
     <p class="sub warn">※ ほんとうの すうじの とおりに、こどもの うちに なくなる じんせいも あるよ。おうちの ひとと いっしょに あそんでね。</p>
     <button class="link" data-act="parents">おうちの かたへ</button>
   </div>`, 'bg-sky');
@@ -173,28 +143,20 @@ function born() {
   const c = pickCountry();
   const kids = 1 + Math.min(8, poisson(Math.max(c.tfr - 1, 0)));
   const g = Math.random() < 0.512 ? 'm' : 'f'; // うまれる あかちゃんは おとこのこが すこし おおい
+  const r = Math.random() * 100;
   const me = life = {
-    c, stars: 0, g, name: nameFor(c, g),
+    c, g, name: nameFor(c, g),
     order: 1 + rnd(kids), // きょうだいの なんばんめ
     rural: Math.random() * 100 >= c.urban,
     sibs: Array.from({ length: kids - 1 }, () => pick(['👦', '👧'])),
     elec: Math.random() * 100 < c.elec,
     water: Math.random() * 100 < c.water,
-    play: null, dream: null, subject: null, log: [], plan: [],
+    wealth: r < c.pov3 ? 'very' : r < c.pov8 ? 'poor' : 'ok',
+    // なくなる ねんれい：生命表から。やさしい モードでは おとなに なるまでは なくならない
+    death: deathAge(c, g, save.gentle ? c.adult + 1 : 0),
+    school: 'none', uni: false, dream: null, job: null, wed: null,
+    joy: 5, tries: 0, wins: 0, log: [], step: 0,
   };
-  // ───── うまれた ときに きまる こと（すべて その くにの とうけいの わりあいで） ─────
-  // なくなる ねんれい：生命表から。やさしい モードでは おとなに なるまでは なくならない
-  me.death = deathAge(c, g, save.gentle ? c.adult + 1 : 0);
-  const r = Math.random() * 100;
-  me.wealth = r < c.pov3 ? 'very' : r < c.pov8 ? 'poor' : 'ok';
-  // がっこう：しょうがっこうを おえる → ちゅうがっこうを おえる（おえる わりあいは つづけて かける）
-  me.prim = Math.random() * 100 < c.prim;
-  me.lsec = me.prim && Math.random() * 100 < (c.lsec / Math.max(c.prim, 1)) * 100;
-  me.leave = me.lsec ? null : me.prim ? 12 + rnd(3) : 6 + rnd(6);
-  if (me.leave === 6) me.plan.push([6, 'いえの しごとが あったり、ちかくに がっこうが なかったりして、がっこうには いけなかった。']);
-  else if (me.leave) me.plan.push([me.leave, `${me.leave}さいで がっこうを やめた。`]);
-  if (Math.random() * 100 < c.clab) { const a = 7 + rnd(5); me.plan.push([a, `${a}さいから、かぞくの ために はたらきはじめた。`]); }
-  if (g === 'f' && Math.random() * 100 < c.cm18) { me.wed = 15 + rnd(3); me.plan.push([me.wed, `${me.wed}さいで けっこんした。`]); }
   show(`${topbar()}
   <div class="hero">
     <p class="lead">どこに うまれるかな…？</p>
@@ -222,6 +184,7 @@ function reveal() {
   const isNew = !save.met[c.id];
   sfx('fanfare');
   addLog(0, `${c.name}の ${life.rural ? 'いなか' : 'まち'}で、${gname(life.g)} として うまれた。${life.name ? `なまえは ${life.name}。` : ''}${WEALTH[life.wealth].replace(/<[^>]+>/g, '')}`);
+  if (life.wealth === 'very') joy(-1);
   show(`${topbar()}
   <div class="card pop">
     <div class="flag-big">${c.flag}</div>
@@ -239,228 +202,292 @@ function reveal() {
       <p class="rare">めずらしさ ${'★'.repeat(rarity(c))}<span>${'★'.repeat(5 - rarity(c))}</span></p>
       <p>📅 きょう ${c.name}で うまれた あかちゃんは やく <b class="num">${fmt(c.births / 365)}</b>にん<br><small>（せかいでは やく <b class="num">${fmt(WORLD_BIRTHS / 365)}</b>にん）</small></p>
     </div>
-    <button class="btn big" data-act="next" data-i="0">おおきく なる ▶</button>
+    <button class="btn big" data-act="next">おおきく なる ▶</button>
   </div>`, `bg-${c.area}`);
   autoStep();
 }
 
-function stage(i) {
-  const s = STAGES[i];
-  const c = life.c;
-  flush(ageOf(s));
-  const head = `${topbar()}${ageBar(i)}<div class="who">${avatar(ageOf(s), life.g)} <b>${callName()}</b> <small>${c.flag} ${c.name}</small></div>`;
-  const cls = `bg-${c.area}`;
-  if (s.key === 'family') {
+// ───── しあわせ ─────
+// かなうか どうか（かくりつ）と、しあわせかどうかは べつ。けっかごとに よい こと・たいへんな ことが ランダムに おこる。
+function joy(d) { life.joy = Math.max(0, Math.min(10, life.joy + d)); }
+function mood(good, goods, bads) {
+  return Math.random() < good ? { d: 1, why: pick(goods) } : { d: -1, why: pick(bads) };
+}
+function joyBar() {
+  const n = Math.round(life.joy);
+  return `<span class="joybar" title="しあわせ">😊 ${'<i class="on"></i>'.repeat(n)}${'<i></i>'.repeat(10 - n)}</span>`;
+}
+
+// かくりつの いいかた
+function pText(p) {
+  if (p >= 99.5) return '<b class="num">10</b>にんに <b class="num">10</b>にん';
+  if (p < 5 && p > 0) return `<b class="num">100</b>にんに <b class="num">${Math.max(1, Math.round(p))}</b>にん`;
+  return `<b class="num">10</b>にんに <b class="num">${Math.round(p / 10)}</b>にん`;
+}
+const SRC = { data: '📊 とうけい', game: '🎲 ゲームの めやす', always: '' };
+
+// ───── じんせいの えらぶ ばめん ─────
+// それぞれ { age, icon, title, body, options:[{ emoji, label, p, src, why, pass(), fail() }] } を かえす。
+// pass/fail は { text, log, mood:{d,why} } を かえす。options が ない ものは よむだけ。
+const STEPS = [
+  // 0さい：かぞく
+  () => {
     const n = life.sibs.length;
     addLog(0, n === 0 ? 'ひとりっこ。' : `${n + 1}にん きょうだいの ${life.order}ばんめ。`);
-    show(`${head}<div class="card">
-      <div class="agebig"><b class="num">0</b>さい</div>
-      <h2>あなたの かぞく</h2>
-      <div class="family">👨 👩 ${life.sibs.join(' ')} <span class="me">👶</span></div>
-      <p>${n === 0 ? 'あなたは ひとりっこ だよ。' : `<b class="num">${n + 1}</b>にん きょうだいの <b class="num">${life.order}</b>ばんめ だよ！`}</p>
-      <div class="info">
-        <p>${c.name}では、おかあさん <b class="num">10</b>にんに こどもが やく <b class="num">${Math.round(c.tfr * 10)}</b>にん うまれるよ。</p>
-        ${c.id === 'jp' ? '' : `<p class="jp">🇯🇵 にほんは <b class="num">${Math.round(JAPAN.tfr * 10)}</b>にん</p>`}
-      </div>
-      <button class="btn big" data-act="next" data-i="1">つぎへ ▶</button>
-    </div>`, cls);
-  } else if (s.key === 'food' && !c.rich) {
-    compareQuiz(head, cls, i, 3, 'ひとの かず', 'ひとが おおいのは', c.pop, JAPAN.pop, `${c.name}の ひとの かずは ${vsJapan(c.pop, JAPAN.pop)}。`);
-  } else if (s.key === 'hello' && !c.rich) {
-    compareQuiz(head, cls, i, 5, 'くにの ひろさ', 'くにが ひろいのは', c.land, JAPAN.land, `${c.name}の ひろさは ${vsJapan(c.land, JAPAN.land)}。`);
-  } else if (s.key === 'food') {
-    const others = shuffle(COUNTRIES.filter((x) => x.rich && x.food !== c.food && x.foodEmoji !== c.foodEmoji)).slice(0, 2);
-    const choices = shuffle([c, ...others]);
-    quiz(head, cls, i, '<b class="num">3</b>さい', 'たべもの クイズ',
-      `${c.name}で よく たべられて いる りょうりは どれかな？`,
-      choices.map((x) => ({ label: `${x.foodEmoji} ${x.food}`, ok: x === c })),
-      `${c.foodEmoji} <b>${c.food}</b> が だいすきに なったよ！`, [3, `${c.food}が だいすきに なった。`]);
-  } else if (s.key === 'hello') {
-    const others = shuffle(COUNTRIES.filter((x) => x.rich && x.hello !== c.hello)).slice(0, 2);
-    const choices = shuffle([c, ...others]);
-    quiz(head, cls, i, '<b class="num">5</b>さい', 'ことば クイズ',
-      `${c.name}の ことばで「こんにちは」は どれかな？`,
-      choices.map((x) => ({ label: `💬 ${x.hello}`, ok: x === c })),
-      `${c.lang}で「<b>${c.hello}</b>」！ ともだちに あいさつ できたよ。`, [5, `${c.lang}で「${c.hello}」と あいさつ できるように なった。`]);
-  } else if (s.key === 'home') {
+    return {
+      age: 0, icon: '👪', title: 'あなたの かぞく',
+      body: `<div class="family">👨 👩 ${life.sibs.join(' ')} <span class="me">👶</span></div>
+        <p>${n === 0 ? 'あなたは ひとりっこ だよ。' : `<b class="num">${n + 1}</b>にん きょうだいの <b class="num">${life.order}</b>ばんめ だよ！`}</p>
+        <div class="info"><p>${life.c.name}では、おかあさん <b class="num">10</b>にんに こどもが やく <b class="num">${Math.round(life.c.tfr * 10)}</b>にん うまれるよ。</p>
+        ${life.c.id === 'jp' ? '' : `<p class="jp">🇯🇵 にほんは <b class="num">${Math.round(JAPAN.tfr * 10)}</b>にん</p>`}</div>`,
+    };
+  },
+  // 3さい：くらし
+  () => {
+    const c = life.c;
     const e = of10(c.elec), w = of10(c.water);
-    addLog(6, `${life.elec ? 'でんきの ある' : 'でんきの ない'} いえで くらした。${life.water ? '' : 'みずくみの おてつだいを した。'}${life.leave === 6 ? '' : 'しょうがっこうに かよいはじめた。'}`);
-    show(`${head}<div class="card">
-      <div class="agebig"><b class="num">6</b>さい</div>
-      <h2>あなたの いえの くらし</h2>
-      <div class="lifebox ${life.elec ? 'yes' : 'no'}">
-        <div class="ico">${life.elec ? '💡' : '🕯️'}</div>
-        <p>${life.elec
-          ? 'いえで でんきが つかえるよ。よるも あかるい！'
-          : 'いえには でんきが きて いないよ。よるは ランプや ろうそくで すごすよ。'}</p>
-      </div>
-      <div class="info"><p>こども <b class="num">10</b>にんの うち、でんきが つかえるのは やく <b class="num">${e}</b>にん</p>${tenKids(e, '💡', '🕯️')}</div>
-      <div class="lifebox ${life.water ? 'yes' : 'no'}">
-        <div class="ico">${life.water ? '🚰' : '🪣'}</div>
-        <p>${life.water
-          ? 'いえの ちかくで きれいな みずが てに はいるよ。'
-          : 'きれいな みずは とおくに あるよ。あるいて みずくみの おてつだいを するよ。'}</p>
-      </div>
-      <div class="info"><p>こども <b class="num">10</b>にんの うち、ちかくで きれいな みずが てに はいるのは やく <b class="num">${w}</b>にん</p>${tenKids(w, '🚰', '🪣')}</div>
-      <div class="lifebox ${life.leave === 6 ? 'no' : 'yes'}">
-        <div class="ico">${life.leave === 6 ? '🧺' : '🎒'}</div>
-        <p>${life.leave === 6 ? 'がっこうには いけなかった。いえの しごとを てつだって いるよ。' : 'しょうがっこうに かよいはじめたよ！'}</p>
-      </div>
-      <div class="info"><p>こども <b class="num">10</b>にんの うち、しょうがっこうを さいごまで おえるのは やく <b class="num">${of10(c.prim)}</b>にん</p>${tenKids(of10(c.prim), '🎓', '🧺')}</div>
-      ${c.id === 'jp' ? '' : `<p class="jp">🇯🇵 にほんは でんき <b class="num">${of10(JAPAN.elec)}</b>にん・みず <b class="num">${of10(JAPAN.water)}</b>にん</p>`}
-      <button class="btn big" data-act="next" data-i="${i + 1}">つぎへ ▶</button>
-    </div>`, cls);
-  } else if (s.key === 'play') {
-    const opts = shuffle([...(c.sport ? [c.sport] : []), ...shuffle(PLAYS).slice(0, c.sport ? 3 : 4)]);
-    show(`${head}<div class="card">
-      <div class="agebig"><b class="num">8</b>さい</div>
-      <h2>ともだちと なにして あそぶ？</h2>
-      <div class="choices">${opts.map((p) => `<button class="btn choice" data-act="play" data-v="${p}">${p}</button>`).join('')}</div>
-      <div id="after"></div>
-    </div>`, cls);
-  } else if (s.key === 'area') {
-    const wrong = shuffle(Object.keys(AREA).filter((k) => k !== c.area)).slice(0, 2);
-    const choices = shuffle([c.area, ...wrong]);
-    quiz(head, cls, i, '<b class="num">10</b>さい', 'ちず クイズ',
-      `${c.name}は どこに ある くにかな？`,
-      choices.map((k) => ({ label: `${AREA[k].globe} ${AREA[k].name}`, ok: k === c.area })),
-      `${c.name}は <b>${AREA[c.area].name}</b>の くに。<br>📝 ${factOf(c)}`, [10, `じぶんの くにが ${AREA[c.area].name}に ある ことを しった。`]);
-  } else if (s.key === 'dream') {
-    const opts = shuffle(DREAMS).slice(0, 4);
-    show(`${head}<div class="card">
-      <div class="agebig"><b class="num">12</b>さい</div>
-      <h2>おおきく なったら なにに なりたい？</h2>
-      <div class="choices">${opts.map((d) => `<button class="btn choice" data-act="dream" data-v="${d.name}">${d.emoji} ${d.name}</button>`).join('')}</div>
-      <div id="after"></div>
-    </div>`, cls);
-  } else if (s.key === 'teen') {
-    const opts = shuffle(SUBJECTS).slice(0, 4);
-    show(`${head}<div class="card">
-      <div class="agebig"><b class="num">15</b>さい</div>
-      <div class="lifebox ${life.lsec ? 'yes' : 'no'}"><div class="ico">${life.lsec ? '🏫' : '🛠️'}</div>
-        <p>${life.lsec ? 'ちゅうがっこうを さいごまで かよったよ。' : life.leave === 6 ? 'がっこうには いけなかったけど、まいにち はたらきながら いろんな ことを おぼえたよ。' : `<b class="num">${life.leave}</b>さいで がっこうを やめて、いまは はたらいて いるよ。`}</p></div>
-      <div class="info"><p>こども <b class="num">10</b>にんの うち、ちゅうがっこうを さいごまで おえるのは やく <b class="num">${of10(c.lsec)}</b>にん${c.id === 'jp' ? '' : `（にほんは <b class="num">${of10(JAPAN.lsec)}</b>にん）`}</p></div>
-      <h2>${life.lsec ? 'がっこうで いちばん すきな べんきょうは？' : 'いちばん すきな ことは？'}</h2>
-      <div class="choices">${opts.map((x) => `<button class="btn choice" data-act="subject" data-v="${x.name}">${x.emoji} ${x.name}</button>`).join('')}</div>
-      <div id="after"></div>
-    </div>`, cls);
-  } else if (s.key === 'adult') {
-    addLog(c.adult, 'おとなの なかまいり。');
-    show(`${head}<div class="card pop">
-      <div class="agebig"><b class="num">${c.adult}</b>さい</div>
-      <div class="flag-big">🎉</div>
-      <h2>おとなの なかまいり！</h2>
-      <p>${c.name}では <b class="num">${c.adult}</b>さいで おとなに なるよ。</p>
-      ${c.id === 'jp' ? '' : `<p class="jp">🇯🇵 にほんは <b class="num">${JAPAN.adult}</b>さい</p>`}
-      <div class="info"><p>${c.flag} ${c.name}で うまれて、<b class="num">${c.adult}</b>ねん。<br>${c.rich ? `${c.foodEmoji} ${c.food}を たべて、「${c.hello}」と あいさつして、` : ''}${life.play}で あそんで おおきく なったね。</p></div>
-      <button class="btn big" data-act="next" data-i="${i + 1}">そのあとの じんせいを みる ▶</button>
-    </div>`, cls);
+    addLog(3, `${life.elec ? 'でんきの ある' : 'でんきの ない'} いえで くらした。${life.water ? '' : 'みずくみの おてつだいを した。'}${c.rich ? `${c.food}が だいすきに なった。` : ''}`);
+    if (!life.water) joy(-1);
+    return {
+      age: 3, icon: '🏠', title: 'あなたの いえの くらし',
+      body: `<div class="lifebox ${life.elec ? 'yes' : 'no'}"><div class="ico">${life.elec ? '💡' : '🕯️'}</div>
+          <p>${life.elec ? 'いえで でんきが つかえるよ。よるも あかるい！' : 'いえには でんきが きて いないよ。よるは ランプや ろうそくで すごすよ。'}</p></div>
+        <div class="info"><p>こども <b class="num">10</b>にんの うち、でんきが つかえるのは やく <b class="num">${e}</b>にん</p>${tenKids(e, '💡', '🕯️')}</div>
+        <div class="lifebox ${life.water ? 'yes' : 'no'}"><div class="ico">${life.water ? '🚰' : '🪣'}</div>
+          <p>${life.water ? 'いえの ちかくで きれいな みずが てに はいるよ。' : 'きれいな みずは とおくに あるよ。みずくみの おてつだいを するよ。'}</p></div>
+        <div class="info"><p>こども <b class="num">10</b>にんの うち、ちかくで きれいな みずが てに はいるのは やく <b class="num">${w}</b>にん</p>${tenKids(w, '🚰', '🪣')}</div>
+        ${c.rich ? `<div class="info"><p>${c.foodEmoji} すきな たべもの：<b>${c.food}</b> ・ 💬 あいさつ：<b>${c.hello}</b>（${c.lang}）</p></div>` : ''}
+        <div class="info"><p>📝 ${factOf(c)}</p></div>`,
+    };
+  },
+  // 6さい：しょうがっこう
+  () => {
+    const c = life.c;
+    return {
+      age: 6, icon: '🎒', title: 'しょうがっこうに いく？',
+      body: `<p class="sub">${c.name}では、しょうがっこうを さいごまで おえる こどもは ${pText(c.prim)}。</p>`,
+      options: [
+        { emoji: '🎒', label: 'しょうがっこうに いく', p: c.prim, src: 'data', why: 'さいごまで かよえる こどもの わりあい',
+          pass: () => { life.school = 'prim'; return { text: 'しょうがっこうを さいごまで かよったよ！', log: 'しょうがっこうに かよい、さいごまで おえた。', mood: mood(0.65, ['ともだちが たくさん できた。', 'よみかきが できるように なって うれしかった。'], ['べんきょうが むずかしくて たいへんだった。', 'とおい みちを あるいて かよって つかれた。']) }; },
+          fail: () => { const a = 7 + rnd(4); return { text: `${life.wealth === 'ok' ? 'がっこうが とおくて' : 'いえの しごとが いそがしくて'}、<b class="num">${a}</b>さいで がっこうを やめたよ。`, log: `しょうがっこうに かよったが、${a}さいで やめた。`, mood: mood(0.4, ['いえで かぞくと すごす じかんが ふえた。', 'どうぶつの せわが じょうずに なった。'], ['ともだちが がっこうに いくのを みて さみしかった。']) }; } },
+        { emoji: '🧺', label: 'いえの しごとを てつだう', p: 100, src: 'always',
+          pass: () => ({ text: 'がっこうには いかず、いえの しごとを てつだったよ。', log: 'がっこうには いかず、いえの しごとを てつだった。', mood: mood(0.5, ['かぞくに たよりに されて うれしかった。', 'はたけしごとを たくさん おぼえた。'], ['まいにち つかれた。', 'じが よめなくて こまる ことが あった。']) }) },
+      ],
+    };
+  },
+  // 10さい：ゆめ
+  () => ({
+    age: 10, icon: '💭', title: 'おおきく なったら なにに なりたい？',
+    body: '<p class="sub">ゆめは だれでも もてるよ。かなうかは あとで わかる。</p>',
+    options: shuffle(DREAMS).slice(0, 4).map((d) => ({
+      emoji: d.emoji, label: d.name, p: 100, src: 'always',
+      pass: () => { life.dream = d; return { text: `<b>${d.name}</b>に なりたいな！`, log: `しょうらいの ゆめは ${d.name}。` }; },
+    })),
+  }),
+  // 12さい：ちゅうがっこう（しょうがっこうを おえた ひと）／ はたらく こども
+  () => {
+    const c = life.c;
+    if (life.school === 'prim') {
+      const p = Math.min(99, (c.lsec / Math.max(c.prim, 1)) * 100);
+      return {
+        age: 12, icon: '🏫', title: 'ちゅうがっこうに すすむ？',
+        body: `<p class="sub">${c.name}では、ちゅうがっこうを さいごまで おえる こどもは ${pText(c.lsec)}。</p>`,
+        options: [
+          { emoji: '🏫', label: 'ちゅうがっこうに すすむ', p, src: 'data', why: 'しょうがっこうを おえた こどもの うち、ちゅうがっこうも おえる わりあい',
+            pass: () => { life.school = 'lsec'; return { text: 'ちゅうがっこうを さいごまで おえたよ！', log: 'ちゅうがっこうに すすみ、さいごまで おえた。', mood: mood(0.6, ['すきな かもくが みつかった。', 'しょうらいの ことを たくさん かんがえた。'], ['しけんが たいへんで まいにち ねぶそくだった。', 'がくひの ことで いえの ひとが こまって いた。']) }; },
+            fail: () => ({ text: 'とちゅうで がっこうを やめて、はたらく ことに なったよ。', log: 'ちゅうがっこうを とちゅうで やめて、はたらきはじめた。', mood: mood(0.4, ['じぶんで かせいだ おかねで かぞくを たすけた。'], ['もっと べんきょう したかった。']) }) },
+          { emoji: '🛠️', label: 'はたらきに でる', p: 100, src: 'always',
+            pass: () => ({ text: '12さいで はたらきはじめたよ。', log: '12さいで はたらきはじめた。', mood: mood(0.45, ['しごとを おぼえて たよりに された。', 'かぞくの くらしが すこし らくに なった。'], ['あさから ばんまで はたらいて つかれた。']) }) },
+        ],
+      };
+    }
+    // がっこうに いって いない こども：はたらくか どうかは とうけいの わりあいで きまる（えらべない）
+    if (c.clab < 0.5) return null;
+    return {
+      age: 12, icon: '🧒', title: 'こどもの しごと',
+      body: `<p class="sub">${c.name}では、7〜14さいの こどもの うち ${pText(c.clab)}が はたらいて いるよ${c.estimated.includes('clab') ? '<small>※</small>' : ''}。</p>`,
+      event: { emoji: '🧺', label: 'いえの そとで はたらく ことに なる？', p: c.clab, src: 'data',
+        pass: () => ({ text: 'いちばや はたけで、おとなと いっしょに はたらいたよ。', log: 'いえの そとで、おとなと いっしょに はたらいた。', mood: mood(0.35, ['しごとを ほめられた。'], ['あそぶ じかんが なかった。', 'からだが いたく なった。']) }),
+        fail: () => ({ text: 'いえの てつだいを しながら すごしたよ。', log: 'いえの てつだいを しながら すごした。', mood: mood(0.55, ['かぞくと すごす じかんが おおかった。'], ['がっこうに いく ともだちが うらやましかった。']) }) },
+    };
+  },
+  // 15さい：おんなのこの はやい けっこん（えらべない できごと）
+  () => {
+    const c = life.c;
+    if (life.g !== 'f' || c.cm18 < 0.5) return null;
+    return {
+      age: 15, icon: '💍', title: 'けっこんの はなし',
+      body: `<p class="sub">${c.name}では、18さいに なる まえに けっこんする おんなのひとが ${pText(c.cm18)}${c.estimated.includes('cm18') ? '<small>※</small>' : ''}。</p>`,
+      event: { emoji: '💍', label: '18さいより まえに けっこんする ことに なる？', p: c.cm18, src: 'data',
+        pass: () => { life.wed = 15 + rnd(3); return { text: `<b class="num">${life.wed}</b>さいで けっこんする ことに なったよ。${life.school === 'lsec' ? '' : 'がっこうは やめる ことに なった。'}`, log: `${life.wed}さいで けっこんした。`, mood: mood(0.3, ['あいての かぞくが やさしかった。'], ['まだ こどもで いたかった。', 'ともだちと あえなく なった。']) }; },
+        fail: () => ({ text: 'けっこんは まだ せず、じぶんの みちを かんがえたよ。', log: '', mood: { d: 0 } }) },
+    };
+  },
+  // おとな：しんろ
+  () => {
+    const c = life.c;
+    const pu = life.school === 'lsec' ? Math.min(99, (c.uni / Math.max(c.lsec, 1)) * 100) : 0;
+    const opts = [
+      { emoji: '🎓', label: 'だいがくに すすむ', p: pu, src: 'data', why: life.school === 'lsec' ? 'ちゅうがっこうを おえた ひとの うち、だいがくなどで まなぶ わりあい' : 'ちゅうがっこうを おえて いないと うけられない',
+        pass: () => { life.uni = true; return { text: `だいがくに ごうかく！ ${life.dream.study}を まなんだよ。`, log: `だいがくに すすんで、${life.dream.study}を まなんだ。`, mood: mood(0.6, ['すきな ことを ふかく まなべた。', 'せかいじゅうの ともだちが できた。'], ['がくひの ために よるも はたらいて たいへんだった。', 'べんきょうに ついていけず くるしかった。']) }; },
+        fail: () => ({ text: `${life.wealth === 'ok' ? 'しけんに おちて' : 'がくひが はらえず'}、だいがくには いけなかったよ。`, log: `だいがくを めざしたが、${life.wealth === 'ok' ? 'しけんに おちた' : 'がくひが はらえなかった'}。`, mood: mood(0.4, ['はやく はたらきはじめて、じぶんの おかねで くらせた。'], ['とても くやしかった。']) }) },
+      { emoji: '💪', label: 'はたらく', p: 100, src: 'always',
+        pass: () => ({ text: 'はたらきはじめたよ。', log: 'おとなとして はたらきはじめた。', mood: mood(0.5, ['じぶんの おかねで すきな ものを かえた。'], ['しごとが きびしかった。']) }) },
+    ];
+    if (life.rural) opts.push({ emoji: '🏙️', label: 'まちに でる', p: 100, src: 'always',
+      pass: () => { life.rural = false; return { text: 'ふるさとを でて、まちで くらしはじめたよ。', log: 'ふるさとを でて、まちで くらしはじめた。', mood: mood(0.5, ['あたらしい ともだちが できた。', 'まちの くらしは べんりだった。'], ['ふるさとが こいしかった。', 'へやが せまくて やちんが たかかった。']) }; } });
+    return { age: c.adult, icon: '🧭', title: `おとなの なかまいり！ ${c.adult}さい`, body: `<p class="sub">${c.name}では <b class="num">${c.adult}</b>さいで おとなに なるよ${c.id === 'jp' ? '' : `（にほんは <b class="num">${JAPAN.adult}</b>さい）`}。これから どうする？</p>`, options: opts };
+  },
+  // しごと
+  () => {
+    const c = life.c;
+    const d = life.dream;
+    const age = Math.max(c.adult + (life.uni ? 4 : 1), life.uni ? 22 : 0);
+    const pw = life.uni ? Math.min(97, c.wage + 25) : c.wage;
+    const fallback = () => pick(Math.random() * 100 < c.agri ? JOBS_FARM : JOBS_TOWN);
+    const setJob = (j) => { life.job = j; };
+    return {
+      age, icon: '💼', title: 'どんな しごとを する？',
+      body: `<p class="sub">${c.name}では、はたらく ひとの うち おきゅうりょうを もらって はたらく ひとは ${pText(c.wage)}。のこりの ひとは、のうぎょうや じぶんの しょうばいを して いるよ。</p>`,
+      options: [
+        { emoji: d.emoji, label: `ゆめの ${d.name}を めざす`, p: d.uni ? (life.uni ? 70 : 0) : 40, src: 'game', why: d.uni && !life.uni ? 'だいがくを でて いないと なれない' : 'ゆめの しごとに つける かずは かぎられて いる',
+          pass: () => { setJob(d); return { text: `ゆめだった <b>${d.name}</b>に なったよ！ ${d.end}`, log: `ゆめだった ${d.name}に なった！`, mood: mood(0.7, ['まいにちが たのしかった。', 'たくさんの ひとに ありがとうと いわれた。'], ['ゆめが かなっても、しごとは おもったより たいへんだった。', 'いそがしくて かぞくとの じかんが へった。']) }; },
+          fail: () => { const j = fallback(); setJob(j); return { text: `${d.name}には なれなかった。かわりに <b>${j.name}</b>に なったよ。`, log: `${d.name}を めざしたが なれず、${j.name}に なった。`, mood: mood(0.45, ['おもって いなかった しごとが だんだん すきに なった。'], ['ゆめを あきらめて かなしかった。']) }; } },
+        { emoji: '🏢', label: 'おきゅうりょうの しごと（かいしゃ・やくしょ・こうじょう など）', p: pw, src: 'data', why: life.uni ? 'だいがくを でると はいりやすい（とうけい＋ゲームの めやす）' : 'おきゅうりょうを もらって はたらく ひとの わりあい',
+          pass: () => { const j = pick(JOBS_TOWN); setJob(j); return { text: `<b>${j.name}</b>として はたらきはじめたよ。まいつき おきゅうりょうが もらえる。`, log: `${j.name}として はたらいた。`, mood: mood(0.55, ['くらしが あんていした。'], ['まいにち おなじ しごとで たいくつだった。', 'じょうしが こわかった。']) }; },
+          fail: () => { const j = fallback(); setJob(j); return { text: `しごとが みつからず、<b>${j.name}</b>を する ことに なったよ。`, log: `かいしゃの しごとは みつからず、${j.name}に なった。`, mood: mood(0.4, ['じぶんの ペースで はたらけた。'], ['しゅうにゅうが すくなく、くらしが くるしかった。']) }; } },
+        { emoji: '🌾', label: 'はたけ・ぼくじょう・りょうで はたらく', p: 100, src: 'always',
+          pass: () => { const j = pick(JOBS_FARM); setJob(j); return { text: `<b>${j.name}</b>として はたらいたよ。${j.end}`, log: `${j.name}として はたらいた。`, mood: mood(0.5, ['しぜんの なかで はたらくのが すきだった。', 'みのりの きせつが うれしかった。'], ['あめが ふらない としは くらしが くるしかった。']) }; } },
+      ],
+    };
+  },
+  // けっこん
+  () => {
+    if (life.wed) return null;
+    const age = Math.max(24, (life.uni ? 26 : life.c.adult + 5));
+    return {
+      age, icon: '💞', title: 'これからの くらし',
+      options: [
+        { emoji: '💍', label: 'けっこんする', p: 80, src: 'game', why: 'いっしょに くらしたい ひとに であえるか',
+          pass: () => { life.wed = age; return { text: 'たいせつな ひとと けっこんしたよ！', log: `${age}さいで けっこんした。`, mood: mood(0.7, ['まいにち わらいが たえなかった。'], ['けんかも たくさん した。']) }; },
+          fail: () => ({ text: 'けっこんしたい ひとには であえなかったよ。', log: 'けっこんは しなかった。', mood: mood(0.5, ['ひとりの じかんを たのしんだ。', 'ともだちと たくさん たびを した。'], ['ときどき さみしかった。']) }) },
+        { emoji: '🧳', label: 'ひとりで じゆうに くらす', p: 100, src: 'always',
+          pass: () => ({ text: 'ひとりで じゆうに くらす ことに したよ。', log: 'ひとりで じゆうに くらした。', mood: mood(0.55, ['すきな ことに じかんを つかえた。'], ['びょうきの とき こころぼそかった。']) }) },
+      ],
+    };
+  },
+];
+
+function stageHead(age) {
+  return `${topbar()}<div class="who">${avatar(age, life.g)} <b>${callName()}</b> <small>${life.c.flag} ${life.c.name} ・ <b class="num">${age}</b>さい</small> ${joyBar()}</div>`;
+}
+
+// つぎの ばめんへ（いきられなかった ときや、ばめんが ない ときは おわり）
+function nextStep() {
+  while (life.step < STEPS.length) {
+    const sp = STEPS[life.step++]();
+    if (!sp) continue;
+    if (sp.age > life.death) break;
+    return renderStep(sp);
   }
+  ending();
 }
 
-function choose(act, v, msg) {
-  app.querySelectorAll(`[data-act=${act}]`).forEach((b) => { b.disabled = true; if (b.dataset.v === v) b.classList.add('right'); });
-  const i = STAGES.findIndex((x) => x.key === (act === 'dream' ? 'dream' : 'teen'));
-  document.getElementById('after').innerHTML = `
-    <div class="info"><p>${msg}</p></div>
-    <button class="btn big" data-act="next" data-i="${i + 1}">つぎへ ▶</button>`;
+function optCard(o, k, ev = false) {
+  const p = Math.max(0, Math.min(100, o.p));
+  return `<button class="opt" data-act="opt" data-k="${k}" ${p <= 0 && !ev ? 'disabled' : ''}>
+    <span class="oe">${o.emoji}</span>
+    <span class="ol"><b>${o.label}</b>
+      ${o.p >= 100 && o.src === 'always' ? '<small>だれでも できる</small>' : `<small>${ev ? 'そう なる' : 'かなう'} かくりつ ${pText(p)}（<b class="num">${Math.round(p)}</b>%）${SRC[o.src] ? ` ・ ${SRC[o.src]}` : ''}</small>
+      <span class="pbar"><i style="width:${p}%"></i></span>${o.why ? `<small class="why">${o.why}</small>` : ''}`}</span>
+  </button>`;
 }
 
-// にほんと くらべる 2たく クイズ（せつめいを かいて いない くに よう）
-function compareQuiz(head, cls, i, age, label, q, v, jp, win) {
+function renderStep(sp) {
+  life.cur = sp;
   const c = life.c;
-  quiz(head, cls, i, `<b class="num">${age}</b>さい`, `${label} クイズ`,
-    `${c.name}と にほん、${q} どっち？`,
-    [{ label: `${c.flag} ${c.name}`, ok: v >= jp }, { label: '🇯🇵 にほん', ok: v < jp }],
-    win, [age, `${label}を にほんと くらべて みた。`]);
+  const choice = sp.options || (sp.event ? [sp.event] : null);
+  show(`${stageHead(sp.age)}<div class="card">
+    <div class="agebig">${sp.icon} <b class="num">${sp.age}</b>さい</div>
+    <h2>${sp.title}</h2>
+    ${sp.body || ''}
+    ${sp.options ? `<div class="opts">${sp.options.map((o, k) => optCard(o, k)).join('')}</div>` : ''}
+    ${sp.event ? `<div class="opts">${optCard(sp.event, 0, true)}</div>
+      <p class="sub">これは えらべない できごと。ボタンを おすと、どうなるか きまるよ。</p>` : ''}
+    <div id="after">${choice ? '' : '<button class="btn big" data-act="next">つぎへ ▶</button>'}</div>
+  </div>`, `bg-${c.area}`);
 }
 
-function quiz(head, cls, i, age, label, q, choices, win, log) {
-  show(`${head}<div class="card">
-    <div class="agebig">${age}</div>
-    <div class="qlabel">❓ ${label}</div>
-    <h2>${q}</h2>
-    <div class="choices">${choices.map((ch, k) => `<button class="btn choice" data-act="answer" data-k="${k}">${ch.label}</button>`).join('')}</div>
-    <div id="after"></div>
-  </div>`, cls);
-  life.quiz = { choices, win, i, log };
+// えらんだ あとの さいころ：ゲージの うえを はりが うごいて、とまった ばしょで きまる
+function chooseOpt(k) {
+  const sp = life.cur;
+  if (!sp || sp.done) return;
+  sp.done = true;
+  const o = sp.options ? sp.options[k] : sp.event;
+  const p = Math.max(0, Math.min(100, o.p));
+  const r = Math.random() * 100;
+  const ok = r < p;
+  app.querySelectorAll('[data-act=opt]').forEach((b) => { b.disabled = true; if (+b.dataset.k === k) b.classList.add('picked'); });
+  const after = document.getElementById('after');
+  const show2 = () => {
+    const res = (ok ? o.pass : o.fail)();
+    if (o.src !== 'always' && !sp.event) { life.tries++; if (ok) life.wins++; }
+    if (res.log) addLog(sp.age, res.log);
+    const m = res.mood || { d: 0 };
+    joy(m.d);
+    if (m.why) addLog(sp.age, m.why);
+    sfx(ok ? 'ok' : 'ng');
+    after.innerHTML = `${o.src === 'always' && !sp.event ? '' : `<p class="result ${ok ? 'ok' : 'ng'}">${sp.event ? (ok ? 'そう なった' : 'そうは ならなかった') : ok ? '✨ かなった！' : '💧 かなわなかった…'}</p>`}
+      <div class="info"><p>${res.text}</p></div>
+      ${m.why ? `<div class="moodline ${m.d > 0 ? 'up' : m.d < 0 ? 'down' : ''}">${m.d > 0 ? '😊 しあわせ ＋1' : m.d < 0 ? '😢 しあわせ −1' : ''}<span>${m.why}</span></div>` : ''}
+      <button class="btn big" data-act="next">つぎへ ▶</button>`;
+    const who = app.querySelector('.who .joybar');
+    if (who) who.outerHTML = joyBar();
+    autoStep();
+  };
+  if (o.src === 'always' && !sp.event) { show2(); return; }
+  // ゲージの アニメーション
+  after.innerHTML = `<div class="roll"><div class="track"><i class="zone" style="width:${p}%"></i><b class="needle" id="needle"></b></div>
+    <div class="rlabel"><span>${sp.event ? 'そう なる' : 'かなう'}</span><span>${sp.event ? 'ならない' : 'かなわない'}</span></div></div>`;
+  const nd = document.getElementById('needle');
+  let t = 0;
+  const steps = 14;
+  const tick = () => {
+    if (life?.cur !== sp) return;
+    t++;
+    const x = t < steps ? Math.random() * 100 : r;
+    nd.style.left = `${x}%`;
+    sfx('tick');
+    if (t < steps) setTimeout(tick, 40 + t * 12 / save.speed);
+    else setTimeout(show2, 450 / save.speed);
+  };
+  tick();
 }
 
-function answer(k, btn) {
-  const qz = life.quiz;
-  if (!qz || qz.done) return;
-  qz.done = true;
-  const ok = qz.choices[k].ok;
-  if (ok) life.stars++;
-  if (qz.log) addLog(...qz.log);
-  sfx(ok ? 'ok' : 'ng');
-  app.querySelectorAll('[data-act=answer]').forEach((b, j) => {
-    b.disabled = true;
-    if (qz.choices[j].ok) b.classList.add('right');
-    else if (b === btn) b.classList.add('wrong');
-  });
-  document.getElementById('after').innerHTML = `
-    <p class="result ${ok ? 'ok' : 'ng'}">${ok ? '⭐ せいかい！' : 'おしい！ こたえは みどりの ボタンだよ。'}</p>
-    <div class="info"><p>${qz.win}</p></div>
-    <button class="btn big" data-act="next" data-i="${qz.i + 1}">つぎへ ▶</button>`;
-}
-
-function play(v) {
-  const c = life.c;
-  if (life.play) return;
-  life.play = v;
-  addLog(8, `ともだちと ${v}を して あそんだ。`);
-  sfx('ok');
-  app.querySelectorAll('[data-act=play]').forEach((b) => { b.disabled = true; if (b.dataset.v === v) b.classList.add('right'); });
-  document.getElementById('after').innerHTML = `
-    <div class="info"><p>${v === c.sport
-      ? `${c.name}では <b>${c.sport}</b>が だいにんき！ みんなで もりあがったよ。`
-      : `<b>${v}</b>で あそんだよ！ たのしかったね。${c.sport ? `<br>${c.name}では <b>${c.sport}</b>も だいにんき だよ。` : ''}`}</p></div>
-    <button class="btn big" data-act="next" data-i="${STAGES.findIndex((x) => x.key === 'play') + 1}">つぎへ ▶</button>`;
-}
-
-// おとなに なった あとの じんせい（しんがく → しごと → かぞく → まご → さいご）
-// どの できごとも、なくなる ねんれい（life.death）より まえの ものだけ おこる。
-function grownUp() {
+// ───── そのあとの じんせい（こども・まご・さいご） ─────
+function laterLife() {
   const c = life.c;
   const D = life.death;
-  const d = DREAMS.find((x) => x.name === life.dream);
-  const at = (a, text) => { if (a < D) life.plan.push([a, text]); };
-  // だいがくなど：ちゅうがっこうを おえた ひとの なかで、そうしゅうがくりつに あう わりあい
-  const uni = life.lsec && Math.random() * 100 < Math.min(100, (c.uni / Math.max(c.lsec, 1)) * 100);
-  const hit = Math.random() < (d.uni ? (uni ? 0.8 : 0) : (uni ? 0.7 : life.lsec ? 0.5 : 0.3));
-  const job = hit ? d : pick(Math.random() * 100 < c.agri ? JOBS_FARM : JOBS_TOWN);
-  const a0 = c.adult;
-  if (uni) at(a0, `だいがくに すすんで、${d.study}を まなんだ。`);
-  else if (life.lsec) at(a0, 'がっこうを おえて、はたらきはじめた。');
-  const workAge = uni ? Math.max(a0 + 4, 22) : a0;
-  at(workAge, hit ? `ゆめだった ${job.name}に なった！ ${job.end}` : `${job.name}に なった。${job.end}`);
-  // けっこん・こども・まご（こどもの かずは ごうけい とくしゅ しゅっしょうりつ、こどもの いのちも 生命表）
-  const wed = life.wed || (Math.random() < 0.85 ? workAge + 2 + rnd(8) : null);
-  let kids = 0, lost = 0, gkids = 0;
-  if (wed) {
-    if (!life.wed) at(wed, 'たいせつな ひとと けっこんした。');
+  const at = (a, text, d = 0) => { if (a < D) { addLog(a, text); joy(d); } };
+  if (life.wed) {
     const want = Math.min(9, poisson(c.tfr));
+    let kids = 0, lost = 0, gkids = 0;
     for (let k = 0; k < want; k++) {
-      const born = wed + 1 + k * 2 + rnd(2);
-      if (born >= D || born > 45) break;
+      const b = life.wed + 1 + k * 2 + rnd(2);
+      if (b >= D || b > 45) break;
       kids++;
       if (Math.random() < c.u5 / 1000) lost++;
     }
-    if (kids > 0) at(wed + 1, `こどもが うまれた。こどもは ぜんぶで ${kids}にん。`);
-    if (lost > 0) at(wed + 3 + rnd(6), lost === 1 ? 'こどもの ひとりが、おさない うちに びょうきで なくなった。とても かなしかった。' : `こどもの うち ${lost}にんが、おさない うちに びょうきで なくなった。とても かなしかった。`);
+    if (kids > 0) at(life.wed + 1, `こどもが うまれた。こどもは ぜんぶで ${kids}にん。`, 1);
+    if (lost > 0) at(life.wed + 3 + rnd(6), lost === 1 ? 'こどもの ひとりが、おさない うちに びょうきで なくなった。とても かなしかった。' : `こどもの うち ${lost}にんが、おさない うちに びょうきで なくなった。とても かなしかった。`, -2);
     for (let k = 0; k < kids - lost; k++) gkids += Math.random() < 0.85 ? poisson(c.tfr) : 0;
-    if (gkids > 0) at(wed + 26 + rnd(8), `まごが うまれた。${life.g === 'm' ? 'おじいちゃん' : 'おばあちゃん'}に なった！`);
-  } else {
-    at(workAge + 5 + rnd(10), 'ともだちや しごとの なかまに かこまれて、にぎやかに くらした。');
+    if (gkids > 0) at(life.wed + 26 + rnd(8), `まごが うまれた。${life.g === 'm' ? 'おじいちゃん' : 'おばあちゃん'}に なった！`, 1);
   }
-  if (D >= 60 && D > workAge) at(Math.min(D - 1, 60 + rnd(6)), 'しごとを ひきついで、ゆっくり くらすように なった。');
-  return { job: workAge < D ? job : null, hit, uni, kids, lost, gkids };
+  if (life.job && D >= 60) at(60 + rnd(6), 'しごとを ひきついで、ゆっくり くらすように なった。', pick([1, 0]));
 }
 
 // さいごの ことば（しいんは「びょうき」「じこ」「としを とって」だけで やさしく）
 function lastWords(a) {
-  const c = life.c;
   if (a === 0) return Math.random() < 0.5 ? 'うまれて すぐに、ちいさな からだで びょうきに なり、なくなりました。' : `うまれて <b class="num">${1 + rnd(11)}</b>かげつで、びょうきに なり、なくなりました。`;
   if (a < 5) return `<b class="num">${a}</b>さいの とき、びょうきに なり、なくなりました。`;
   const accident = a < 15 ? 0.3 : a < 45 ? 0.35 : a < 70 ? 0.08 : 0.02;
@@ -469,13 +496,20 @@ function lastWords(a) {
   return `<b class="num">${a}</b>さいの とき、びょうきに なり、なくなりました。`;
 }
 
+function joyVerdict(j) {
+  if (j >= 8) return ['🌈', 'とても しあわせな いっしょう'];
+  if (j >= 5) return ['🌤️', 'しあわせも たいへんな ことも あった いっしょう'];
+  if (j >= 3) return ['🌥️', 'くろうの おおい いっしょう'];
+  return ['🌧️', 'とても くるしい ことが おおかった いっしょう'];
+}
+
 let lastShare = '';
 function ending() {
   const c = life.c;
   const D = life.death;
   const grown = D >= c.adult;
-  const g = grown ? grownUp() : null;
-  flush(D);
+  laterLife();
+  life.log.sort((x, y) => x[0] - y[0]);
   const last = lastWords(D);
   addLog(D, last.replace(/<[^>]+>/g, ''));
   const isNew = !save.met[c.id];
@@ -484,13 +518,14 @@ function ending() {
   const who = life.name ? ` ${life.name}の` : '';
   const place = `${c.name}の ${life.rural ? 'いなか' : 'まち'}で ${gname(life.g)} として うまれ`;
   const headline = grown
-    ? `${place}、${g.job ? `${g.job.name}として はたらき、` : ''}${D}さいまで いきた${who} じんせい`
+    ? `${place}、${life.job ? `${life.job.name}として はたらき、` : ''}${D}さいまで いきた${who} じんせい`
     : `${place}、${D}さいで なくなった${who} じんせい`;
-  save.past.unshift({ flag: c.flag, g: life.g, job: g?.job ? `${g.job.emoji} ${g.job.name}` : '🕊️', old: D, text: headline });
+  const [vi, vt] = joyVerdict(life.joy);
+  save.past.unshift({ flag: c.flag, g: life.g, job: life.job ? `${life.job.emoji} ${life.job.name}` : '🕊️', old: D, text: headline, joy: Math.round(life.joy) });
   save.past = save.past.slice(0, 30);
   store(save);
   sfx(grown ? 'fanfare' : 'ng');
-  lastShare = `${c.flag} ${headline}\n` + life.log.map(([a, t]) => `${a}さい ${t}`).join('\n') + '\n#せかいのどこかにうまれたら';
+  lastShare = `${c.flag} ${headline}\n${grown ? `しあわせ ${Math.round(life.joy)}/10 ・ かなった えらびかた ${life.wins}/${life.tries}\n` : ''}` + life.log.map(([a, t]) => `${a}さい ${t}`).join('\n') + '\n#せかいのどこかにうまれたら';
   const row = (label, a, b, key) => `<tr><th>${label}</th><td>${a}${key && c.estimated.includes(key) ? '<small>※</small>' : ''}</td>${c.id === 'jp' ? '' : `<td>${b}</td>`}</tr>`;
   const per1000 = (v) => `<b class="num">${Math.round(v)}</b>にん`;
   show(`${topbar()}<div class="card pop">
@@ -498,12 +533,14 @@ function ending() {
     <h2 class="headline">${headline}</h2>
     <div class="lastbox ${grown ? '' : 'young'}"><p>${last}</p>
       ${grown ? '' : `<p class="sub">${callName()}の ことを、かぞくは ずっと わすれなかったよ。</p>`}</div>
-    ${grown ? '' : `<div class="info"><p>${c.name}では、うまれた あかちゃん <b class="num">1,000</b>にんの うち、<b class="num">5</b>さいまでに なくなるのは やく ${per1000(c.u5)}。${c.id === 'jp' ? '' : `<br>にほんは やく ${per1000(JAPAN.u5)}。`}</p>
+    ${grown ? `<div class="verdict"><span class="vi">${vi}</span><div><b>${vt}</b>
+      <p>${joyBar()}</p>
+      <p class="sub">えらんで かなった こと <b class="num">${life.wins}</b> / <b class="num">${life.tries}</b>。${life.wins >= life.tries / 2 === life.joy >= 5 ? 'かなった ことも しあわせも、かさなる ときも あれば かさならない ときも ある。' : life.joy >= 5 ? 'かなわない ことが おおくても、しあわせな じかんは たくさん あったね。' : 'かなった ことが おおくても、しあわせとは かぎらないんだね。'}</p></div></div>`
+      : `<div class="info"><p>${c.name}では、うまれた あかちゃん <b class="num">1,000</b>にんの うち、<b class="num">5</b>さいまでに なくなるのは やく ${per1000(c.u5)}。${c.id === 'jp' ? '' : `<br>にほんは やく ${per1000(JAPAN.u5)}。`}</p>
       <p class="sub">びょうきの おおくは、きれいな みず・ワクチン・くすり・びょういんが あれば ふせげるんだよ。</p></div>`}
-    <div class="stars">${'⭐'.repeat(life.stars)}${'☆'.repeat(3 - life.stars)}</div>
     ${isNew ? `<div class="stamp">${c.flag}<span>ずかんに<br>スタンプ！</span></div>` : ''}
     <h3 class="loghead">📖 じんせいの きろく</h3>
-    <ol class="lifelog">${life.log.map(([a, t], k) => `<li style="animation-delay:${Math.min(k * 0.08, 1.2)}s"><span class="age"><b class="num">${a}</b>さい</span><span class="ava">${k === life.log.length - 1 ? '🕊️' : avatar(a, life.g)}</span><p>${t}</p></li>`).join('')}</ol>
+    <ol class="lifelog">${life.log.map(([a, t], k) => `<li style="animation-delay:${Math.min(k * 0.06, 1.2)}s"><span class="age"><b class="num">${a}</b>さい</span><span class="ava">${k === life.log.length - 1 ? '🕊️' : avatar(a, life.g)}</span><p>${t}</p></li>`).join('')}</ol>
     <p class="owari">おしまい</p>
     <button class="btn" data-act="share">📋 きろくを コピー</button>
     <p class="sub" id="shared" hidden>コピー したよ。おうちの ひとに みせてね。</p>
@@ -514,12 +551,11 @@ function ending() {
         ${row(`⏳ へいきんじゅみょう<br><small>（${life.g === 'm' ? 'おとこの ひと' : 'おんなの ひと'}）</small>`, `<b class="num">${life.g === 'm' ? c.lem : c.lef}</b>さい`, `<b class="num">${life.g === 'm' ? JAPAN.lem : JAPAN.lef}</b>さい`, life.g === 'm' ? 'lem' : 'lef')}
         ${row('🍼 5さいまでに なくなる<br><small>（あかちゃん 1,000にんの うち）</small>', per1000(c.u5), per1000(JAPAN.u5), 'u5')}
         ${row('🪙 1にち 3ドルより すくない おかねで くらす<br><small>（10にんの うち）</small>', n10(c.pov3), n10(JAPAN.pov3), 'pov3')}
-        ${row('💡 でんきが つかえる<br><small>（こども 10にんの うち）</small>', `<b class="num">${of10(c.elec)}</b>にん`, `<b class="num">${of10(JAPAN.elec)}</b>にん`)}
-        ${row('🚰 ちかくに きれいな みず<br><small>（こども 10にんの うち）</small>', `<b class="num">${of10(c.water)}</b>にん`, `<b class="num">${of10(JAPAN.water)}</b>にん`)}
         ${row('🎒 しょうがっこうを おえる<br><small>（こども 10にんの うち）</small>', n10(c.prim), n10(JAPAN.prim), 'prim')}
+        ${row('🏫 ちゅうがっこうを おえる<br><small>（こども 10にんの うち）</small>', n10(c.lsec), n10(JAPAN.lsec), 'lsec')}
         ${row('🎓 だいがくなどで まなぶ<br><small>（わかもの 10にんの うち）</small>', n10(c.uni), n10(JAPAN.uni), 'uni')}
-        ${row('🧑‍🌾 のうぎょうで はたらく<br><small>（おとな 10にんの うち）</small>', n10(c.agri), n10(JAPAN.agri), 'agri')}
-        ${row('👶 うまれる こども<br><small>（おかあさん 10にんで）</small>', `<b class="num">${Math.round(c.tfr * 10)}</b>にん`, `<b class="num">${Math.round(JAPAN.tfr * 10)}</b>にん`)}
+        ${row('🏢 おきゅうりょうの しごと<br><small>（はたらく ひと 10にんの うち）</small>', n10(c.wage), n10(JAPAN.wage), 'wage')}
+        ${row('💡 でんきが つかえる<br><small>（こども 10にんの うち）</small>', `<b class="num">${of10(c.elec)}</b>にん`, `<b class="num">${of10(JAPAN.elec)}</b>にん`)}
         ${row('🎲 うまれる かくりつ', oddsText(c), oddsText(JAPAN))}
       </table>
       ${c.estimated.length ? '<p class="sub">※ この くにの データが ないので、にた くにの へいきん</p>' : ''}
@@ -551,7 +587,7 @@ function past() {
   show(`${topbar()}<div class="card wide">
     <h2>📜 これまでの じんせい</h2>
     <p class="sub">これまでに うまれた <b class="num">${save.lives}</b>かいの うち、あたらしい <b class="num">${save.past.length}</b>かい</p>
-    <ol class="past">${save.past.map((x) => `<li><span class="pf">${x.flag}</span><div><p>${x.text}</p><small>${x.job} ・ <b class="num">${x.old}</b>さいまで いきた</small></div></li>`).join('')}</ol>
+    <ol class="past">${save.past.map((x) => `<li><span class="pf">${x.flag}</span><div><p>${x.text}</p><small>${x.job} ・ <b class="num">${x.old}</b>さいまで いきた${x.joy != null ? ` ・ 😊 <b class="num">${x.joy}</b>/10` : ''}</small></div></li>`).join('')}</ol>
     <button class="btn big" data-act="born">👶 うまれる</button>
   </div>`, 'bg-sky');
 }
@@ -610,9 +646,14 @@ function hundred() {
 function parents() {
   show(`${topbar()}<div class="card wide parents">
     <h2>おうちの かたへ</h2>
-    <p>いま生まれてくる赤ちゃんの一人として、世界のどこかの国にランダムに生まれ、その国の統計どおりの一生を生きるゲームです。成人するまでは選択やクイズをしながら1年ずつ進み、そのあとの進学・仕事・家族・最期は人生の記録として読みます。
+    <p>いま生まれてくる赤ちゃんの一人として、世界のどこかの国にランダムに生まれ、その国の統計どおりの一生を生きるゲームです。
+    人生の節目（小学校・中学校・進路・仕事・結婚）では選択肢を選びます。選択肢には<strong>かなう確率</strong>が表示され（📊は統計、🎲は統計がないためのゲームの目安）、ゲージの針で「かなったか」が決まります。
+    たとえば大学に進める確率は、中学校を終えた人のうち大学などで学ぶ人の割合なので、国によって大きく違います。
+    また、選択がかなうことと幸せになることは別にしてあります。結果ごとに良いこと・大変なことがランダムに起こり、「しあわせ」が上下します。
+    こどもの労働や18歳未満の結婚は、選べない「できごと」として統計の確率で起こります。</p>
+    <p>
     生まれる国は、実際にその国で生まれる赤ちゃんの数に比例した確率で、世界の${COUNTRIES.length}か国から決まります。
-    そのうち赤ちゃんの数が多い${COUNTRIES.filter((c) => c.rich).length}か国には、あいさつ・料理などの説明とクイズがあります。それ以外の国では、日本とくらべる数字のクイズになります。</p>
+    そのうち赤ちゃんの数が多い${COUNTRIES.filter((c) => c.rich).length}か国には、あいさつ・料理などの説明があります。それ以外の国では、数字から作った説明になります。</p>
     <p>Web ゲーム「80億分の1」（1in8b.life）の、統計どおりに世界のどこかに生まれて一生を見守るというアイデアへのオマージュです（元の作品は15歳以上向け。このゲームは別に作ったもので、文章や絵は使っていません）。
     「おまかせ」をオンにすると、選択も自動で進み、人生を上から眺められます。</p>
     <h3>いのちについて（大切）</h3>
@@ -762,24 +803,8 @@ app.addEventListener('click', (e) => {
   if (act !== 'mute') sfx('tap');
   if (act === 'title') { life = null; title(); }
   else if (act === 'born') born();
-  else if (act === 'next') {
-    const i = +b.dataset.i;
-    // つぎの ねんれいまで いきられなかった ときは、そこで じんせいが おわる
-    if (i < STAGES.length && ageOf(STAGES[i]) <= life.death) stage(i); else ending();
-  }
-  else if (act === 'answer') answer(+b.dataset.k, b);
-  else if (act === 'play') play(b.dataset.v);
-  else if (act === 'dream' && !life.dream) {
-    life.dream = b.dataset.v;
-    const d = DREAMS.find((x) => x.name === life.dream);
-    addLog(12, `しょうらいの ゆめは ${d.name}。`);
-    choose('dream', life.dream, `${d.emoji} <b>${d.name}</b>に なりたいな！ ゆめに むかって がんばろう。`);
-  } else if (act === 'subject' && !life.subject) {
-    life.subject = b.dataset.v;
-    const x = SUBJECTS.find((y) => y.name === life.subject);
-    addLog(15, `${x.name}が いちばん すきな べんきょうに なった。`);
-    choose('subject', life.subject, `${x.emoji} <b>${x.name}</b>が いちばん すき！ ${x.msg}`);
-  }
+  else if (act === 'next') { if (life) nextStep(); }
+  else if (act === 'opt') { if (life) chooseOpt(+b.dataset.k); }
   else if (act === 'zukan') zukan();
   else if (act === 'zsel') zukan(b.dataset.v);
   else if (act === 'hundred') hundred();
@@ -811,7 +836,7 @@ function autoStep() {
   const me = life;
   autoT = setTimeout(() => {
     if (life !== me) return;
-    const opts = [...app.querySelectorAll('[data-act=answer],[data-act=play],[data-act=dream],[data-act=subject]')].filter((x) => !x.disabled);
+    const opts = [...app.querySelectorAll('[data-act=opt]')].filter((x) => !x.disabled);
     const t = opts.length ? pick(opts) : app.querySelector('[data-act=next]');
     if (t) t.click();
   }, 2400 / save.speed);

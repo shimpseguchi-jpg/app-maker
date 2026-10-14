@@ -140,10 +140,42 @@ b { color: #1b5fa8; }
 .pname { color: #e2541b; font-size: 1.2em; }
 .rare { color: var(--gold-d); letter-spacing: .1em; }
 .rare span { color: #e3e7ee; }
-.who { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .95em; }
+.who { width: 100%; max-width: 760px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; font-size: .95em; }
 .who small { color: var(--ink-soft); }
 .settings { gap: 8px; }
 .mini.on { background: var(--green); color: #fff; }
+
+/* じんせいの えらぶ ばめん */
+.opts { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.opt {
+  display: flex; gap: 14px; align-items: center; text-align: left; width: 100%;
+  border: 0; border-radius: 18px; padding: 12px 16px; background: #fff; cursor: pointer;
+  box-shadow: 0 5px 0 #c9d6e3; font-weight: 700;
+}
+.opt:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9d6e3; }
+.opt:disabled { cursor: default; opacity: .5; }
+.opt.picked { opacity: 1; outline: 4px solid var(--blue); }
+.opt .oe { font-size: 2.2em; line-height: 1; }
+.opt .ol { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.opt .ol small { font-size: .72em; color: var(--ink-soft); font-weight: 700; }
+.opt .ol small.why { font-weight: 500; }
+.pbar { display: block; height: 10px; border-radius: 99px; background: #eef1f5; overflow: hidden; }
+.pbar i { display: block; height: 100%; background: linear-gradient(90deg, #4fd38a, #2fbf71); border-radius: 99px; }
+.roll { width: 100%; max-width: 520px; }
+.track { position: relative; height: 26px; border-radius: 99px; background: #ffd9d9; overflow: visible; }
+.track .zone { position: absolute; left: 0; top: 0; bottom: 0; background: #9be6bb; border-radius: 99px 0 0 99px; }
+.track .needle { position: absolute; top: -8px; width: 6px; height: 42px; margin-left: -3px; border-radius: 3px; background: var(--ink); transition: left .08s; left: 0; }
+.rlabel { display: flex; justify-content: space-between; font-size: .75em; color: var(--ink-soft); margin-top: 4px; }
+.moodline { width: 100%; display: flex; flex-direction: column; gap: 2px; border-radius: 14px; padding: 8px 14px; font-size: .9em; text-align: left; }
+.moodline.up { background: #fff4c4; }
+.moodline.down { background: #e6ecf7; }
+.moodline span { font-weight: 500; }
+.joybar { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; font-size: .85em; }
+.joybar i { display: inline-block; width: 8px; height: 14px; border-radius: 3px; background: #e3e7ee; }
+.joybar i.on { background: var(--gold); }
+.verdict { width: 100%; display: flex; gap: 14px; align-items: center; background: #fff7e0; border-radius: 18px; padding: 12px 16px; text-align: left; }
+.verdict .vi { font-size: 3em; line-height: 1; }
+.verdict .joybar { margin-left: 0; }
 
 /* じんせいの きろく */
 .lastbox { width: 100%; background: #f1f4fa; border-radius: 18px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
