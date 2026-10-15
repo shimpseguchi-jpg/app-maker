@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="道の駅チェック">
+<meta name="theme-color" content="#1f6f43">
+<meta name="description" content="栃木・千葉・茨城・群馬の道の駅めぐりチェックリスト">
+<title>道の駅チェック</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>道の駅チェック <small>栃木・千葉・茨城・群馬</small></h1>
+  <div class="top-right">
+    <span id="sync-state" class="sync-state" hidden></span>
+    <div class="total" id="total"></div>
+  </div>
+</header>
+<main class="layout">
+  <section class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <span><i class="dot todo"></i>未訪問</span>
+      <span><i class="dot plan"></i>行く予定</span>
+      <span><i class="dot done"></i>行った</span>
+      <span><i class="line hw"></i>高速道路</span>
+      <span><i class="line nr"></i>国道</span>
+    </div>
+  </section>
+  <section class="list-wrap">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-mode="check" aria-selected="true">チェックリスト</button>
+      <button type="button" role="tab" data-mode="route" aria-selected="false">道順モード</button>
+    </div>
+    <div id="check-panel" class="panel">
+      <div class="tools">
+        <input id="q" type="search" placeholder="駅名・市町村・路線で検索">
+        <select id="filter">
+          <option value="all">すべて</option>
+          <option value="todo">未訪問だけ</option>
+          <option value="plan">行く予定だけ</option>
+          <option value="done">行っただけ</option>
+        </select>
+      </div>
+      <div id="list"></div>
+      <div class="io">
+        <button id="export">記録を保存（書き出し）</button>
+        <label class="btn">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label>
+        <button id="sync-open" type="button">2人で共有</button>
+        <button id="reset" class="danger">全部リセット</button>
+      </div>
+    </div>
+    <div id="route-panel" class="panel" hidden>
+      <div class="route-body">
+        <p class="hint">地図の道の駅を押した順に道順に入ります（もう一度押すと外れます）。</p>
+        <div class="route-tools">
+          <button id="add-planned" type="button">「行く予定」の駅をまとめて追加</button>
+          <button id="optimize" type="button">回る順番を最適化</button>
+          <button id="clear-route" type="button" class="danger">全部外す</button>
+        </div>
+        <div class="route-opts">
+          <label><input id="from-here" type="checkbox"> 現在地から出発</label>
+          <label>各駅の休憩
+            <select id="rest">
+              <option value="0">なし</option>
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60">1時間</option>
+            </select>
+          </label>
+        </div>
+        <ol id="stops"></ol>
+        <div id="route-result"></div>
+      </div>
+    </div>
+    <p class="credit">駅データ：Wikipedia「道の駅一覧 関東地方」（CC BY-SA 4.0）をもとに作成。所要時間は <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>（OpenStreetMap の道路データ）で計算した目安です。最新の状況は各駅・<a href="https://www.michi-no-eki.jp/" target="_blank" rel="noopener">道の駅公式サイト</a>で確認してください。</p>
+  </section>
+</main>
+<dialog id="sync-dialog" class="sync-dialog">
+  <form id="sync-form">
+    <h2>2人で共有</h2>
+    <p class="muted">同じ「同期URL」を入れて合言葉クイズに正解した端末どうしで、「行った」「行く予定」の記録が同じになります。</p>
+    <label for="sync-url">同期URL（Google Apps Script の …/exec）</label>
+    <input id="sync-url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+    <fieldset id="sync-quiz" class="quiz">
+      <legend>合言葉：<b>THE虎牙道</b></legend>
+      <label><input type="radio" name="sync-pass" value="ノクチル"> ノクチル</label>
+      <label><input type="radio" name="sync-pass" value="シグナルズ"> シグナルズ</label>
+      <label><input type="radio" name="sync-pass" value="プロジェクトフェアリー"> プロジェクトフェアリー</label>
+    </fieldset>
+    <p id="sync-msg" class="sync-msg" role="status"></p>
+    <div class="sync-buttons">
+      <button type="submit" class="primary">つなぐ</button>
+      <button type="button" id="sync-off" class="danger" hidden>共有をやめる</button>
+      <button type="button" id="sync-close">閉じる</button>
+    </div>
+    <div id="share-box" class="share-box" hidden>
+      <label for="share-link">相手に送るリンク（開いて合言葉に答えると共有に参加できます）</label>
+      <div class="share-row">
+        <input id="share-link" type="text" readonly>
+        <button type="button" id="share-copy">コピー</button>
+      </div>
+      <p class="muted small">同期URLが入ったリンクです。2人以外には送らないでください。</p>
+    </div>
+  </form>
+</dialog>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="js/stations.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
