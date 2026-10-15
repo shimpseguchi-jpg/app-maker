@@ -24,27 +24,59 @@
     <div id="map"></div>
     <div class="legend">
       <span><i class="dot todo"></i>未訪問</span>
-      <span><i class="dot done"></i>訪問済み</span>
+      <span><i class="dot plan"></i>行く予定</span>
+      <span><i class="dot done"></i>行った</span>
       <span><i class="line hw"></i>高速道路</span>
       <span><i class="line nr"></i>国道</span>
     </div>
   </section>
   <section class="list-wrap">
-    <div class="tools">
-      <input id="q" type="search" placeholder="駅名・市町村・路線で検索">
-      <select id="filter">
-        <option value="all">すべて</option>
-        <option value="todo">未訪問だけ</option>
-        <option value="done">訪問済みだけ</option>
-      </select>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-mode="check" aria-selected="true">チェックリスト</button>
+      <button type="button" role="tab" data-mode="route" aria-selected="false">道順モード</button>
     </div>
-    <div id="list"></div>
-    <div class="io">
-      <button id="export">記録を保存（書き出し）</button>
-      <label class="btn">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label>
-      <button id="reset" class="danger">全部リセット</button>
+    <div id="check-panel" class="panel">
+      <div class="tools">
+        <input id="q" type="search" placeholder="駅名・市町村・路線で検索">
+        <select id="filter">
+          <option value="all">すべて</option>
+          <option value="todo">未訪問だけ</option>
+          <option value="plan">行く予定だけ</option>
+          <option value="done">行っただけ</option>
+        </select>
+      </div>
+      <div id="list"></div>
+      <div class="io">
+        <button id="export">記録を保存（書き出し）</button>
+        <label class="btn">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label>
+        <button id="reset" class="danger">全部リセット</button>
+      </div>
     </div>
-    <p class="credit">駅データ：Wikipedia「道の駅一覧 関東地方」（CC BY-SA 4.0）をもとに作成。最新の状況は各駅・<a href="https://www.michi-no-eki.jp/" target="_blank" rel="noopener">道の駅公式サイト</a>で確認してください。</p>
+    <div id="route-panel" class="panel" hidden>
+      <div class="route-body">
+        <p class="hint">地図の道の駅を押した順に道順に入ります（もう一度押すと外れます）。</p>
+        <div class="route-tools">
+          <button id="add-planned" type="button">「行く予定」の駅をまとめて追加</button>
+          <button id="optimize" type="button">回る順番を最適化</button>
+          <button id="clear-route" type="button" class="danger">全部外す</button>
+        </div>
+        <div class="route-opts">
+          <label><input id="from-here" type="checkbox"> 現在地から出発</label>
+          <label>各駅の休憩
+            <select id="rest">
+              <option value="0">なし</option>
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60">1時間</option>
+            </select>
+          </label>
+        </div>
+        <ol id="stops"></ol>
+        <div id="route-result"></div>
+      </div>
+    </div>
+    <p class="credit">駅データ：Wikipedia「道の駅一覧 関東地方」（CC BY-SA 4.0）をもとに作成。所要時間は <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>（OpenStreetMap の道路データ）で計算した目安です。最新の状況は各駅・<a href="https://www.michi-no-eki.jp/" target="_blank" rel="noopener">道の駅公式サイト</a>で確認してください。</p>
   </section>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
