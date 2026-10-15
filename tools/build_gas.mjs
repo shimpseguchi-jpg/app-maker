@@ -1,5 +1,5 @@
 // Google Apps Script（GAS）で くばる ための「1ファイル版」を つくる
-// つかいかた：node tools/build_gas.mjs   → gas/ に Code.gs・arcanumber.html・kazumaho.html が できる
+// つかいかた：node tools/build_gas.mjs   → gas/ に Code.gs・arcanumber.html・kazumaho.html・yomitoki.html が できる
 import { execFileSync } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
@@ -13,6 +13,7 @@ const esbuild = (args) => execFileSync('npx', [...ESBUILD, ...args], { cwd: ROOT
 const GAMES = [
   { id: 'arcanumber', dir: 'arcanumber' },
   { id: 'kazumaho', dir: '.' },
+  { id: 'yomitoki', dir: 'yomitoki' },
 ];
 
 // base64 を もどして CSS と JS を うごかす（この なかには「+」を つかわない）
