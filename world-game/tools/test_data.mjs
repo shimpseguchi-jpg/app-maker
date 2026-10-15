@@ -65,9 +65,11 @@ for (const k of ['KID_COUNTRY', 'KID_POLICY', 'KID_EVENT', 'KID_GM', 'KID_SPARK'
 
 // ニュースへの反応：ニュースの種類ごとに左右2つ、効果の書き方が正しいか
 const { REACTIONS, NEWS_ICON, NEWS_CAT, SPECIAL, OPTION_BY_ID } = await import('../js/data/reactions.js');
+const { KIND_OF } = await import('../js/data/reactions.js');
+for (const e of EVENTS) if (!e.special && !['start', 'misc'].includes(e.cat)) ok(KIND_OF[e.id] && REACTIONS[KIND_OF[e.id]], `ニュース ${e.id}「${e.name}」の状況の種類`);
 const allOpts = [...new Set(Object.values(REACTIONS).flat()), ...SPECIAL];
 ok(Object.keys(OPTION_BY_ID).length === allOpts.length, `選択肢の id が重ならない（${allOpts.length}こ）`);
-for (const o of SPECIAL) { const kt = KID.kidFx(o.fx).join(' '); ok(typeof o.when === 'function' && /↑/.test(kt) && /↓/.test(kt) && o.k && !/[一-龯々ァ-ヺ]/.test(o.k) && o.fx.every((f) => /^(self|who|world|rel)\.\w+[+-][sml]$/.test(f)), `3つめ ${o.id}：${kt}`); }
+for (const o of SPECIAL) { const kt = KID.kidFx(o.fx).join(' '); ok(typeof o.when === 'function' && /↑/.test(kt) && /↓/.test(kt) && o.k && !/[一-龯々ァ-ヺ]/.test(o.k) && o.fx.every((f) => /^(self|who|world|rel|poorBg)\.\w+[+-][sml]$/.test(f)), `3つめ ${o.id}：${kt}`); }
 for (const e of EVENTS) ok(NEWS_ICON[e.cat] && NEWS_CAT[e.cat], `ニュースの種類 ${e.id} ${e.cat}`);
 for (const [k, pair] of Object.entries(REACTIONS)) {
   ok(pair.filter((o) => o.pop > 0).length >= 2 && pair.filter((o) => o.pop <= 0).length >= 2, `反応 ${k}：自国優先と、そうでないものが2つ以上ずつ`);

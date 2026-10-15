@@ -333,7 +333,7 @@ export function kidFx(list) {
     const [, scope, stat, sg] = m;
     let key, bad = false, who;
     if (scope === 'rel') { who = stat === 'tgt' ? 'あいて' : 'ほかの くに'; key = 'friend'; }
-    else if (scope === 'world') { const w = KID_WORLD[stat]; if (!w) continue; [key, bad] = w; who = 'せかい'; }
+    else if (scope === 'world') { const w = KID_WORLD[stat]; if (!w) continue; key = w[0]; bad = !!w[1]; who = 'せかい'; }
     else { key = KID_STAT_OF[stat]; if (!key) continue; bad = KID_BAD.has(stat); who = SCOPE_KID[scope] || 'あいて'; }
     const v = (sg === '+') !== bad ? 1 : -1;
     const g = (groups[who] ||= {});

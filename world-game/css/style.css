@@ -408,3 +408,10 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .review .tlrow { grid-template-columns: 6em 1fr auto; font-size: 12.5px; padding: 4px 8px; }
 .review .tlrow.news { grid-template-columns: 1.6em 1fr; }
 .kid .review .tlrow { font-size: 14px; }
+/* 4つめ（▼ 下にふる） */
+.ncard.out-d { transform: translateY(640px) !important; opacity: 0; }
+.nlabel.d { top: auto; bottom: 52px; left: 50%; transform: translateX(-50%); background: #a0603a; max-width: 80%; text-align: center; }
+.ncard.lean-d .nlabel.d { opacity: 1; }
+.news-ctl .nmid { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nopt.dn { border-color: #a0603a; text-align: center; background: #2c1f18; }
+.news-ctl .nopts.three { align-items: center; }

@@ -1,5 +1,5 @@
 // ゲームの進行：世界の生成 → 基本政策 → 毎年（イベント → 各国の手番 → 年末処理）→ 終了
-import { REACTIONS, SPECIAL, OPTION_BY_ID } from '../data/reactions.js';
+import { SPECIAL, OPTION_BY_ID, kindOf, poolOf } from '../data/reactions.js';
 import { secAfterReact, secYearEnd, secBack, addMood, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
 import { MAJORS, BACKS, REGIONS, POLAR_LINKS } from '../data/countries.js';
@@ -374,7 +374,8 @@ function fireEvent(g, ev, H) {
   addSituations(g, ev, who, evName);
   // ニュースへの反応（左右の2択）。自国が動いていて、核・投票など別の決定があるニュースでなければ
   const me = g.majors[g.player];
-  if (me?.panel && !ev.special && REACTIONS[ev.cat]) { entry.react = who === g.player ? 'self' : ev.cat; entry.opts = newsOptions(g, entry); }
+  const kind = kindOf(ev);
+  if (me?.panel && !ev.special && kind) { entry.react = who === g.player ? 'self' : kind; entry.opts = newsOptions(g, entry); }
   for (const n of ev.next || []) { g.boost[n] = (g.boost[n] || 0) + 3; (g.cause ||= {})[n] = { id: ev.id, name: evName, year: yearLabel(g) }; }
   for (const p of ev.ins || []) if (!g.inserts.includes(p)) g.inserts.push(p);
   if (ev.coop && !g.coop.includes(ev.id)) {
@@ -389,15 +390,23 @@ function fireEvent(g, ev, H) {
 function newsOptions(g, e) {
   const me = g.majors[g.player];
   const rng = rngOf(g);
-  const pool = REACTIONS[e.react];
+  const pool = poolOf(e.react);
   const a = pick(rng, pool.filter((o) => o.pop > 0)), b = pick(rng, pool.filter((o) => o.pop <= 0));
   const opts = rng() < 0.5 ? [a.id, b.id] : [b.id, a.id];
-  const sp = SPECIAL.find((x) => { try { return x.when(g, me, e, { allied, rel, isSeat }) && (x.chance == null || rng() < x.chance); } catch (err) { return false; } });
-  if (sp) opts.push(sp.id);
+  // 状況しだいで3つめ（▲）・4つめ（▼）
+  const h = { allied, rel, isSeat, neighbors };
+  for (const x of SPECIAL) {
+    if (opts.length >= 4) break;
+    try { if (x.when(g, me, e, h) && (x.chance == null || rng() < x.chance)) opts.push(x.id); } catch (err) { /* 当てはまらない */ }
+  }
   return opts;
 }
-// カードの選択肢（前の版のセーブは山の最初の2つ）
-export const newsOpts = (e) => e.opts || REACTIONS[e.react].slice(0, 2).map((o) => o.id);
+// カードの選択肢（前の版のセーブで選択肢が見つからないときは、山の最初の2つ）
+export const newsOpts = (e) => {
+  if (e.opts && e.opts.every((id) => OPTION_BY_ID[id])) return e.opts;
+  const pool = poolOf(e.react);
+  return pool ? pool.slice(0, 2).map((o) => o.id) : [];
+};
 
 // プレイヤーがニュースのカードで選んだ（side：0＝左、1＝右、2＝↑前）
 export function reactNews(g, i, side) {

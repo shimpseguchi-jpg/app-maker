@@ -58,7 +58,13 @@ for (; t < 4000; t++) {
     if (!shot.has('news2')) { shot.add('news2'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-11-news-front.png` }); }
     const opts = await page.$$('.news-back [data-side]');
     // ときどきスワイプで選ぶ
-    if (opts.length === 3 && Math.random() < 0.5) {
+    if (opts.length === 4 && Math.random() < 0.5) {
+      // 4つめ（▼）：下にスワイプ
+      if (!shot.has('news4')) { shot.add('news4'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-13-news-four.png` }); }
+      const b = await page.$('.ncard'); const r = await b.boundingBox();
+      await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await page.mouse.down();
+      await page.mouse.move(r.x + r.width / 2 - 10, r.y + r.height / 2 + 200, { steps: 6 }); await page.mouse.up();
+    } else if (opts.length >= 3 && Math.random() < 0.5) {
       // 3つめ（↑）：上にスワイプ
       if (!shot.has('news3')) { shot.add('news3'); await page.waitForTimeout(600); await page.screenshot({ path: `${out}/wg-12-news-three.png` }); }
       const b = await page.$('.ncard'); const r = await b.boundingBox();
