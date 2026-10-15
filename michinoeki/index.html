@@ -17,7 +17,10 @@
 <body>
 <header class="top">
   <h1>道の駅チェック <small>栃木・千葉・茨城・群馬</small></h1>
-  <div class="total" id="total"></div>
+  <div class="top-right">
+    <span id="sync-state" class="sync-state" hidden></span>
+    <div class="total" id="total"></div>
+  </div>
 </header>
 <main class="layout">
   <section class="map-wrap">
@@ -49,6 +52,7 @@
       <div class="io">
         <button id="export">記録を保存（書き出し）</button>
         <label class="btn">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label>
+        <button id="sync-open" type="button">2人で共有</button>
         <button id="reset" class="danger">全部リセット</button>
       </div>
     </div>
@@ -79,6 +83,34 @@
     <p class="credit">駅データ：Wikipedia「道の駅一覧 関東地方」（CC BY-SA 4.0）をもとに作成。所要時間は <a href="https://project-osrm.org/" target="_blank" rel="noopener">OSRM</a>（OpenStreetMap の道路データ）で計算した目安です。最新の状況は各駅・<a href="https://www.michi-no-eki.jp/" target="_blank" rel="noopener">道の駅公式サイト</a>で確認してください。</p>
   </section>
 </main>
+<dialog id="sync-dialog" class="sync-dialog">
+  <form id="sync-form">
+    <h2>2人で共有</h2>
+    <p class="muted">同じ「同期URL」を入れて合言葉クイズに正解した端末どうしで、「行った」「行く予定」の記録が同じになります。</p>
+    <label for="sync-url">同期URL（Google Apps Script の …/exec）</label>
+    <input id="sync-url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+    <fieldset id="sync-quiz" class="quiz">
+      <legend>合言葉：<b>THE虎牙道</b></legend>
+      <label><input type="radio" name="sync-pass" value="ノクチル"> ノクチル</label>
+      <label><input type="radio" name="sync-pass" value="シグナルズ"> シグナルズ</label>
+      <label><input type="radio" name="sync-pass" value="プロジェクトフェアリー"> プロジェクトフェアリー</label>
+    </fieldset>
+    <p id="sync-msg" class="sync-msg" role="status"></p>
+    <div class="sync-buttons">
+      <button type="submit" class="primary">つなぐ</button>
+      <button type="button" id="sync-off" class="danger" hidden>共有をやめる</button>
+      <button type="button" id="sync-close">閉じる</button>
+    </div>
+    <div id="share-box" class="share-box" hidden>
+      <label for="share-link">相手に送るリンク（開いて合言葉に答えると共有に参加できます）</label>
+      <div class="share-row">
+        <input id="share-link" type="text" readonly>
+        <button type="button" id="share-copy">コピー</button>
+      </div>
+      <p class="muted small">同期URLが入ったリンクです。2人以外には送らないでください。</p>
+    </div>
+  </form>
+</dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="js/stations.js"></script>
 <script src="js/app.js"></script>
