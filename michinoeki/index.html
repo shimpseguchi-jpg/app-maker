@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="道の駅チェック">
+<meta name="theme-color" content="#1f6f43">
+<meta name="description" content="栃木・千葉・茨城・群馬の道の駅めぐりチェックリスト">
+<title>道の駅チェック</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>道の駅チェック <small>栃木・千葉・茨城・群馬</small></h1>
+  <div class="total" id="total"></div>
+</header>
+<main class="layout">
+  <section class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <span><i class="dot todo"></i>未訪問</span>
+      <span><i class="dot done"></i>訪問済み</span>
+      <span><i class="line hw"></i>高速道路</span>
+      <span><i class="line nr"></i>国道</span>
+    </div>
+  </section>
+  <section class="list-wrap">
+    <div class="tools">
+      <input id="q" type="search" placeholder="駅名・市町村・路線で検索">
+      <select id="filter">
+        <option value="all">すべて</option>
+        <option value="todo">未訪問だけ</option>
+        <option value="done">訪問済みだけ</option>
+      </select>
+    </div>
+    <div id="list"></div>
+    <div class="io">
+      <button id="export">記録を保存（書き出し）</button>
+      <label class="btn">記録を読み込む<input id="import" type="file" accept="application/json" hidden></label>
+      <button id="reset" class="danger">全部リセット</button>
+    </div>
+    <p class="credit">駅データ：Wikipedia「道の駅一覧 関東地方」（CC BY-SA 4.0）をもとに作成。最新の状況は各駅・<a href="https://www.michi-no-eki.jp/" target="_blank" rel="noopener">道の駅公式サイト</a>で確認してください。</p>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="js/stations.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
