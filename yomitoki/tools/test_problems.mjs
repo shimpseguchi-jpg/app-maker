@@ -35,6 +35,14 @@ if (!checkExpr(p, [{ t: p.expr[1].t, sign: 1 }, { t: p.expr[0].t, sign: 1 }]).ok
 const cw = (s, v) => { const w = countWord(s, v); return w.num + w.suf; };
 const want = [['mouse', 1, '1ぴき'], ['mouse', 3, '3びき'], ['mouse', 10, '10ぴき'], ['mouse', 5, '5ひき'], ['pencil', 3, '3ぼん'], ['pencil', 6, '6ぽん'], ['kid', 1, 'ひとり'], ['kid', 2, 'ふたり'], ['kid', 4, '4にん']];
 for (const [s, v, w] of want) if (cw(s, v) !== w) fail(`かぞえかた ${s} ${v} → ${cw(s, v)}`);
+// どれだけ ちがう ぶんが でるか（かずを ふせて かぞえる）
+const plain = (q) => q.sentences.map((s) => s.text.replace(/#\d+/g, '□')).join(' ');
+for (const kind of KIND_IDS) {
+  const set = new Set();
+  for (let seed = 1; seed <= 2000; seed++) set.add(plain(gen(kind, seed)));
+  console.log(`  ${kind}: ぶんの かたち ${set.size} とおり`);
+  if (set.size < 20) fail(`${kind} の バリエーションが すくない`);
+}
 // みほん
 for (const kind of KIND_IDS) { const q = gen(kind, 42); console.log(`[${KINDS[kind].level}] ${kind}:`, q.sentences.map((s) => s.text.replace(/#(\d+)/g, (_, i) => { const w = countWord(q.tokens[i].subj, q.tokens[i].v); return w.num + w.suf; })).join(' '), '→', exprText(q), '=', q.answer + q.unit); }
 console.log(bad ? `NG ${bad} / ${n}` : `OK ${n} もん`);
