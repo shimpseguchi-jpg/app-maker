@@ -3,6 +3,7 @@
 // 毎回「自国優先（pop が＋）」から1つと「よその国を助ける・がまんする（pop が0以下）」から1つを引き、左右はランダムに置く。
 // 状況しだいで3つめ（▲ 上にふる）・4つめ（▼ 下にふる）が出る：SPECIAL の when が当てはまるとき
 // id：選択肢の名前（セーブに残す）、n：おとな向け、k：1ねんせい向け（ひらがな）、fx：効果（self：自国、who：ニュースの対象国、rel.tgt：対象国との関係）
+// need(stats)：その選択肢を選べるのに要る国の状態（例：食べものが足りない国は「食糧を送る」を選べない）。足りなければ山の別の選択肢が出る
 // pop：国民の気持ち（短絡的で自国優先）。＋は自国を優先する選択、−はよその国を助ける・がまんする選択
 // どの選択肢にも得と損がある（1ねんせいの絵の表示でも ↑ と ↓ が両方出る）
 // self：ニュースの対象が自国のときに使う山
@@ -10,13 +11,13 @@ export const REACTIONS = {
   // 経済の混乱（恐慌・通貨危機・破綻）
   crisis: [
     { id: 'eco_protect', pop: 3, n: '自国の市場を守る', k: 'じぶんの くにの おみせを まもる', fx: ['self.capital+s', 'self.rep-s', 'world.trust-s'] },
-    { id: 'eco_support', pop: -3, n: '各国と協調して支える', k: 'みんなで ささえる', fx: ['self.fiscal-s', 'self.rep+s', 'world.trust+s'] },
-    { id: 'eco_buy', pop: 3, n: '安くなった外国の資産を買う', k: 'やすく なった よその くにの ものを かう', fx: ['self.capital+s', 'self.gnp+s', 'self.rep-m', 'world.tension+s'] },
-    { id: 'eco_loan', pop: -2, n: '困っている国に緊急融資する', k: 'こまって いる くにに おかねを かす', fx: ['self.capital-s', 'who.gnp+s', 'rel.tgt+s', 'self.rep+s'] },
+    { id: 'eco_support', need: (s) => s.fiscal >= -10, pop: -3, n: '各国と協調して支える', k: 'みんなで ささえる', fx: ['self.fiscal-s', 'self.rep+s', 'world.trust+s'] },
+    { id: 'eco_buy', need: (s) => s.capital >= 35, pop: 3, n: '安くなった外国の資産を買う', k: 'やすく なった よその くにの ものを かう', fx: ['self.capital+s', 'self.gnp+s', 'self.rep-m', 'world.tension+s'] },
+    { id: 'eco_loan', need: (s) => s.capital >= 45, pop: -2, n: '困っている国に緊急融資する', k: 'こまって いる くにに おかねを かす', fx: ['self.capital-s', 'who.gnp+s', 'rel.tgt+s', 'self.rep+s'] },
   ],
   // ブーム・過熱
   boom: [
-    { id: 'bm_ride', pop: 3, n: '波に乗って投資する', k: 'ぶーむに のって おかねを だす', fx: ['self.capital+s', 'self.gnp+s', 'self.stability-s'] },
+    { id: 'bm_ride', need: (s) => s.capital >= 40, pop: 3, n: '波に乗って投資する', k: 'ぶーむに のって おかねを だす', fx: ['self.capital+s', 'self.gnp+s', 'self.stability-s'] },
     { id: 'bm_warn', pop: -1, n: '行き過ぎに警告する', k: '「やりすぎだよ」と ちゅうい する', fx: ['self.rep+s', 'self.gnp-s'] },
     { id: 'bm_tax', pop: 2, n: 'もうけに税をかけて国の財布に入れる', k: 'もうけに ぜいきんを かける', fx: ['self.fiscal+s', 'self.stability-s'] },
     { id: 'bm_share', pop: -3, n: 'もうけを貧しい国の支援に回す', k: 'もうけを まずしい くにに わける', fx: ['self.fiscal-s', 'self.rep+s', 'poorBg.econ+s'] },
@@ -24,7 +25,7 @@ export const REACTIONS = {
   // 品不足・流れが止まる（禁輸・部品不足・運河）
   supply: [
     { id: 'su_stock', pop: 3, n: '自国の分を先に確保する', k: 'じぶんの くにの ぶんを さきに あつめる', fx: ['self.industry+s', 'self.rep-s', 'world.trust-s'] },
-    { id: 'su_share', pop: -3, n: '足りない国に回す', k: 'たりない くにに わける', fx: ['self.industry-s', 'self.rep+s', 'world.trust+s'] },
+    { id: 'su_share', need: (s) => s.industry >= 50, pop: -3, n: '足りない国に回す', k: 'たりない くにに わける', fx: ['self.industry-s', 'self.rep+s', 'world.trust+s'] },
     { id: 'su_make', pop: 2, n: '自国で作れるように研究を急ぐ', k: 'じぶんの くにで つくれるように けんきゅう する', fx: ['self.fiscal-m', 'self.tech+s'] },
     { id: 'su_route', pop: -2, n: '別の運び方を各国と探す', k: 'ほかの はこびかたを みんなで さがす', fx: ['self.fiscal-s', 'self.rep+s', 'world.tension-s'] },
   ],
@@ -46,7 +47,7 @@ export const REACTIONS = {
   war: [
     { id: 'mil_mediate', pop: -2, n: '仲裁に入る', k: 'なかなおりを てつだう', fx: ['self.fiscal-s', 'self.rep+s', 'world.tension-s'] },
     { id: 'mil_arm', pop: 3, n: '軍備を固める', k: 'ぐんたいを ふやす', fx: ['self.soldiers+s', 'self.security+s', 'world.tension+s'] },
-    { id: 'mil_sell', pop: 3, n: '武器を売り込む', k: 'ぶきを うる', fx: ['self.capital+s', 'self.rep-s', 'world.conflicts+s'] },
+    { id: 'mil_sell', need: (s) => s.industry >= 55 || s.soldiers >= 30, pop: 3, n: '武器を売り込む', k: 'ぶきを うる', fx: ['self.capital+s', 'self.rep-s', 'world.conflicts+s'] },
     { id: 'mil_refuge', pop: -3, n: '戦火を逃れた人を受け入れる', k: 'にげて きた ひとを うけいれる', fx: ['self.stability-s', 'self.rep+s', 'world.refugees-s'] },
   ],
   // 軍拡・にらみあい（要塞・軍事化・新兵器）
@@ -93,17 +94,17 @@ export const REACTIONS = {
   ],
   // 食べもの
   food: [
-    { id: 'fw_send', pop: -3, n: '食糧を送る', k: 'たべものを おくる', fx: ['self.food-s', 'self.rep+s', 'poorBg.food+s'] },
+    { id: 'fw_send', need: (s) => s.food >= 60, pop: -3, n: '食糧を送る', k: 'たべものを おくる', fx: ['self.food-s', 'self.rep+s', 'poorBg.food+s'] },
     { id: 'fd_stock', pop: 3, n: '自国の備蓄を増やす', k: 'じぶんの くにに ためて おく', fx: ['self.food+s', 'self.fiscal-s', 'self.rep-s'] },
     { id: 'fw_sell', pop: 3, n: '値上がりした食糧を高く売る', k: 'ねあがり した たべものを たかく うる', fx: ['self.capital+s', 'self.food-s', 'self.rep-s', 'world.foodPrice+s'] },
-    { id: 'fd_seed', pop: -2, n: '育て方と種を分け合う', k: 'そだてかたと たねを わけあう', fx: ['self.fiscal-s', 'self.rep+s', 'poorBg.food+s'] },
+    { id: 'fd_seed', need: (s) => s.food >= 50, pop: -2, n: '育て方と種を分け合う', k: 'そだてかたと たねを わけあう', fx: ['self.fiscal-s', 'self.rep+s', 'poorBg.food+s'] },
   ],
   // 水
   water: [
-    { id: 'wt_share', pop: -3, n: '水を分け合う約束を呼びかける', k: 'みずを わけあう やくそくを よびかける', fx: ['self.water-s', 'self.rep+s', 'world.tension-s'] },
+    { id: 'wt_share', need: (s) => s.water >= 40, pop: -3, n: '水を分け合う約束を呼びかける', k: 'みずを わけあう やくそくを よびかける', fx: ['self.water-s', 'self.rep+s', 'world.tension-s'] },
     { id: 'wt_secure', pop: 3, n: '自国の水源を押さえる', k: 'じぶんの くにの みずを まもる', fx: ['self.water+s', 'self.rep-s', 'world.tension+s'] },
-    { id: 'wt_sell', pop: 2, n: '水を高く売る', k: 'みずを たかく うる', fx: ['self.capital+s', 'self.water-s', 'self.rep-s'] },
-    { id: 'wt_tech', pop: -2, n: '節水と浄水の技術を教える', k: 'みずを きれいに する ぎじゅつを おしえる', fx: ['self.fiscal-s', 'self.rep+s', 'poorBg.water+s'] },
+    { id: 'wt_sell', need: (s) => s.water >= 50, pop: 2, n: '水を高く売る', k: 'みずを たかく うる', fx: ['self.capital+s', 'self.water-s', 'self.rep-s'] },
+    { id: 'wt_tech', need: (s) => s.tech >= 40, pop: -2, n: '節水と浄水の技術を教える', k: 'みずを きれいに する ぎじゅつを おしえる', fx: ['self.fiscal-s', 'self.rep+s', 'poorBg.water+s'] },
   ],
   // よい発見・成功（新しい技術・病気の根絶・環境の回復）
   good: [
@@ -135,21 +136,21 @@ export const REACTIONS = {
   ],
   // 感染症・薬・食の安全
   outbreak: [
-    { id: 'health_team', pop: -3, n: '医療チームを送る', k: 'おいしゃさんを おくる', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s', 'rel.tgt+s'] },
+    { id: 'health_team', need: (s) => s.tech >= 45, pop: -3, n: '医療チームを送る', k: 'おいしゃさんを おくる', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s', 'rel.tgt+s'] },
     { id: 'health_close', pop: 2, n: '国境を閉じる', k: 'くにの もんを しめる', fx: ['self.capital-s', 'self.stability+s'] },
-    { id: 'health_open', pop: -2, n: '薬の作り方を公開する', k: 'くすりの つくりかたを みんなに おしえる', fx: ['self.tech-s', 'self.rep+m', 'world.trust+s'] },
+    { id: 'health_open', need: (s) => s.tech >= 55, pop: -2, n: '薬の作り方を公開する', k: 'くすりの つくりかたを みんなに おしえる', fx: ['self.tech-s', 'self.rep+m', 'world.trust+s'] },
     { id: 'health_hoard', pop: 3, n: '薬を自国の分だけ確保する', k: 'くすりを じぶんの くにの ぶんだけ あつめる', fx: ['self.fiscal-s', 'self.stability+s', 'self.rep-m'] },
   ],
   // 自然災害・復興
   disaster: [
-    { id: 'dis_rescue', pop: -3, n: '救援を送る', k: 'たすけに いく', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s', 'rel.tgt+s'] },
+    { id: 'dis_rescue', need: (s) => s.fiscal >= -12, pop: -3, n: '救援を送る', k: 'たすけに いく', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s', 'rel.tgt+s'] },
     { id: 'dis_prepare', pop: 2, n: '自国の備えを固める', k: 'じぶんの くにの そなえを する', fx: ['self.security+s', 'self.fiscal-s', 'self.stability+s'] },
     { id: 'dis_donate', pop: -1, n: '国民に募金を呼びかける', k: 'みんなに ぼきんを よびかける', fx: ['self.capital-s', 'self.rep+s', 'who.stability+s'] },
-    { id: 'dis_contract', pop: 3, n: '復興の工事を自国の企業で請け負う', k: 'たてなおしの しごとを じぶんの くにの かいしゃが もらう', fx: ['self.capital+s', 'self.gnp+s', 'self.rep-s', 'rel.tgt-s'] },
+    { id: 'dis_contract', need: (s) => s.industry >= 50, pop: 3, n: '復興の工事を自国の企業で請け負う', k: 'たてなおしの しごとを じぶんの くにの かいしゃが もらう', fx: ['self.capital+s', 'self.gnp+s', 'self.rep-s', 'rel.tgt-s'] },
   ],
   // 事故（原発・工場・システム）
   accident: [
-    { id: 'ac_help', pop: -2, n: '専門家を送る', k: 'せんもんかを おくる', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s'] },
+    { id: 'ac_help', need: (s) => s.tech >= 50, pop: -2, n: '専門家を送る', k: 'せんもんかを おくる', fx: ['self.fiscal-s', 'self.rep+s', 'who.stability+s'] },
     { id: 'ac_ban', pop: 3, n: 'その国からの輸入を止める', k: 'その くにの ものを かわない', fx: ['self.stability+s', 'rel.tgt-s', 'self.rep-s'] },
     { id: 'ac_check', pop: 2, n: '自国の施設を総点検する', k: 'じぶんの くにを ぜんぶ てんけん する', fx: ['self.fiscal-s', 'self.security+s'] },
     { id: 'ac_rule', pop: -1, n: '安全の国際ルールを作る', k: 'あんぜんの きまりを みんなで つくる', fx: ['self.industry-s', 'self.rep+s', 'world.trust+s'] },
@@ -158,7 +159,7 @@ export const REACTIONS = {
   cyber: [
     { id: 'cy_guard', pop: 2, n: '自国のネットの守りを固める', k: 'じぶんの くにの ねっとを まもる', fx: ['self.fiscal-s', 'self.security+s'] },
     { id: 'cy_rule', pop: -2, n: '各国でネットのルールを作る', k: 'みんなで ねっとの きまりを つくる', fx: ['self.security-s', 'self.rep+s', 'world.trust+s'] },
-    { id: 'cy_counter', pop: 3, n: 'やり返す力を持つ', k: 'やりかえす ちからを もつ', fx: ['self.tech+s', 'self.rep-s', 'world.tension+s'] },
+    { id: 'cy_counter', need: (s) => s.tech >= 60, pop: 3, n: 'やり返す力を持つ', k: 'やりかえす ちからを もつ', fx: ['self.tech+s', 'self.rep-s', 'world.tension+s'] },
     { id: 'cy_open', pop: -1, n: '情報を公開して説明する', k: 'ほんとうの ことを みんなに はなす', fx: ['self.rep+s', 'self.stability-s'] },
   ],
   // 新しい技術（AI・遺伝子・自動化・特許）
@@ -170,9 +171,9 @@ export const REACTIONS = {
   ],
   // 宇宙
   space: [
-    { id: 'spc_race', pop: 3, n: '負けじと宇宙開発を急ぐ', k: 'まけずに うちゅうを めざす', fx: ['self.fiscal-m', 'self.tech+s', 'world.tension+s'] },
+    { id: 'spc_race', need: (s) => s.tech >= 60, pop: 3, n: '負けじと宇宙開発を急ぐ', k: 'まけずに うちゅうを めざす', fx: ['self.fiscal-m', 'self.tech+s', 'world.tension+s'] },
     { id: 'spc_joint', pop: -2, n: '共同の計画を提案する', k: 'みんなで いっしょに やろうと いう', fx: ['self.fiscal-s', 'self.rep+s', 'world.tension-s'] },
-    { id: 'spc_guard', pop: 2, n: '宇宙の守りを固める', k: 'うちゅうの まもりを かためる', fx: ['self.soldiers+s', 'self.rep-s', 'world.tension+s'] },
+    { id: 'spc_guard', need: (s) => s.tech >= 50, pop: 2, n: '宇宙の守りを固める', k: 'うちゅうの まもりを かためる', fx: ['self.soldiers+s', 'self.rep-s', 'world.tension+s'] },
     { id: 'spc_rule', pop: -1, n: '宇宙のルール作りを呼びかける', k: 'うちゅうの きまりを よびかける', fx: ['self.capital-s', 'self.rep+s', 'world.trust+s'] },
   ],
   // 人口・都市・人の流れ
@@ -193,7 +194,7 @@ export const REACTIONS = {
   un: [
     { id: 'intl_support', pop: -2, n: '支持する', k: 'さんせいする', fx: ['self.fiscal-s', 'self.rep+s', 'world.trust+s'] },
     { id: 'intl_distance', pop: 2, n: '距離を置く', k: 'はんたいする', fx: ['self.fiscal+s', 'self.rep-s', 'world.trust-s'] },
-    { id: 'intl_lead', pop: -3, n: '議論のまとめ役を買って出る', k: 'みんなの まとめやくに なる', fx: ['self.fiscal-m', 'self.rep+m', 'world.trust+s'] },
+    { id: 'intl_lead', need: (s) => s.rep >= 45, pop: -3, n: '議論のまとめ役を買って出る', k: 'みんなの まとめやくに なる', fx: ['self.fiscal-m', 'self.rep+m', 'world.trust+s'] },
     { id: 'intl_terms', pop: 3, n: '自国に有利な条件をつける', k: 'じぶんの くにに いい じょうけんを つける', fx: ['self.capital+s', 'world.trust-s', 'rel.all-s'] },
   ],
   // 国の集まりができる・まとまる

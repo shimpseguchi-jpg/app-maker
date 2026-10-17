@@ -57,9 +57,10 @@ for (const e of EVENTS) ok(KID.KID_EVENT[e.id], `1ねんせいの できごと $
 for (const k of Object.keys(GM)) ok(KID.KID_GM[k], `1ねんせいの せりふ ${k}`);
 for (const k of Object.keys(SPARKS)) ok(KID.KID_SPARK[k], `1ねんせいの ひだね ${k}`);
 
-const { kidify, KIDIFY_DICT, GRADE1_KANJI } = await import('../js/ui/kidify.js');
+const { kidify, KIDIFY_DICT, GRADE1_KANJI: G1K, EXTRA_KANJI } = await import('../js/ui/kidify.js');
+const GRADE1_KANJI = G1K + EXTRA_KANJI; // 国名の「国」だけは使う
 for (const [k, v] of Object.entries(KIDIFY_DICT)) for (const ch of v.match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `1年生で ならわない かん字 ${ch}（${k}）`);
-const expect = { 'すてらの くに': 'ステラの くに', 'みったーまいやー': 'ミッターマイヤー', 'おおきな ひとが みずを のむ': '大きな 人が 水を のむ', 'ひとつの くに': '一つの くに', '2031ねん': '2031年', 'みずうみが ひあがった': 'みずうみが ひあがった', 'ほしを そらす': 'ほしを そらす', 'まちがえたり': 'まちがえたり', 'でめが 3': '出目が 3', 'にゅーすの かーど': 'ニュースの カード' };
+const expect = { 'すてらの くに': 'ステラ国', 'ふそうの くにが': 'フソウ国が', 'にじの くに': 'にじの くに', 'みったーまいやー': 'ミッターマイヤー', 'おおきな ひとが みずを のむ': '大きな 人が 水を のむ', 'ひとつの くに': '一つの くに', '2031ねん': '2031年', 'みずうみが ひあがった': 'みずうみが ひあがった', 'ほしを そらす': 'ほしを そらす', 'まちがえたり': 'まちがえたり', 'でめが 3': '出目が 3', 'にゅーすの かーど': 'ニュースの カード' };
 for (const [a, b] of Object.entries(expect)) ok(kidify(a) === b, `kidify「${a}」→「${kidify(a)}」（よそう「${b}」）`);
 for (const k of ['KID_COUNTRY', 'KID_POLICY', 'KID_EVENT', 'KID_GM', 'KID_SPARK']) { const w = (v) => { if (typeof v === 'string') { for (const ch of kidify(v).match(/[一-龯々]/g) || []) ok(GRADE1_KANJI.includes(ch), `${k}: ${kidify(v)}`); } else if (v && typeof v === 'object') Object.values(v).forEach(w); }; w(KID[k]); }
 
@@ -80,6 +81,8 @@ for (const [k, pair] of Object.entries(REACTIONS)) {
 const SEC = await import('../js/data/secretary.js');
 for (const tbl of ['SEC_REACT', 'SEC_DANGER', 'SEC_MOOD']) for (const [k, v] of Object.entries(SEC[tbl])) ok(v.length === 2 && v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 ${tbl}.${k}`);
 for (const [k, list] of Object.entries(SEC.SEC_POP)) for (const v of list) ok(v[0] && v[1] && !/[一-龯々ァ-ヺ]/.test(v[1]), `補佐官 SEC_POP.${k}`);
+for (const [tone, t] of Object.entries(SEC.SEC_TONE)) for (const [kind, tbl] of Object.entries(t)) for (const [k, v] of Object.entries(tbl)) for (const pair of Array.isArray(v[0]) ? v : [v]) ok(pair.length === 2 && pair[0] && pair[1] && !/[一-龯々ァ-ヺ]/.test(pair[1]), `補佐官（${tone}）${kind}.${k}`);
+for (const [tone, t] of Object.entries(SEC.SEC_TONE)) for (const k of Object.keys(t.react || {})) ok(SEC.SEC_REACT[k], `補佐官（${tone}）react.${k} は ふつうの せりふにも ある`);
 for (const k of SEC.SEC_DANGER_ORDER) ok(SEC.SEC_DANGER[k], `補佐官 注意 ${k}`);
 for (const o of allOpts) ok(Number.isInteger(o.pop), `反応「${o.n}」に国民の気持ち（pop）`);
 // 世界議会の議題

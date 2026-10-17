@@ -111,6 +111,29 @@ function modValue(g, c, key, tgt) {
     default: return clamp(((s[key] ?? 50) - 50) / 5, -10, 10);
   }
 }
+// 国の「教育」の高さ（0〜100）：識字率と技術力から（1ねんせいモードの「べんきょう」と同じ式）
+export const eduLevel = (c) => clamp(Math.round((c.stats.literacy - 50) * 1.2 + c.stats.tech * 0.4), 0, 100);
+export const EDU_LOW = 60, EDU_HIGH = 88;
+// 国の状態で成功率が上下する：政情・国民の気持ち・教育。[おとなの名前, 値, 1ねんせいの名前]
+function statusMods(c, pol) {
+  const out = [], s = c.stats, tags = pol.tags || [];
+  // 治安・内政の政策は、国を立て直すための手なので政情では下げない（不安定な国がますます立て直せなくなるのを防ぐ）
+  if (pol.cat !== 'dom') {
+    if (s.stability < 25) out.push(['政情が不安定', -6, 'くにが ぐらぐら']);
+    else if (s.stability < 40) out.push(['政情が不安定', -3, 'くにが ぐらぐら']);
+    else if (s.stability >= 75) out.push(['政情が安定', 3, 'くにが おちついて いる']);
+  }
+  const m = c.mood ?? 50;
+  if (tags.includes('coop') && m < 35) out.push(['国民の反発', -8, 'みんなが はんたい']);
+  else if (tags.includes('coop') && m >= 70) out.push(['国民の後押し', 3, 'みんなが おうえん']);
+  else if (tags.includes('selfish') && m < 35) out.push(['国民の後押し', 5, 'みんなが おうえん']);
+  // 教育：教育・技術の政策は教育の高い国ほど通りやすく、教育の低い国では教育・技術と国際機関の政策（長い目で見る手）が通りにくい
+  const e = eduLevel(c);
+  if (pol.cat === 'edu' && e >= EDU_HIGH) out.push(['教育が高い', 3, 'べんきょうが すすんで いる']);
+  else if ((pol.cat === 'edu' || pol.cat === 'intl') && e < EDU_LOW) out.push(['教育が低い', -4, 'べんきょうが たりない']);
+  return out;
+}
+
 export function probability(g, c, pol, tgt) {
   const parts = [['基本', pol.p]];
   let p = pol.p;
@@ -123,6 +146,7 @@ export function probability(g, c, pol, tgt) {
     if (bonus && bonus.includes(pol.id)) { parts.push(['基本政策', 10]); p += 10; break; }
   }
   if (pol.pAdj) { const v = Math.round(pol.pAdj(g, c, tgt)); if (v) { parts.push(['状況', v]); p += v; } }
+  for (const x of statusMods(c, pol)) { parts.push(x); p += x[1]; }
   // 情勢：ニュースのあと、しばらく成功率が上下する（data/situations.js）
   for (const s of activeSituations(g)) {
     if (s.scope === 'who' && s.who !== c.id) continue;

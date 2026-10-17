@@ -15,7 +15,7 @@ import { OPTION_BY_ID, NEWS_ICON, NEWS_CAT, poolOf } from './data/reactions.js';
 import { EVENT_BY_ID } from './data/events.js';
 import { SEC_NAME, moodFace, MOOD_WORD } from './data/secretary.js';
 import { AGENDAS } from './data/agendas.js';
-import { getMood } from './engine/secretary.js';
+import { getMood, toneOf } from './engine/secretary.js';
 import { voteChance } from './engine/ai.js';
 import {
   KID_EVENT, KID_COUNTRY, KID_STATS, kidStats, KID_DANGER, kidFx, KID_MOD, KID_PERSONA, KID_CATS, KID_STAGES, KID_AGENDAS, KID_ENDINGS, KID_TIERS,
@@ -90,16 +90,20 @@ const agendaName = (a) => (kid() ? AGENDAS[a].kid : AGENDAS[a].name);
 const secName = () => SEC_NAME[kid() ? 1 : 0];
 const secBubble = (text) => `<div class="gm sec"><div class="face">👩‍💼</div><div class="bubble"><b class="name">${esc(secName())}</b>${esc(text)}</div></div>`;
 const moodWord = (m) => MOOD_WORD.find(([v]) => m >= v)[1][kid() ? 1 : 0];
+// 国民の気質（教育で変わる）
+const TONE_NAME = { emo: ['感情的・目先のこと', 'すぐ かっと なる'], mid: ['ふつう', 'ふつう'], wise: ['理性的・長い目', 'よく かんがえる'] };
+const toneName = (c) => TONE_NAME[toneOf(c)][kid() ? 1 : 0];
 function moodHelp() {
   const c = g.majors[g.player];
   modal(`<h2>${moodFace(getMood(c))} ${K('国民の気持ち', 'みんなの きもち')}</h2>
     ${secBubble(K('国民はわかりやすいんです。自分の国を優先すれば喜び、よその国を助ければ、たとえ正しくても文句を言います。気持ちが沈むと政情が不安定になり、明るいと落ち着きます。暮らし（政情・治安・食べもの・水・貧富の差）がよければ、少しずつ機嫌も直ります。', 'くにの みんなは とても わかりやすいの。じぶんの くにを たいせつに すると よろこんで、よその くにを たすけると、いい ことでも ぷんぷん するの。きもちが くらいと くにが ぐらぐら して、あかるいと おちつくよ。くらしが よく なると、すこしずつ きげんも なおるよ。'))}
+    ${secBubble(K(`ただし、国民の気質は教育で変わります（いまは「${toneName(c)}」）。教育が低い国の国民は感情的で目先のことで動き、喜ぶのも怒るのも大きくなります。教育が高い国の国民は理性的で長い目で考え、選択への反応は小さく、暮らしの実際で判断します。教育・技術の政策で教育を上げると、国民は落ち着いていきます。`, `でもね、みんなの ようすは べんきょうで かわるの（いまは「${toneName(c)}」）。べんきょうが たりない くにの ひとは、すぐ かっと なって、よろこぶのも おこるのも おおきいの。べんきょうが すすんだ くにの ひとは、よく かんがえて、ながい めで みて くれるよ。`))}
     <div class="row"><button class="btn primary" data-close>${K('とじる', 'とじる')}</button></div>`);
 }
 function moodRow(c) {
   const m = getMood(c);
   const last = g.lastSec?.text;
-  return `<div class="moodrow" data-mood><span class="mface">${moodFace(m)}</span><span>${K('国民の気持ち', 'みんなの きもち')}</span><b>${esc(moodWord(m))}</b>${K(`<small class="muted">${m}</small>`, '')}</div>
+  return `<div class="moodrow" data-mood><span class="mface">${moodFace(m)}</span><span>${K('国民の気持ち', 'みんなの きもち')}</span><b>${esc(moodWord(m))}</b>${K(`<small class="muted">${m}</small>`, '')}<span class="tone ${toneOf(c)}">${esc(toneName(c))}</span></div>
     ${last ? `<div class="secnote">👩‍💼 ${esc(last)}</div>` : ''}`;
 }
 
@@ -415,10 +419,18 @@ function resHtml(res) {
 // ニュースのつながり：きっかけになったニュースと、このあと起きやすくなるニュース
 function linkHtml(f) {
   const out = [];
+  if (f.why) out.push(`<div class="evfrom">📊 ${K('あなたの国の状態で起きやすくなっていた', 'きみの くにの ようすで おきやすく なって いた')}：${esc(f.why)}</div>`);
   if (f.from) out.push(`<div class="evfrom">🔗 ${K('きっかけ', 'きっかけ')}：${f.from.year}${K('年', 'ねん')}の「${esc(f.from.name)}」</div>`);
   const nx = (f.next || []).map(evName).filter(Boolean);
   if (nx.length) out.push(`<div class="evnext">➜ ${K('このあと起きやすくなる', 'このあと おきやすく なる')}：${nx.map((n) => `「${esc(n)}」`).join('')}</div>`);
   return out.join('');
+}
+// 国の崩壊の波紋（大きな国ほど世界中に）
+function shockText(f) {
+  const nm = nameOf(f.id);
+  const t = f.failed ? K(`${nm}が国として立ち行かなくなった`, `${nm}が くにとして なりたたなく なった`) : K(`${nm}の崩壊の波紋`, `${nm}が たおれた えいきょう`);
+  const lv = [null, K('おもに となりの国に影響', 'となりの くにに えいきょう'), K('地域に大きな影響', 'まわりの くにぐにに おおきな えいきょう'), K('世界中に衝撃', 'せかいじゅうが ゆれた')][f.lv];
+  return [t, lv];
 }
 function feedHtml(f) {
   const pri = GM_PRI[settings.gm];
@@ -428,6 +440,7 @@ function feedHtml(f) {
     case 'act': return `<div class="act"><span class="who" style="color:${seatColor(g, f.id)}">${esc(nameOf(f.id))}</span><span class="pol">${esc(polName(f.pol))}${f.tgt ? `<span class="muted">→${esc(nameOf(f.tgt))}</span>` : ''}</span><span class="roll">${K(`${f.p}% / 出目${f.roll}`, `${f.p}いか／でめ ${f.roll}`)}</span><span class="tier ${f.tier}">${tierName(f.tier)}</span></div>`;
     case 'ai': return pri >= 3 ? `<div class="ailine">${esc(nameOf(f.id))}「${esc(f.text)}」</div>` : '';
     case 'sys': return `<div class="sys ${f.cls || ''}">${esc(f.text)}</div>`;
+    case 'shock': { const [t, lv] = shockText(f); return `<div class="ev shock"><b>💥 ${esc(t)}<span class="lv lv${f.lv}">${esc(lv)}</span></b>${resHtml(f.res)}</div>`; }
     case 'sec': return `<div class="secline">👩‍💼 <b>${esc(secName())}</b>${esc(f.text)}</div>`;
     case 'spark': return `<div class="ev spark"><b>${SPARKS[f.type].icon} ${K('火種', 'ひだね')}：${esc(nameOf(f.where))}${K('で', 'で ')}${esc(sparkName(f.type))}</b>${esc(kid() ? KID_SPARK[f.type][1] : SPARKS[f.type].hint)}</div>`;
     case 'vote': return `<div class="vote"><b>${K('世界議会の投票', 'せかいの ぎかいの きめごと')}：「${esc(f.name)}」</b><br>${f.votes.map((v) => `${esc(nameOf(v.id))} ${v.yes ? `<span class="good">${K('賛成', 'さんせい')}</span>` : `<span class="bad">${K('反対', 'はんたい')}</span>`}`).join('　')}</div>`;
@@ -675,7 +688,8 @@ function renderYearEnd(box) {
     : `<b style="color:var(--text);font-size:15px">${G.yearLabel(g)}年が終わった</b><br>自国の国力 ${me.power}（${sign(diff('power'))}）　GNP成長率 ${fmt(me.growth || 0, 1)}%　地球環境 ${h.env}（${sign(diff('env'))}）　紛争 ${h.conflicts}カ所（${sign(diff('conflicts'), true)}）`;
   // ふりかえり：今年のニュース（きみの こたえ・きっかけ）と、各国の動き。ここで落ち着いて読み返せる
   const news = g.feed.filter((f) => f.k === 'event');
-  const review = `<div class="review"><div class="rvcol"><h5>📰 ${K('今年のニュース', 'ことしの ニュース')}</h5>${news.map(newsRow).join('') || '<div class="muted">—</div>'}</div>
+  const shocks = g.feed.filter((f) => f.k === 'shock').map((f) => { const [t, lv] = shockText(f); return `<div class="tlrow news"><span class="who">💥</span><span class="pol">${esc(t)}<span class="mychoice bad">${esc(lv)}</span></span></div>`; }).join('');
+  const review = `<div class="review"><div class="rvcol"><h5>📰 ${K('今年のニュース', 'ことしの ニュース')}</h5>${news.map(newsRow).join('')}${shocks}${news.length || shocks ? '' : '<div class="muted">—</div>'}</div>
     <div class="rvcol"><h5>🗳 ${K('各国の動き', 'みんなの くにの うごき')}</h5>${(g.yearActs || []).map((r) => actRow(r)).join('') || '<div class="muted">—</div>'}</div></div>`;
   box.innerHTML = `<div class="yearend"><div class="sum">${sum}<div class="row"><button class="btn primary" data-next>${K('次の年へ ▶', 'つぎへ ▶')}</button></div></div>${review}</div>`;
   // 自国が崩壊中は自動で進むので、ボタンは出さない（二重に年が進まないように）
@@ -734,6 +748,7 @@ function newsDeck() {
           <div class="nface nfront">
             <div class="ncat"><span>${head}</span><span>${n + 1} / ${total}</span></div>
             <h3>${esc(f.name)}${f.who ? `<small>${esc(nameOf(f.who))}</small>` : ''}</h3>
+            ${f.why ? `<div class="nwhy">📊 ${K('あなたの国の状態で起きやすくなっていた', 'きみの くにの ようすで おきやすく なって いた')}：${esc(f.why)}</div>` : ''}
             ${f.from ? `<div class="nfrom">🔗 ${K('きっかけ', 'きっかけ')}：${f.from.year}${K('年', 'ねん')}の「${esc(f.from.name)}」</div>` : ''}
             <p class="ntext">${esc(f.text)}</p>
             <div class="nby">— ${esc(K(GM_NAME, KID_GM_NAME))}</div>

@@ -415,3 +415,15 @@ h3.hz { display: flex; justify-content: space-between; align-items: center; padd
 .news-ctl .nmid { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .nopt.dn { border-color: #a0603a; text-align: center; background: #2c1f18; }
 .news-ctl .nopts.three { align-items: center; }
+/* 国の崩壊の波紋 */
+.feed .ev.shock { background: #2a1416; border-color: #7a2a2e; }
+.feed .ev.shock b { color: #ff9a8a; }
+.feed .ev.shock .lv { display: inline-block; margin-left: 8px; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: #4a1e22; color: #ffd0c8; }
+.feed .ev.shock .lv.lv3 { background: #e5534b; color: #fff; }
+.tlrow .mychoice.bad { color: #ff9a8a; }
+.nfront .nwhy { font-size: 14px; font-weight: 700; color: #7a4a10; background: #f4e2c4; border-radius: 8px; padding: 4px 10px; margin: 2px 0 4px; }
+.kid .nfront .nwhy { font-size: 16px; }
+.moodrow .tone { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--panel2); color: var(--muted); }
+.moodrow .tone.emo { background: #4a2a1e; color: #ffbf8a; }
+.moodrow .tone.wise { background: #1e3a4a; color: #9fd3ff; }
+.kid .moodrow .tone { font-size: 13px; }

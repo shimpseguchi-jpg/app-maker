@@ -65,9 +65,12 @@ const RE = new RegExp(`(?<![ぁ-ゖァ-ヺー々一-龯])(?:${KEYS.join('|')})`,
 
 function toKata(s) { return s.replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60)); }
 
+// 国の名前は「フソウの くに」ではなく「フソウ国」と書く（国は2年生の字だが、国名には使う）。
+// カタカナの国名のあとの「の くに」だけを置きかえる（「にじの くに」のような言葉の名前はそのまま）
+export const EXTRA_KANJI = '国';
 export function kidify(s) {
   if (!s || !/[ぁ-ゖ]/.test(s)) return s;
-  return s.replace(RE, (w) => DICT[w]);
+  return s.replace(RE, (w) => DICT[w]).replace(/([ァ-ヺ][ァ-ヺー]*)の くに/g, '$1国');
 }
 
 export const KIDIFY_DICT = DICT;

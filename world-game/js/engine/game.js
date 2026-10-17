@@ -1,13 +1,13 @@
 // ゲームの進行：世界の生成 → 基本政策 → 毎年（イベント → 各国の手番 → 年末処理）→ 終了
 import { SPECIAL, OPTION_BY_ID, kindOf, poolOf } from '../data/reactions.js';
-import { secAfterReact, secYearEnd, secBack, addMood, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
+import { secAfterReact, secYearEnd, secBack, moodFromReaction, moodFromPolicy, moodYearEnd, secPolicy } from './secretary.js';
 import { makeRng, hashSeed, shuffle, pick, weighted, clamp } from '../util.js';
 import { MAJORS, BACKS, REGIONS, POLAR_LINKS } from '../data/countries.js';
 import { AREAS, CENTERS } from '../data/mapdata.js';
 import { POLICIES, POLICY_LIST, BASE, targetsFor } from '../data/policies.js';
 import { EVENTS, EVENT_BY_ID, nukePair } from '../data/events.js';
 import { GM, AI_LINES } from '../data/gm.js';
-import { registerBases, neighbors, rawNeighbors, setUnits, unitOf, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active, allied } from './core.js';
+import { registerBases, neighbors, rawNeighbors, setUnits, unitOf, polarNeighbors, isSeat, C, power, probability, judge, TIER, rel, addRel, active, allied, eduLevel, EDU_LOW } from './core.js';
 import { applyFx } from './effects.js';
 import { PERSONAS, choosePolicy, voteYes, AGENDAS } from './ai.js';
 import { AGENDA_BASE, AGENDA_LOSE_FX, AGENDA_GAIN_FX } from '../data/agendas.js';
@@ -232,6 +232,42 @@ function collapse(g, id, why) {
   chron(g, J(g, `${c.name}、${w}`, `${c.name}で ${KID_WHY[w] || 'せいふが たおれた'}`));
   say(g, c.player ? 'player.collapsed' : 'ai.collapsed', { name: c.name });
   g.allies = g.allies.filter((k) => !k.split('-').includes(id));
+  collapseShock(g, id);
+}
+
+// 崩壊の波紋：国の大きさ（主要国全体の GNP に占める割合）しだいで、世界への影響が大きくなる。
+// 大国なら世界中の景気・紛争・難民・国際機関への信頼に、小さな国ならおもに となりの国に
+const r1 = (v) => Math.round(v * 10) / 10;
+export function shockLevel(share) { return share >= 0.15 ? 3 : share >= 0.05 ? 2 : 1; }
+function collapseShock(g, id) {
+  const c = g.majors[id];
+  const total = Object.values(g.majors).filter((x) => !x.annexedBy).reduce((sum, x) => sum + x.stats.gnp, 0) || 1;
+  const share = Math.min(0.5, c.stats.gnp / total);
+  const lv = shockLevel(share);
+  const fx = [`world.conflicts+${r1(2 + 30 * share)}`, `world.refugees+${r1(4 + 40 * share)}`, `world.tension+${r1(2 + 20 * share)}`, `world.trust-${r1(2 + 20 * share)}`,
+    `tgtNb.stability-${r1(4 + 30 * share)}`, 'tgtNb.guerrilla+3'];
+  if (lv >= 2) fx.push(`all.capital-${r1(40 * share)}`, `all.industry-${r1(25 * share)}`);
+  if (lv >= 3) fx.push(`all.stability-${r1(15 * share)}`, 'world.foodPrice+10', 'bgAll.econ-4');
+  pushShock(g, id, lv, fx);
+}
+// 背景国が国として成り立たなくなった（政情がほぼ0）：大きな国（抽選外の主要国・まとまった地域）ほど影響が大きい
+function backFailures(g) {
+  for (const b of Object.values(g.backs)) {
+    if (b.owner || b.sunk) continue;
+    if (b.failed != null && b.stats.stability >= 30) delete b.failed;
+    if (b.failed != null || b.stats.stability > 6) continue;
+    b.failed = g.year;
+    const lv = b.big || (b.merged?.length || 1) >= 3 ? 2 : 1;
+    pushShock(g, b.id, lv, lv >= 2 ? ['tgtNb.stability-8', 'tgtNb.guerrilla+4', 'world.refugees+6', 'world.conflicts+4']
+      : ['tgtNb.stability-5', 'tgtNb.guerrilla+2', 'world.refugees+3', 'world.conflicts+2']);
+  }
+}
+function pushShock(g, id, lv, fx) {
+  const changes = [];
+  applyFx(g, fx, { self: id, tgt: id }, 1, changes);
+  const name = C(g, id).name;
+  g.feed.push({ k: 'shock', id, lv, failed: !g.majors[id], res: summarizeChanges(g, changes.filter((x) => x.id !== id)) });
+  if (lv >= 3) chron(g, J(g, `${name}の崩壊が世界をゆるがす`, `${name}が たおれて、せかいじゅうが ゆれた`));
 }
 
 function annex(g, owner, id) {
@@ -329,6 +365,25 @@ export function beginYear(g) {
   if (g.pending && !g.result) g.phase = 'pending';
 }
 
+// プレイヤーの国の状態で起きやすくなるニュース：弱いところ（強いところ）に関係するニュースほど起きやすい
+const PRESSURE = [
+  { kinds: ['food'], test: (s) => s.food < 60, m: 1.8, why: ['食べものが足りない', 'たべものが たりない'] },
+  { kinds: ['water'], test: (s) => s.water < 30, m: 1.8, why: ['水が足りない', 'みずが たりない'] },
+  { kinds: ['unrest', 'population', 'refugee'], test: (s) => s.stability < 40, m: 1.6, why: ['政情が不安定', 'くにが ぐらぐら して いる'] },
+  { kinds: ['crisis', 'money'], test: (s) => s.debt >= 150 || s.fiscal <= -8, m: 1.6, why: ['借金が多い', 'しゃっきんが おおい'] },
+  { kinds: ['armed', 'crime'], test: (s) => s.security < 40 || s.guerrilla >= 50, m: 1.6, why: ['治安が悪い', 'あぶない ひとが おおい'] },
+  { kinds: ['outbreak'], test: (s, c) => eduLevel(c) < EDU_LOW, m: 1.5, why: ['教育が低い', 'べんきょうが たりない'] },
+  { kinds: ['climate', 'nature'], test: (s) => s.co2 >= 70, m: 1.4, why: ['CO₂を多く出している', 'けむりを たくさん だして いる'] },
+  { kinds: ['war', 'tension', 'nuke'], test: (s) => s.soldiers >= 100 || s.nuke >= 4, m: 1.3, why: ['軍が大きい', 'ぐんたいが おおきい'] },
+  { kinds: ['cyber', 'frontier', 'good', 'space'], test: (s) => s.tech >= 80, m: 1.3, why: ['技術が進んでいる', 'ぎじゅつが すすんで いる'] },
+];
+function pressure(g, ev) {
+  const c = g.majors[g.player];
+  if (!c?.panel || !(ev.w > 0 && ev.w < 100)) return null;
+  const k = kindOf(ev);
+  return PRESSURE.find((p) => p.kinds.includes(k) && p.test(c.stats, c)) || null;
+}
+
 function pickEvents(g, H) {
   const out = [];
   const can = (e) => {
@@ -342,7 +397,7 @@ function pickEvents(g, H) {
   const pool = EVENTS.filter((e) => e.w > 0 && e.w < 100 && can(e));
   const n = g.kid ? (H.rng() < 0.5 ? 3 : 2) : H.rng() < 0.45 ? 2 : 1;
   for (let i = 0; i < n && pool.length; i++) {
-    const e = weighted(H.rng, pool.filter((x) => !out.includes(x)), (x) => x.w * (1 + (g.boost[x.id] || 0)));
+    const e = weighted(H.rng, pool.filter((x) => !out.includes(x)), (x) => x.w * (1 + (g.boost[x.id] || 0)) * (pressure(g, x)?.m || 1));
     if (e) out.push(e);
   }
   return out;
@@ -363,6 +418,8 @@ function fireEvent(g, ev, H) {
   const from = g.cause?.[ev.id];
   if (from) { entry.from = from; delete g.cause[ev.id]; }
   entry.next = (ev.next || []).filter((n) => EVENT_BY_ID[n]);
+  const pr = pressure(g, ev);
+  if (pr) entry.why = J(g, pr.why[0], pr.why[1]);
   g.feed.push(entry);
   chron(g, `${evName}${whoName ? `（${whoName}）` : ''}${from ? J(g, `　←「${from.name}」から`, `　←「${from.name}」から`) : ''}`);
   // このニュースで動いた数値を集めて、ニュースの下に「→ どこの何が上下したか」を出す
@@ -391,7 +448,9 @@ function newsOptions(g, e) {
   const me = g.majors[g.player];
   const rng = rngOf(g);
   const pool = poolOf(e.react);
-  const a = pick(rng, pool.filter((o) => o.pop > 0)), b = pick(rng, pool.filter((o) => o.pop <= 0));
+  // 国の状態で選べない選択肢（need）はのぞく。のぞいて空になったら、そのまま
+  const can = (list) => { const ok = list.filter((o) => !o.need || o.need(me.stats)); return ok.length ? ok : list; };
+  const a = pick(rng, can(pool.filter((o) => o.pop > 0))), b = pick(rng, can(pool.filter((o) => o.pop <= 0)));
   const opts = rng() < 0.5 ? [a.id, b.id] : [b.id, a.id];
   // 状況しだいで3つめ（▲）・4つめ（▼）
   const h = { allied, rel, isSeat, neighbors };
@@ -421,7 +480,7 @@ export function reactNews(g, i, side) {
   e.choice = id;
   e.rres = summarizeChanges(g, changes);
   // 補佐官が「街の声」を伝える
-  if (opt.pop) addMood(g.majors[g.player], opt.pop * 2);
+  moodFromReaction(g.majors[g.player], opt.pop);
   e.sec = secAfterReact(g, e.rres, opt.pop);
   g.lastSec = { text: e.sec, year: g.year };
   return e;
@@ -736,6 +795,7 @@ export function endYear(g) {
     } else c.stats.stability = clamp(c.stats.stability + 2.5 + (c.support || 0) / 10, 0, 100);
   }
   for (const b of Object.values(g.backs)) if (!b.owner) tickBack(g, b, H);
+  backFailures(g);
   // 感染症は3年で終わる（共同開発に成功すれば早く終わる）
   if (g.flags.pandemic != null && (g.year - g.flags.pandemic >= 3 || g.flags.vaccineCoop != null)) {
     if (g.year > g.flags.pandemic) H.deaths(0.5);
