@@ -2,6 +2,7 @@
 // 派生ステータスの式は仮。戦闘エンジンを作るときに調整する
 import { IDOLS } from '../data/idols.js';
 import { SONGS } from '../data/songs.js';
+import { CLASSES } from '../data/classes.js';
 import { evaluateSynergies } from './synergy.js';
 
 export const BASE_STATS = ['pow', 'vo', 'men', 'sta', 'dan', 'vis'];
@@ -27,11 +28,13 @@ export function derive(b, level = 1) {
   };
 }
 
-// slots: [{ idol: 'haruka', song: 'ready' | null }, ...] 先頭 FRONT_SIZE 人が前列
+// slots: [{ idol: 'haruka', song: 'ready' | null, cls?, level?, base?, learned? }, ...] 先頭 FRONT_SIZE 人が前列
+// cls・level・base・learned は育成状態（js/engine/classes.js の unit）。省略時はアイドルの初期値
 export function buildMembers(slots) {
   return slots.filter(Boolean).slice(0, PARTY_SIZE).map((s, i) => {
     const idol = IDOLS[s.idol];
-    return { id: idol.id, idol, tags: idol.tags, row: i < FRONT_SIZE ? 'front' : 'back', song: s.song || null, level: s.level || 1 };
+    return { id: idol.id, idol, tags: idol.tags, row: i < FRONT_SIZE ? 'front' : 'back', song: s.song || null,
+      cls: s.cls || idol.cls, level: s.level || 1, base: s.base || idol.base, learned: s.learned || [] };
   });
 }
 
@@ -64,6 +67,12 @@ export function computeParty(members) {
     for (const e of a.effects) apply(e, targets(e.to, members, a.holders, null), a.syn.name);
   }
   members.forEach((mem, i) => {
+    const cls = CLASSES[mem.cls];
+    if (cls) for (const e of cls.effects) apply(e, [i], cls.name);
+    for (const id of mem.learned) {
+      const e = Object.values(CLASSES).flatMap((c) => c.effects).find((x) => x.id === id);
+      if (e) apply(e, [i], '習得済み');
+    }
     const song = mem.song && SONGS[mem.song];
     if (!song) return;
     for (const e of song.effects) apply(e, targets(e.to || 'self', members, [i], i), song.title);
@@ -73,7 +82,7 @@ export function computeParty(members) {
     const { add, pct, abilities } = mods[i];
     const fix = (k, v) => Math.floor((v + (add[k] || 0)) * (100 + (pct[k] || 0)) / 100);
     const base = {};
-    for (const k of BASE_STATS) base[k] = fix(k, mem.idol.base[k]);
+    for (const k of BASE_STATS) base[k] = fix(k, mem.base[k]);
     const d = derive(base, mem.level);
     const stats = { ...base };
     for (const k of DERIVED_STATS) stats[k] = fix(k, d[k]);

@@ -4,7 +4,9 @@
 // rank: 1〜5（ダンジョンの深さと店売り価格の目安）
 // effects: synergies.js と同じ形式。to は self(装備者) / party / front / back
 // live: 戦闘中に使える「ライブスキル」（エルミナージュの呪文回数制に相当：uses は休むまでの回数）
-// TODO: 原曲の歌唱メンバーが装備したときの「持ち歌ボーナス」（クレジットを確認してから追加）
+// 持ち歌ボーナス（765PRO 以外のアイドルを加えるときに入れる。docs/DESIGN.md「5. 楽曲装備」）
+//   credit: { type: 'solo' | 'unit' | 'all', singers: [idolId...] } を曲に足す予定
+//   原曲を歌ったアイドルが装備すると効果が強まる。強さは 個人曲 > ユニット曲 > 全体曲 の順
 
 export const SONGS = {};
 function def(s) { SONGS[s.id] = s; }

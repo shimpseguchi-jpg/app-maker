@@ -6,6 +6,9 @@ import { SYNERGIES } from '../js/data/synergies.js';
 import { SONGS } from '../js/data/songs.js';
 import { evaluateSynergies, matchDistinct } from '../js/engine/synergy.js';
 import { buildMembers, computeParty, BASE_STATS, DERIVED_STATS } from '../js/engine/party.js';
+import { CLASSES, SPELLS } from '../js/data/classes.js';
+import { newUnit, canChangeClass, changeClass, canPromote, promote } from '../js/engine/classes.js';
+import { tryRevive, reviveChance, isWiped } from '../js/engine/revive.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -112,6 +115,59 @@ ok(!activeIds(party('iori', 'azusa', 'mami')).includes('unit_ryugu'), '真美は
   ok(!h.abilities.some((a) => a.id === 'fly'), '蒼い鳥は装備者だけ');
   ok(c.live?.uses === 3, 'ライブスキルの回数');
   ok(c.abilities.some((a) => a.id === 'fly' && a.source === '蒼い鳥'), '効果の出どころを記録');
+}
+
+// ── クラス ──
+for (const c of Object.values(CLASSES)) {
+  ok(c.tier === 1 || c.tier === 2, `${c.id}: tier`);
+  checkEffects(c.id, c.effects);
+  for (const k of Object.keys(c.req || {})) ok(BASE_STATS.includes(k), `${c.id}: req.${k}`);
+  for (const k of Object.keys(c.bonus || {})) ok(BASE_STATS.includes(k), `${c.id}: bonus.${k}`);
+  if (c.tier === 1) {
+    ok(c.change && c.req, `${c.id}: 下位職は転職で選べる`);
+    for (const p of c.promote) ok(CLASSES[p]?.tier === 2, `${c.id} → ${p}: 昇格先は上位職`);
+    ok(c.promote.length === 2 || c.id === 'dancer', `${c.id}: 昇格先は2択`);
+  } else {
+    ok(!c.promote, `${c.id}: 上位職は昇格しない`);
+    const from = Object.values(CLASSES).filter((x) => x.promote?.includes(c.id));
+    ok(from.length || (c.change && c.req), `${c.id}: 昇格元も転職条件もない`);
+  }
+}
+for (const i of Object.values(IDOLS)) {
+  ok(CLASSES[i.cls]?.tier === 1, `${i.name}: 初期クラスは下位職`);
+  ok(Object.entries(CLASSES[i.cls].req).every(([k, v]) => i.base[k] >= v), `${i.name}: 初期クラスの条件を満たす`);
+}
+{
+  const u = newUnit(IDOLS.chihaya);                 // 魔道士
+  ok(!canPromote(u, 'sage'), 'Lv1 では昇格できない');
+  const u10 = { ...u, level: 10, base: { ...u.base, vo: 20 } };
+  ok(!canPromote(u10, 'bishop'), '昇格先は2択のどちらか（魔道士→ビショップ不可）');
+  ok(!canPromote(u10, 'sage', false), '昇格アイテムが必要');
+  const s = promote(u10, 'sage');
+  ok(s.cls === 'sage' && s.level === 1 && s.base.vo === 22 && s.base.men === u.base.men + 2, '昇格：Lv1・能力は残りボーナス加算');
+  ok(s.learned.includes('arcane'), '昇格しても魔法は残る');
+  ok(!canChangeClass(u, 'samurai'), '侍は条件が高い');
+  const p = changeClass(u10, 'priest', IDOLS.chihaya);
+  ok(p.level === 1 && p.base.vo === IDOLS.chihaya.base.vo, '転職：Lv1・能力はアイドル本来の値に戻る');
+  ok(p.learned.includes('arcane') && p.history.includes('mage'), '転職：魔法は引き継ぐ');
+  const t = changeClass(newUnit(IDOLS.ami), 'mercenary', IDOLS.ami);
+  ok(!t.learned.includes('disarm'), '罠解除のようなクラス技能は引き継がない');
+  ok([...SPELLS].every((id) => Object.values(CLASSES).some((c) => c.effects.some((e) => e.id === id))), 'SPELLS は実在の能力');
+  const m = computeParty(buildMembers([{ idol: 'chihaya', cls: 'priest', learned: ['arcane'] }])).members[0];
+  ok(m.abilities.some((a) => a.id === 'arcane') && m.abilities.some((a) => a.id === 'heal'), '習得済み魔法と今のクラスの魔法');
+  const k = computeParty(buildMembers([{ idol: 'makoto', cls: 'knight' }])).members[0];
+  const f = computeParty(buildMembers([{ idol: 'makoto', cls: 'fighter' }])).members[0];
+  ok(k.stats.def === f.stats.def + 4, 'クラス特性が能力値に反映');
+}
+
+// ── 蘇生（ロストなし） ──
+{
+  const u = newUnit(IDOLS.makoto);
+  ok(tryRevive(u, 'dead', () => 0) === 'ok', '蘇生成功');
+  ok(tryRevive(u, 'dead', () => 0.999) === 'ash', '死亡からの失敗は灰');
+  ok(tryRevive(u, 'ash', () => 0.999) === 'ash', '灰からの失敗も灰のまま（ロストしない）');
+  ok(reviveChance(u, 'dead') > reviveChance(u, 'ash'), '灰のほうが難しい');
+  ok(isWiped(['dead', 'ash', 'stone']) && !isWiped(['dead', 'ok']), '全滅判定');
 }
 
 console.log(`${pass} ok / ${fail} ng`);

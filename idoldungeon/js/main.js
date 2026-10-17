@@ -2,6 +2,7 @@
 import { IDOLS, IDOL_LIST } from './data/idols.js';
 import { TAGS } from './data/tags.js';
 import { SONGS } from './data/songs.js';
+import { CLASSES } from './data/classes.js';
 import { buildMembers, computeParty, BASE_STATS, DERIVED_STATS, STAT_NAME, FRONT_SIZE, PARTY_SIZE } from './engine/party.js';
 
 const KEY = 'idoldungeon.proto';
@@ -30,7 +31,7 @@ function render() {
     const i = IDOLS[id];
     const on = slots.some((s) => s.idol === id);
     return `<button class="idol" style="--c:${i.color}" data-idol="${id}" aria-pressed="${on}">
-      <b>${esc(i.name)}</b><div class="tags">${i.tags.map((t) => `<span class="tag ${on && hitTags.has(t) ? 'hit' : ''}">${esc(TAGS[t].name)}</span>`).join('')}</div></button>`;
+      <b>${esc(i.name)} <small class="cls">${esc(CLASSES[i.cls].name)}</small></b><div class="tags">${i.tags.map((t) => `<span class="tag ${on && hitTags.has(t) ? 'hit' : ''}">${esc(TAGS[t].name)}</span>`).join('')}</div></button>`;
   }).join('');
 
   const songOpts = (cur) => `<option value="">（楽曲なし）</option>` + Object.values(SONGS)
@@ -40,7 +41,7 @@ function render() {
     const stat = (k) => `<span class="${m.stats[k] > solo[i][k] ? 'up' : ''}">${STAT_NAME[k]}<b>${m.stats[k]}</b></span>`;
     return `${i === 0 ? '<div class="row-label">前列</div>' : i === FRONT_SIZE ? '<div class="row-label">後列</div>' : ''}
     <div class="member" style="--c:${m.idol.color}">
-      <header><b>${esc(m.idol.name)}</b>
+      <header><b>${esc(m.idol.name)} <small class="cls">${esc(CLASSES[m.cls].name)}</small></b>
         <select data-song="${i}">${songOpts(m.song)}</select>
         <span class="moves"><button data-up="${i}" aria-label="前へ">▲</button><button data-down="${i}" aria-label="後ろへ">▼</button></span>
       </header>
