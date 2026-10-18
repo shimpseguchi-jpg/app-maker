@@ -7,13 +7,13 @@ import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
-import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, DRPG_BONUS } from '../engine/expedition.js';
+import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, DRPG_BONUS, newExpedition, FIRST_PARTY } from '../engine/expedition.js';
 import { enterCardMode } from '../engine/cards.js';
 import { CARD_DUNGEONS } from '../data/cards.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote, prepCheck } from '../engine/town.js';
-import { SLOTS, saveSlot, readSlot, exportText, importText } from '../save.js';
+import { SLOTS, saveSlot, readSlot, clearSlot, exportText, importText } from '../save.js';
 import { sceneSvg, sceneInfo } from './scenes.js';
 
 export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['help', '遊び方'], ['depart', '迷宮へ']];
@@ -23,6 +23,7 @@ let shopMode = 'buy';
 let ioText = '';
 let trainee = null;   // 訓練所で選んでいるアイドル
 let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
+let wipeAsk = null;   // 記録：消す前の確認 'reset'（今の冒険を最初から）| 記録枠の番号
 
 // エルミナージュの施設画面：背景画の上に、左上の縦メニュー（施設）と、こげ茶の板（中身）。施設の人のひとことは下の窓
 export function renderTown(ex) {
@@ -223,13 +224,22 @@ function help() {
     <ul class="plain">
       <li>仲間がいなくなることはない（ロストなし）。死体が迷宮に残るので、寺院でお金を払って回収するか、別のパーティで迎えに行く</li>
       <li>みんな倒れてお金もないときは、寺院がただで助けてくれる</li>
+    </ul>
+    <h3>記録</h3>
+    <ul class="plain">
+      <li>冒険は自動で保存される。<b>記録</b>では3つの記録枠に残したり、文字列で書き出したりできる</li>
+      <li>はじめから遊びたいときは、記録の「<b>最初からやり直す</b>」（記録枠に残したものは消えない）</li>
     </ul>`;
 }
 
 function record() {
+  const ask = (what, yes) => `<div class="confirm"><b>${what}</b><div class="row"><button data-t="${yes}">消す</button><button data-t="wipeNo">やめる</button></div></div>`;
   return `<p class="sub">冒険は自動で保存されています。ここでは、別の記録枠に残したり、文字列で書き出したりできます。</p>
     <div class="town-grid">${SLOTS.map((n) => { const r = readSlot(n); return `<div class="slot"><b>記録 ${n}</b> <small class="sub">${r ? `${esc(r.summary)}<br>${new Date(r.savedAt).toLocaleString('ja-JP')}` : '空き'}</small>
-      <div class="row"><button data-t="save" data-id="${n}">ここに記録</button><button data-t="load" data-id="${n}" ${r ? '' : 'disabled'}>読み込む</button></div></div>`; }).join('')}</div>
+      ${wipeAsk === n ? ask(`記録 ${n} を消しますか？（今の冒険はそのまま）`, 'clearYes') : `<div class="row"><button data-t="save" data-id="${n}">ここに記録</button><button data-t="load" data-id="${n}" ${r ? '' : 'disabled'}>読み込む</button><button data-t="clearAsk" data-id="${n}" ${r ? '' : 'disabled'}>消す</button></div>`}</div>`; }).join('')}</div>
+    <h3>最初からやり直す</h3>
+    ${wipeAsk === 'reset' ? ask('今の冒険を消して、最初からやり直しますか？ 元には戻せません。（記録 1〜3 に残したものは消えません）', 'resetYes')
+      : '<p class="sub">今の冒険（アイドルの育成・お金・楽譜・迷宮の地図）を消して、はじめから遊びます。残しておきたいときは、先に記録枠に記録するか書き出しておこう。</p><div class="row"><button data-t="resetAsk">最初からやり直す</button></div>'}
     <h3>書き出し・読み込み</h3>
     <div class="row"><button data-t="export">書き出す</button><button data-t="import">貼り付けた文字列を読み込む</button></div>
     <textarea id="io" rows="3" placeholder="ここに記録の文字列">${esc(ioText)}</textarea>`;
@@ -238,7 +248,7 @@ function record() {
 // クリック・変更の処理。戻り値 { msgs, replace?: 新しい冒険データ }
 export function townAction(ex, el, rng = Math.random) {
   const d = el.dataset;
-  if (d.tab) { tab = d.tab; return { msgs: [] }; }
+  if (d.tab) { tab = d.tab; wipeAsk = null; return { msgs: [] }; }
   if (d.shop) { shopMode = d.shop; return { msgs: [] }; }
   if (d.trainee) { trainee = d.trainee; confirm = null; return { msgs: [] }; }
   if (d.join) return { msgs: joinParty(ex, d.join) };
@@ -265,6 +275,11 @@ export function townAction(ex, el, rng = Math.random) {
     case 'retrieve': return { msgs: retrieve(ex, d.id) };
     case 'donate': return { msgs: donate(ex, d.id, 100) };
     case 'save': saveSlot(Number(d.id), ex); return { msgs: [`記録 ${d.id} に記録した`] };
+    case 'clearAsk': wipeAsk = Number(d.id); return { msgs: [] };
+    case 'resetAsk': wipeAsk = 'reset'; return { msgs: [] };
+    case 'wipeNo': wipeAsk = null; return { msgs: [] };
+    case 'clearYes': { const n = wipeAsk; wipeAsk = null; clearSlot(n); return { msgs: [`記録 ${n} を消した`] }; }
+    case 'resetYes': wipeAsk = null; tab = 'tavern'; return { msgs: ['冒険を最初からやり直した。酒場でパーティを組もう'], replace: newExpedition(FIRST_PARTY) };
     case 'load': { const r = readSlot(Number(d.id)); return r ? { msgs: [`記録 ${d.id} を読み込んだ`], replace: r.data } : { msgs: [] }; }
     case 'export': ioText = exportText(ex); return { msgs: ['記録を書き出した。下の文字列をコピーして保管しよう'] };
     case 'import': {

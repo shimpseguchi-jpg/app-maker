@@ -17,6 +17,8 @@ import { CARD_PROMO_RATE } from '../data/cards.js';
 
 // 最初に持っている楽譜（鑑定済み）
 export const STARTER_SONGS = ['ready', 'ohayo'];
+// はじめのパーティ（酒場で組み直せる）
+export const FIRST_PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 
 export function newExpedition(slots, dungeonId = 'd1') {
   const ex = normalize({ ex: newExplore(dungeonId), mode: 'town', slots: slots.map((s) => ({ idol: s.idol })), gold: 500 });

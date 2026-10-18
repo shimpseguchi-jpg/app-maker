@@ -7,6 +7,9 @@ export function saveSlot(n, ex) {
   localStorage.setItem(SLOT(n), JSON.stringify(rec));
   return rec;
 }
+export function clearSlot(n) {
+  localStorage.removeItem(SLOT(n));
+}
 export function readSlot(n) {
   try { return JSON.parse(localStorage.getItem(SLOT(n))); } catch (e) { return null; }
 }

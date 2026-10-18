@@ -6,7 +6,7 @@ import { CLASSES } from './data/classes.js';
 import { SPELLS_BY_ID, KIND_TARGET } from './data/spells.js';
 import { CONDITIONS } from './engine/revive.js';
 import { getFloor, viewCells, DIR_NAME, isDark, isAntiMagic } from './engine/dungeon.js';
-import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf } from './engine/expedition.js';
+import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf, FIRST_PARTY } from './engine/expedition.js';
 import { renderTown, townAction, townSpeech, openTab } from './ui/town.js';
 import { portrait, shortName } from './ui/portrait.js';
 import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveReady, autoCommands } from './engine/battle.js';
@@ -20,8 +20,6 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const has = (m, id) => m.abilities?.some((a) => a.id === id);
 
-// はじめのパーティ（酒場で組み直せる）
-const FIRST_PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 
 let ex = load();
 let pending = null;
