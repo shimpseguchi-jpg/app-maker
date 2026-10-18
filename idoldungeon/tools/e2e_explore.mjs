@@ -60,7 +60,7 @@ await page.evaluate((ex) => { localStorage.clear(); localStorage.setItem('idoldu
 await page.reload();
 
 const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('idoldungeon.expedition')));
-let battles = 0, presses = 0, plays = 0;
+let battles = 0, presses = 0, plays = 0, guardians = 0;
 const results = {};
 for (const d of ['d1', 'd2']) {
   await page.click('[data-tab=depart]');
@@ -73,6 +73,7 @@ for (const d of ['d1', 'd2']) {
       const a = ex.ex.floor === goal.floor && ex.ex.x === goal.x && ex.ex.y === goal.y ? 'stairs' : nextStep(ex.ex, goal);
       await page.keyboard.press(KEYS[a]);
       presses++;
+      if (await page.isVisible('[data-m=fight]')) { await page.click('[data-m=fight]'); guardians++; } // ルームガーダーには挑む
       if (await page.isVisible('#battle')) battles++;
       while (await page.isVisible('#battle')) {
         for (const sel of ['[data-b=skip]', '[data-b=end]', '[data-b=auto]', '[data-b=go]']) {
@@ -121,6 +122,7 @@ ok(ex.scores.some((sc) => !sc.known), 'ボスのドロップ（未鑑定の楽�
 const per = (d, k) => (ex.ex.dungeon === d ? ex.ex[k] : ex.ex.maps[d][k]); // 鍵・スイッチは迷宮ごとに記録（いまいる迷宮のぶんは ex.ex に出ている）
 ok(per('d2', 'keys').includes('propKey') && per('d2', 'flags').d2gate && per('d1', 'keys').includes('silverKey'), '両方の迷宮の鍵とスイッチ（迷宮ごとに記録）');
 ok(results.card.town && results.card.clears === 2 && results.card.cards >= 21, `カードモード：劇場地下迷宮をボスまで進んで街に戻った（${results.card.cards}枚）`);
+ok(guardians > 0, `ルームガーダーの部屋では挑むか聞かれる（${guardians}回）`);
 ok(plays > 0, '戦闘のターンを1人ずつ再生する（行動順の表示と「とばす」）');
 ok(!errors.length, 'ページのエラー: ' + errors.join(' / '));
 console.log(`操作 ${presses} 回・戦闘 ${battles} 回 / 所持金 ${ex.gold}G / スクリーンショット ${shot}`);

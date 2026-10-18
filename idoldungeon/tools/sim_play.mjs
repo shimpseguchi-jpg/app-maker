@@ -4,7 +4,7 @@
 //   迷宮：レベルに見合う階まで潜って戦い、HP が減ったり倒れた人が出たら引き返す
 //   鍵・スイッチは道すがら取り、ボスを倒したら次の迷宮へ
 import { DUNGEONS } from '../js/data/floors.js';
-import { newExpedition, move, battleTurn, finishBattle, wipeOut, climb, enterDungeon, partyView, unitOf } from '../js/engine/expedition.js';
+import { newExpedition, move, battleTurn, finishBattle, wipeOut, climb, enterDungeon, partyView, unitOf, fightGuardian } from '../js/engine/expedition.js';
 import { act, useStairs, getFloor, isSolid } from '../js/engine/dungeon.js';
 import { autoCommands } from '../js/engine/battle.js';
 import { stay, treat, retrieve, trainingInfo, doPromote, ROOMS, roomFee } from '../js/engine/town.js';
@@ -82,7 +82,8 @@ function runOnce(seed) {
       if (a === 'stairs') { const r = climb(ex); if (ex.mode === 'town') return 'town'; continue; }
       const before = `${ex.ex.floor}:${ex.ex.x},${ex.ex.y},${ex.ex.dir}`;
       const r = move(ex, a, rng);
-      if (r.pending?.type === 'battle') { if (fight() === 'wiped') return 'wiped'; }
+      if (r.pending?.type === 'guardian') fightGuardian(ex, r.pending, rng); // ルームガーダーにはいつも挑む
+      if (r.pending?.type === 'battle' || r.pending?.type === 'guardian') { if (fight() === 'wiped') return 'wiped'; }
       if (r.pending?.type === 'wiped') { wipeOut(ex); log.wipes++; return 'wiped'; }
       if (stopOnRest && needRest()) return 'rest';
       // 回転床・ワープ・逃走で予定とずれたら、道順を引き直す

@@ -115,7 +115,7 @@ const floors = [];
   floors.push({ f, id: '1F', name: '奈落の大劇場 1F 客席', d: [dx, dy], specials: [
     { type: 'event', x: 10, y: 1, id: 'd2open', text: '客席には誰もいない。舞台の上から、かすかに歌声が聞こえる' },
     { type: 'fountain', x: fountain[0], y: fountain[1], effect: 'heal', amount: 20, text: 'ロビーの水飲み場だ' },
-    { type: 'guardian', x: 9, y: 8, id: 'g2a', name: '客席の案内係' },
+    { type: 'guardian', x: 9, y: 8, id: 'g2a', name: '客席の案内係', hint: 9 },
     { type: 'event', x: 1, y: 18, id: 'd2closet', give: { gold: 300, score: 'go_my_way' }, text: '忘れ物の箱だ。中にお金と楽譜が入っている' },
   ] });
 }
@@ -133,7 +133,7 @@ const floors = [];
   const [kx, ky] = ends[0], [gx, gy] = ends[1];
   floors.push({ f, id: 'B1F', name: '奈落の大劇場 B1F 舞台裏', d: [dx, dy], specials: [
     { type: 'event', x: kx, y: ky, id: 'propKey', give: { key: 'propKey' }, text: '小道具の山の中に「小道具部屋の鍵」があった' },
-    { type: 'guardian', x: gx, y: gy, id: 'g2b', name: '舞台裏の番人' },
+    { type: 'guardian', x: gx, y: gy, id: 'g2b', name: '舞台裏の番人', hint: 11 },
   ] });
 }
 // ── B2F 奈落：ピット・シュート・回転床・呪文禁止エリア ──

@@ -118,6 +118,10 @@ export function move(ex, action, rng = Math.random) {
         if (e.effect === 'heal') ex.hp[m.id] = Math.min(m.maxHp, ex.hp[m.id] + e.amount);
         if (e.effect === 'poison') ex.cond[m.id] = 'poison';
       }
+    } else if (e.type === 'battle' && e.kind === 'guardian') {
+      // ルームガーダー：部屋に入ったところで、挑むか引き返すかを選ぶ（fightGuardian / leaveGuardian）
+      msgs.push(`${e.name}の部屋だ。奥から強い気配がする${e.hint ? `（目安 Lv${e.hint}）` : ''}`);
+      pending = { type: 'guardian', id: e.id, name: e.name, hint: e.hint };
     } else if (e.type === 'battle') {
       if (e.kind === 'boss') {
         msgs.push(bossLine(e.id, ex.ex.bossClears[e.id] || 0));
@@ -235,6 +239,16 @@ export function startBattle(ex, ev, rng = Math.random, zone = null) {
   ex.battle = createBattle(battleParty(ex), groups, {
     kind: ev.kind, canFlee: ev.kind !== 'boss', zone: zone || { dark: isDark(ch), anti: isAntiMagic(ch) }, rng });
   return ex.battle;
+}
+
+// ルームガーダーに挑む（move の pending を渡す）／引き返して部屋の外へ
+export function fightGuardian(ex, g, rng = Math.random) {
+  startBattle(ex, { kind: 'guardian', id: g.id, name: g.name }, rng);
+  return [`${g.name}が襲いかかってきた！`];
+}
+export function leaveGuardian(ex) {
+  retreat(ex.ex);
+  return ['気づかれないうちに、そっと部屋を出た'];
 }
 
 // 1ターン進める。戻り値はこのターンの記録

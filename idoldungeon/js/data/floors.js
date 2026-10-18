@@ -6,6 +6,7 @@
 //   境目：|- 壁  空白=通路  D 扉  S シークレットドア（調べると見つかる）  L 鍵のかかった扉  G 仕掛け扉（スイッチで開く）
 //         > < ^ v 一方通行の扉（矢印の向きにだけ通れる）  + 柱
 // specials: マスや境目に置く仕掛け（type ごとの中身は js/engine/dungeon.js 参照）
+//   guardian の hint：挑むかどうか聞くときに出す目安のレベル
 // unlock: このボスを倒すと行けるようになる（エルミナージュのダンジョン選択）
 // 下り階段・シュートの真下（次の階の同じ座標）は床、上り階段は上の階の下り階段と同じ座標にする（テストで確認）
 
@@ -42,7 +43,7 @@ def({ id: 'd1', name: '劇場地下迷宮（仮）', start: { x: 5, y: 0, dir: 0
     '+-+-+-+-+-+-+-+-+-+-+-+-+',
   ], specials: [
     { type: 'event', x: 5, y: 3, id: 'opening', text: '幕が上がった。ここから先は劇の中の迷宮だ' },
-    { type: 'guardian', x: 2, y: 2, id: 'g1a', name: '楽屋の番人（仮）' },
+    { type: 'guardian', x: 2, y: 2, id: 'g1a', name: '楽屋の番人（仮）', hint: 2 },
     { type: 'fountain', x: 8, y: 2, effect: 'heal', amount: 10, text: '澄んだ水が湧いている' },
     { type: 'event', x: 11, y: 1, id: 'silverKey', give: { key: 'silverKey' }, text: '隠し部屋で「銀の鍵」を見つけた' },
     { type: 'switch', x: 9, y: 11, flag: 'f1gate', text: '壁のレバーを引いた。どこかで扉の開く音がする' },
@@ -78,7 +79,7 @@ def({ id: 'd1', name: '劇場地下迷宮（仮）', start: { x: 5, y: 0, dir: 0
     { type: 'lock', x: 10, y: 1, dir: 2, key: 'silverKey' },
     { type: 'fountain', x: 11, y: 5, effect: 'poison', text: '濁った水だ……飲んだら気分が悪くなった' },
     { type: 'event', x: 7, y: 8, id: 'antimagic', text: '空気が重い。ここは呪文禁止エリアだ' },
-    { type: 'guardian', x: 8, y: 6, id: 'g1b', name: '奈落の見張り（仮）' },
+    { type: 'guardian', x: 8, y: 6, id: 'g1b', name: '奈落の見張り（仮）', hint: 4 },
   ] },
   { id: 'B2F', name: '地下迷宮 B2F', encounter: 0.07, theme: '#ff9a7a', map: [
     '+-+-+-+-+-+-+-+-+-+-+-+-+',
@@ -163,7 +164,7 @@ def({ id: 'd2', name: '奈落の大劇場（仮）', unlock: 'b1', start: { x: 1
   ], specials: [
     { type: 'event', x: 10, y: 1, id: 'd2open', text: '客席には誰もいない。舞台の上から、かすかに歌声が聞こえる' },
     { type: 'fountain', x: 8, y: 0, effect: 'heal', amount: 20, text: 'ロビーの水飲み場だ' },
-    { type: 'guardian', x: 9, y: 8, id: 'g2a', name: '客席の案内係' },
+    { type: 'guardian', x: 9, y: 8, id: 'g2a', name: '客席の案内係', hint: 9 },
     { type: 'event', x: 1, y: 18, id: 'd2closet', give: { gold: 300, score: 'go_my_way' }, text: '忘れ物の箱だ。中にお金と楽譜が入っている' },
   ] },
   { id: 'B1F', name: '奈落の大劇場 B1F 舞台裏', encounter: 0.06, theme: '#9fb4ff', map: [
@@ -210,7 +211,7 @@ def({ id: 'd2', name: '奈落の大劇場（仮）', unlock: 'b1', start: { x: 1
     '+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+',
   ], specials: [
     { type: 'event', x: 4, y: 19, id: 'propKey', give: { key: 'propKey' }, text: '小道具の山の中に「小道具部屋の鍵」があった' },
-    { type: 'guardian', x: 11, y: 0, id: 'g2b', name: '舞台裏の番人' },
+    { type: 'guardian', x: 11, y: 0, id: 'g2b', name: '舞台裏の番人', hint: 11 },
   ] },
   { id: 'B2F', name: '奈落の大劇場 B2F 奈落', encounter: 0.07, theme: '#ff7a9a', pit: 10, map: [
     '+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+',

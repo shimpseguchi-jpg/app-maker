@@ -54,7 +54,7 @@ const wander = (f, d = 'd1') => (rng) => { const t = ENCOUNTERS[d][f]; return ro
 
 console.log(`各 ${N} 回（パーティ：真・響・春香／律子・千早・雪歩）`);
 for (const lv of [1, 2, 3]) trial('1F 徘徊', lv, wander(0), 'wander', 5);
-for (const lv of [2, 3]) trial('1F 楽屋の番人', lv, (rng) => roll(FIXED_GROUPS.g1a, rng), 'guardian');
+for (const lv of [1, 2, 3]) trial('1F 楽屋の番人', lv, (rng) => roll(FIXED_GROUPS.g1a, rng), 'guardian');
 for (const lv of [3, 4, 5]) trial('B1F 徘徊', lv, wander(1), 'wander', 5);
 for (const lv of [4, 5]) trial('B1F 奈落の見張り', lv, (rng) => roll(FIXED_GROUPS.g1b, rng), 'guardian');
 for (const lv of [5, 6, 7]) trial('B2F 徘徊', lv, wander(2), 'wander', 5);
