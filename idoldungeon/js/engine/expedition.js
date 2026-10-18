@@ -120,8 +120,7 @@ export function move(ex, action, rng = Math.random) {
       }
     } else if (e.type === 'battle') {
       if (e.kind === 'boss') {
-        const b = bossAt(e.id, ex.ex.bossClears[e.id] || 0);
-        msgs.push(b.clears ? `${b.name}が強くなって待ち構えていた！（再戦${b.clears}回目）` : `${b.name}が立ちはだかった！`);
+        msgs.push(bossLine(e.id, ex.ex.bossClears[e.id] || 0));
       } else msgs.push(e.kind === 'wander' ? '何かが近づいてくる！' : `${e.name}が待ち構えていた！`);
       startBattle(ex, e, rng);
       pending = { type: 'battle' };
@@ -190,12 +189,19 @@ export function battleParty(ex) {
 }
 
 // ボスを敵データの形にする（再戦の強化・特性つき）
+// ボスが現れたときの一言（強さの段階が上がっていればそう言う）
+export function bossLine(id, clears) {
+  const b = bossAt(id, clears);
+  if (b.stage) return `${b.name}が強くなって待ち構えていた！（第${b.stage + 1}段階）`;
+  return clears ? `${b.name}が再び立ちはだかった！（${clears + 1}回目）` : `${b.name}が立ちはだかった！`;
+}
+
 export function bossEnemy(id, clears) {
   const b = bossAt(id, clears);
   const resistAll = b.traits.some((t) => t.id === 'resistAll');
   const def = BOSSES[id];
-  return { id, name: b.name, uname: def.uname || '巨大な影', icon: def.icon || '👹', level: b.level, ...b.stats, hit: (def.hit || 80) + clears * 3, eva: def.eva || 8,
-    exp: Math.round((def.exp || 600) * (1 + 0.5 * clears)), gold: 0, traits: b.traits,
+  return { id, name: b.name, uname: def.uname || '巨大な影', icon: def.icon || '👹', level: b.level, ...b.stats, hit: (def.hit || 80) + b.stage * 5, eva: def.eva || 8,
+    exp: Math.round((def.exp || 600) * (1 + 0.5 * b.stage)), gold: 0, traits: b.traits,
     resist: resistAll ? ['sleep', 'silence', 'confuse', 'death'] : ['death'],
     acts: def.acts || [{ kind: 'attack', w: 3 }, { kind: 'dmgAll', power: 0.8, w: 1, name: '大見得' }] };
 }

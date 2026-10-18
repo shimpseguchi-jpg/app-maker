@@ -11,7 +11,7 @@ import { newUnit, canChangeClass, changeClass, canPromote, promote } from '../js
 import { tryRevive, reviveChance, isWiped } from '../js/engine/revive.js';
 import { ITEMS, PROMOTE_ITEMS, crestFor } from '../js/data/items.js';
 import { BOSSES } from '../js/data/bosses.js';
-import { bossAt, rollDrops, masterRate, shopStock } from '../js/engine/boss.js';
+import { bossAt, rollDrops, masterRate, shopStock, untilNextStage } from '../js/engine/boss.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -177,14 +177,16 @@ for (const it of PROMOTE_ITEMS) {
 // ── ボスと再戦 ──
 for (const b of Object.values(BOSSES)) for (const c of b.drops.crests) ok(ITEMS[c], `${b.id}: ドロップ ${c}`);
 {
-  const b0 = bossAt('b1', 0), b1 = bossAt('b1', 1), b3 = bossAt('b1', 3);
-  ok(b1.stats.hp > b0.stats.hp && b3.stats.atk > b1.stats.atk && b3.level > b1.level, '再戦ごとに強くなる');
-  ok(b0.traits.length === 0 && b1.traits.length === 1 && b3.traits.length === 3, '再戦ごとに特性が増える');
-  ok(b3.gold > b0.gold && b3.songRank > b0.songRank && bossAt('b1', 10).songRank === 5, '報酬も良くなる（楽曲ランクは5まで）');
+  const b0 = bossAt('b1', 0), b4 = bossAt('b1', 4), b5 = bossAt('b1', 5), b10 = bossAt('b1', 10), b15 = bossAt('b1', 15);
+  ok(b4.stats.hp === b0.stats.hp && b4.level === b0.level && !b4.traits.length && b4.gold === b0.gold && b4.stage === 0, '1〜5回目（倒した回数0〜4）は最初の強さのまま');
+  ok(b5.stage === 1 && b5.stats.hp === Math.floor(b0.stats.hp * 1.5) && b10.stats.atk > b5.stats.atk && b10.level > b5.level, '5回倒すごとに1段階強くなる（＋50%）');
+  ok(b5.traits.length === 1 && b10.traits.length === 2 && b15.traits.length === 3, '段階ごとに特性が1つずつ増える');
+  ok(b10.gold > b5.gold && b5.gold > b0.gold && b10.songRank > b0.songRank && bossAt('b1', 50).songRank === 5, '報酬も段階で良くなる（楽曲ランクは5まで）');
+  ok(untilNextStage(0) === 5 && untilNextStage(4) === 1 && untilNextStage(5) === 5, '次の段階まであと何回');
   const d = rollDrops('b1', 0, () => 0.99);
   ok(d.items.length === 1 && BOSSES.b1.drops.crests.includes(d.items[0]), '系統別の昇格アイテムは確定ドロップ');
   ok(rollDrops('b1', 0, () => 0).items.includes('masterSeal'), 'マスタープルフも落とす');
-  ok(masterRate(3) > masterRate(0) && masterRate(99) === 50, 'マスタープルフは再戦ほど出やすい（上限50%）');
+  ok(masterRate(4) === masterRate(0) && masterRate(5) > masterRate(0) && masterRate(99) === 50, 'マスタープルフは段階が上がるほど出やすい（上限50%）');
   ok(shopStock(0).masterSeal === 0 && shopStock(3, 1).masterSeal === 2, '店のマスタープルフはボスを倒した回数ぶん入荷');
 }
 

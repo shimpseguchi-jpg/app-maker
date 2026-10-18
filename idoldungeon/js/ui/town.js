@@ -14,6 +14,8 @@ import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppra
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote, prepCheck } from '../engine/town.js';
 import { SLOTS, saveSlot, readSlot, clearSlot, exportText, importText } from '../save.js';
+import { BOSSES } from '../data/bosses.js';
+import { bossStage, untilNextStage } from '../engine/boss.js';
 import { sceneSvg, sceneInfo } from './scenes.js';
 
 export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['help', '遊び方'], ['depart', '迷宮へ']];
@@ -176,7 +178,8 @@ function castle(ex) {
     <div class="book">${list.map((x) => x.known
       ? `<div class="bk"><span class="eicon">${x.enemy.icon}</span><b>${esc(x.enemy.name)}</b> <small class="sub">Lv${x.enemy.level}・HP${x.enemy.hp}・攻撃${x.enemy.atk}・防御${x.enemy.def}・経験値${x.enemy.exp}・倒した数 ${x.kills}</small></div>`
       : `<div class="bk unknown"><span class="eicon">❔</span><b>？？？</b> <small class="sub">${x.kills ? `倒した数 ${x.kills}` : 'まだ出会っていない'}</small></div>`).join('')}</div>
-    ${Object.keys(clears).length ? `<p class="sub">ボス撃破：${Object.values(clears).map((c) => `${c}回`).join('、')}（倒したボスは強化されて再出現する）</p>` : ''}
+    ${Object.keys(clears).length ? `<h3>ボス <small class="sub">5回倒すごとに1段階強くなって再出現する</small></h3>
+      <ul class="plain">${Object.entries(clears).map(([id, n]) => `<li>${esc(BOSSES[id].name)}：${n}回撃破・いまは第${bossStage(n) + 1}段階（あと${untilNextStage(n)}回倒すと第${bossStage(n) + 2}段階）</li>`).join('')}</ul>` : ''}
     <p class="sub">${ex.items.length ? '持っている昇格アイテム：' + [...new Set(ex.items)].map((id) => `${ITEMS[id].name}×${ex.items.filter((x) => x === id).length}`).join('、') : ''}</p>`;
 }
 
@@ -188,7 +191,7 @@ function help() {
       <li><b>迷宮へ</b>から出発。「出発前のチェック」で準備の抜けを確かめられる</li>
       <li>迷宮で戦って経験値・お金・楽譜を集め、階段で街に戻る</li>
       <li><b>宿屋</b>に泊まる（ここでレベルが上がる）。倒れた仲間は<b>寺院</b>へ</li>
-      <li>ボスを倒すと次の迷宮と、その迷宮のカードモードが開く</li>
+      <li>ボスを倒すと次の迷宮と、その迷宮のカードモードが開く。倒したボスは街に戻ると復活し、<b>5回倒すごとに1段階強くなる</b>（城で段階を確かめられる）</li>
     </ol>
     <h3>装備：楽譜</h3>
     <ul class="plain">
