@@ -9,6 +9,9 @@ import { buildMembers, computeParty, BASE_STATS, DERIVED_STATS } from '../js/eng
 import { CLASSES, SPELLS } from '../js/data/classes.js';
 import { newUnit, canChangeClass, changeClass, canPromote, promote } from '../js/engine/classes.js';
 import { tryRevive, reviveChance, isWiped } from '../js/engine/revive.js';
+import { ITEMS, PROMOTE_ITEMS, crestFor } from '../js/data/items.js';
+import { BOSSES } from '../js/data/bosses.js';
+import { bossAt, rollDrops, masterRate, shopStock } from '../js/engine/boss.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -139,11 +142,13 @@ for (const i of Object.values(IDOLS)) {
 }
 {
   const u = newUnit(IDOLS.chihaya);                 // 魔道士
-  ok(!canPromote(u, 'sage'), 'Lv1 では昇格できない');
+  ok(!canPromote(u, 'sage', 'guidingRing'), 'Lv1 では昇格できない');
   const u10 = { ...u, level: 10, base: { ...u.base, vo: 20 } };
-  ok(!canPromote(u10, 'bishop'), '昇格先は2択のどちらか（魔道士→ビショップ不可）');
-  ok(!canPromote(u10, 'sage', false), '昇格アイテムが必要');
-  const s = promote(u10, 'sage');
+  ok(!canPromote(u10, 'bishop', 'guidingRing'), '昇格先は2択のどちらか（魔道士→ビショップ不可）');
+  ok(!canPromote(u10, 'sage', null), '昇格アイテムが必要');
+  ok(!canPromote(u10, 'sage', 'heroCrest'), '系統の違うアイテムでは昇格できない');
+  ok(canPromote(u10, 'sage', 'masterSeal'), 'マスタープルフはどの下位職にも使える');
+  const s = promote(u10, 'sage', 'guidingRing');
   ok(s.cls === 'sage' && s.level === 1 && s.base.vo === 22 && s.base.men === u.base.men + 2, '昇格：Lv1・能力は残りボーナス加算');
   ok(s.learned.includes('arcane'), '昇格しても魔法は残る');
   ok(!canChangeClass(u, 'samurai'), '侍は条件が高い');
@@ -158,6 +163,29 @@ for (const i of Object.values(IDOLS)) {
   const k = computeParty(buildMembers([{ idol: 'makoto', cls: 'knight' }])).members[0];
   const f = computeParty(buildMembers([{ idol: 'makoto', cls: 'fighter' }])).members[0];
   ok(k.stats.def === f.stats.def + 4, 'クラス特性が能力値に反映');
+}
+
+// ── 昇格アイテム ──
+for (const c of Object.values(CLASSES)) {
+  if (c.tier === 1 && c.promote.length) ok(crestFor(c.id), `${c.id}: 系統別の昇格アイテムがある`);
+}
+for (const it of PROMOTE_ITEMS) {
+  ok(it.price > 0 && (it.shop === 'always' || it.shop === 'perClear'), `${it.id}: 店売りの設定`);
+  for (const c of it.for) ok(c === '*' || CLASSES[c]?.tier === 1, `${it.id}: 対象 ${c}`);
+}
+
+// ── ボスと再戦 ──
+for (const b of Object.values(BOSSES)) for (const c of b.drops.crests) ok(ITEMS[c], `${b.id}: ドロップ ${c}`);
+{
+  const b0 = bossAt('b1', 0), b1 = bossAt('b1', 1), b3 = bossAt('b1', 3);
+  ok(b1.stats.hp > b0.stats.hp && b3.stats.atk > b1.stats.atk && b3.level > b1.level, '再戦ごとに強くなる');
+  ok(b0.traits.length === 0 && b1.traits.length === 1 && b3.traits.length === 3, '再戦ごとに特性が増える');
+  ok(b3.gold > b0.gold && b3.songRank > b0.songRank && bossAt('b1', 10).songRank === 5, '報酬も良くなる（楽曲ランクは5まで）');
+  const d = rollDrops('b1', 0, () => 0.99);
+  ok(d.items.length === 1 && BOSSES.b1.drops.crests.includes(d.items[0]), '系統別の昇格アイテムは確定ドロップ');
+  ok(rollDrops('b1', 0, () => 0).items.includes('masterSeal'), 'マスタープルフも落とす');
+  ok(masterRate(3) > masterRate(0) && masterRate(99) === 50, 'マスタープルフは再戦ほど出やすい（上限50%）');
+  ok(shopStock(0).masterSeal === 0 && shopStock(3, 1).masterSeal === 2, '店のマスタープルフはボスを倒した回数ぶん入荷');
 }
 
 // ── 蘇生（ロストなし） ──

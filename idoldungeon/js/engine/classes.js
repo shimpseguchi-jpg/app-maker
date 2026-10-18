@@ -2,6 +2,7 @@
 // unit: { idol, cls, level, base: {pow..vis}, learned: [abilityId...], history: [clsId...] }
 import { CLASSES, PROMOTE_LEVEL, SPELLS } from '../data/classes.js';
 import { BASE_STATS } from './party.js';
+import { itemFits } from '../data/items.js';
 
 export function newUnit(idol) {
   return { idol: idol.id, cls: idol.cls, level: 1, base: { ...idol.base }, learned: [], history: [] };
@@ -19,13 +20,14 @@ export function changeClass(unit, clsId, idol) {
     learned: mergeLearned(unit), history: [...unit.history, unit.cls] };
 }
 
-// 昇格：下位職 Lv10 以上で、昇格アイテムを使って2択の上位職へ。Lv1 に戻るが能力は残り、昇格ボーナスが足される
-export function canPromote(unit, clsId, hasItem = true) {
+// 昇格：下位職 Lv10 以上で、今のクラスに合う昇格アイテム（js/data/items.js）を使って2択の上位職へ
+// Lv1 に戻るが能力は残り、昇格ボーナスが足される。アイテムは使うとなくなる（在庫の管理は呼び出し側）
+export function canPromote(unit, clsId, itemId) {
   const cur = CLASSES[unit.cls];
-  return !!(hasItem && cur?.tier === 1 && unit.level >= PROMOTE_LEVEL && cur.promote.includes(clsId));
+  return !!(cur?.tier === 1 && unit.level >= PROMOTE_LEVEL && cur.promote.includes(clsId) && itemFits(itemId, unit.cls));
 }
-export function promote(unit, clsId, hasItem = true) {
-  if (!canPromote(unit, clsId, hasItem)) throw new Error(`昇格できない: ${unit.cls} → ${clsId}`);
+export function promote(unit, clsId, itemId) {
+  if (!canPromote(unit, clsId, itemId)) throw new Error(`昇格できない: ${unit.cls} → ${clsId}`);
   const bonus = CLASSES[clsId].bonus || {};
   const base = {};
   for (const k of BASE_STATS) base[k] = unit.base[k] + (bonus[k] || 0);
