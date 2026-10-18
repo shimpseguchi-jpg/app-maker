@@ -7,7 +7,8 @@ import { SPELLS_BY_ID, KIND_TARGET } from './data/spells.js';
 import { CONDITIONS } from './engine/revive.js';
 import { getFloor, viewCells, DIR_NAME, isDark, isAntiMagic } from './engine/dungeon.js';
 import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf } from './engine/expedition.js';
-import { renderTown, townAction } from './ui/town.js';
+import { renderTown, townAction, townSpeech } from './ui/town.js';
+import { portrait, shortName } from './ui/portrait.js';
 import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveReady, autoCommands } from './engine/battle.js';
 import { expForLevel } from './engine/growth.js';
 import { drawView } from './ui/view3d.js';
@@ -44,51 +45,83 @@ function render() {
   const town = ex.mode === 'town', battle = !!(ex.battle || battleEnd);
   const st = ex.ex;
   const fl = getFloor(st.dungeon, st.floor);
-  $('where').textContent = town ? '街' : `${DUNGEONS[st.dungeon].name} ${fl.id}`;
   const ch = fl.cellAt(st.x, st.y);
-  // 座標表示はエルミナージュと同じ X/Y。ダークゾーンでは分からない
-  $('pos').textContent = town ? '' : isDark(ch) ? 'X?? Y?? ?向き' : `X${String(st.x).padStart(2, '0')} Y${String(st.y).padStart(2, '0')} ${DIR_NAME[st.dir]}向き`;
-  $('zone').textContent = town ? '' : isDark(ch) ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
-  $('gold').textContent = `${ex.gold}G`;
-  $('view').hidden = town || battle; $('town').hidden = !town; $('battle').hidden = !battle; $('pad').hidden = town || battle;
+  const dark = !town && isDark(ch);
+  // 右上の場所名（エルミナージュの細い下線つきの札）。座標は X/Y、ダークゾーンでは分からない
+  $('where').textContent = town ? `劇中の街 ― ${townSpeech().place}` : `${DUNGEONS[st.dungeon].name}  ${fl.id}`;
+  $('pos').textContent = town || battle ? '' : dark ? 'X?? Y??' : `X${String(st.x).padStart(2, '0')}  Y${String(st.y).padStart(2, '0')}`;
+  $('zone').textContent = town ? '' : dark ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
+  $('gold').textContent = `${ex.gold} G`;
+  $('screen').dataset.mode = town ? 'town' : battle ? 'battle' : 'dungeon';
+  $('town').hidden = !town; $('battle').hidden = !battle; $('pad').hidden = town || battle;
+  $('hudmap').hidden = town || battle; $('compass').hidden = town || battle;
   if (town) $('town').innerHTML = renderTown(ex);
-  else if (battle) renderBattle();
   else {
     drawView($('view'), st, viewCells(st), { theme: fl.theme });
+    if (battle) renderBattle();
     const stairs = ch === 'u' || ch === 'd';
-    $('stairs-btn').hidden = !stairs;
+    $('stairs-btn').hidden = !stairs || battle;
     $('stairs-btn').textContent = ch === 'd' ? '階段を下りる' : st.floor === 0 ? '街へ戻る' : '階段を上る';
+    // 方角：針は北を指す（向いている方角が上）。まん中に向いている方角
+    $('compass').innerHTML = dark ? '<b>？</b>' : `<i class="needle" style="transform:rotate(${-st.dir * 90}deg)"></i><b>${DIR_NAME[st.dir]}</b>`;
+    if (!dark) drawMap($('map'), st, { theme: fl.theme, mini: true });
+    else { const c = $('map').getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 150, 150); }
   }
-  if (!isDark(ch) || town) drawMap($('map'), st, { theme: town ? getFloor(st.dungeon, 0).theme : fl.theme });
-  else { const c = $('map').getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 264, 264); }
-  $('log').innerHTML = log.slice(-6).map((m) => `<div>${esc(m)}</div>`).join('');
-  $('log').hidden = battle;
+  renderLog(town, battle);
   renderParty();
   save();
 }
 
+// 下の窓：街では施設の人のひとこと、戦闘中は戦闘の記録、迷宮ではできごと
+function renderLog(town, battle) {
+  let lines, speaker = '';
+  if (battle) lines = (ex.battle || battleEnd.battle).log.slice(-5);
+  else if (town) { const t = townSpeech(); speaker = t.speaker; lines = [`「${t.line}」`, ...log.slice(-2)]; }
+  else lines = log.slice(-4);
+  $('log').innerHTML = (speaker ? `<div class="speaker">${esc(speaker)}</div>` : '') + lines.map((m) => `<div>${esc(m)}</div>`).join('');
+}
+
+// 6人の顔（エルミナージュの下の列：名前・顔・レベル・大きな HP・ゲージ）
 function renderParty() {
   const list = ex.battle ? ex.battle.party.map((m) => ({ ...m, idol: IDOLS[m.id] })) : partyView(ex);
-  $('party').innerHTML = list.map((m, i) => {
-    const pct = Math.round((m.hp / m.maxHp) * 100);
+  const tiles = list.map((m, i) => {
+    const pct = Math.max(0, Math.round((m.hp / m.maxHp) * 100));
     const flags = [];
-    if (m.cond !== 'ok') flags.push(`<span class="cond ${m.cond}">${CONDITIONS[m.cond].name}</span>`);
-    if (m.poison) flags.push('<span class="cond poison">毒</span>');
-    if (m.sleep) flags.push('<span class="cond">睡眠</span>');
-    if (m.silence) flags.push('<span class="cond">沈黙</span>');
-    if (m.fled) flags.push('<span class="cond">逃走</span>');
+    if (m.cond !== 'ok') flags.push(CONDITIONS[m.cond].name);
+    if (m.poison) flags.push('毒');
+    if (m.sleep) flags.push('睡眠');
+    if (m.silence) flags.push('沈黙');
+    if (m.fled) flags.push('逃走');
     const u = unitOf(ex, m.id);
     const mp = ex.battle ? m.mp : ex.mp[m.id];
-    const mpText = mp && Object.keys(mp).length ? ' 呪' + Object.values(mp).join('/') : '';
     const live = ex.battle ? m.live?.left : ex.live[m.id]?.left;
     const active = ex.battle && !ex.battle.result && i === cmdIdx ? ' active' : '';
-    return `<div class="pm${active}" style="--c:${m.idol.color}"><b>${esc(m.idol.name)}</b> <small>${esc(CLASSES[m.cls].name)} Lv${u.level}</small> ${flags.join('')}
-      <div class="hpbar"><i style="width:${pct}%"></i></div><small>HP ${m.hp}/${m.maxHp}${mpText}${live != null ? ` 歌${live}` : ''} ・ 次Lvまで ${Math.max(0, expForLevel(u.level + 1) - u.exp)}</small></div>`;
-  }).join('');
+    const down = ['dead', 'ash', 'stone', 'paralyze'].includes(m.cond) || m.fled ? ' down' : '';
+    const tip = `${m.idol.name}（${CLASSES[m.cls].name} Lv${u.level}）HP ${m.hp}/${m.maxHp}${mp && Object.keys(mp).length ? ' 呪文' + Object.values(mp).join('/') : ''}${live != null ? ` 歌${live}` : ''} 次のLvまで ${Math.max(0, expForLevel(u.level + 1) - u.exp)}`;
+    return `<div class="pt${active}${down}" style="--c:${m.idol.color}" title="${esc(tip)}">
+      <div class="pt-name">${esc(shortName(m.id))}</div>
+      <div class="pt-face">${portrait(m.id)}</div>
+      ${flags.length ? `<div class="pt-cond">${esc(flags[0])}</div>` : ''}
+      <div class="pt-lv">${u.level}</div><div class="pt-hp">${m.hp}</div>
+      <div class="pt-gauge"><i style="width:${pct}%" class="${pct < 30 ? 'low' : ''}"></i></div>
+    </div>`;
+  });
+  for (let i = list.length; i < 6; i++) tiles.push('<div class="pt empty"></div>');
+  $('party').innerHTML = tiles.join('');
   const items = ex.items.reduce((a, id) => ((a[id] = (a[id] || 0) + 1), a), {});
-  const keys = ex.ex.keys.map((k) => `<span class="tag">🔑${esc(keyLabel(k))}</span>`).join('');
+  const keys = ex.ex.keys.map((k) => `<span class="tag">🔑 ${esc(keyLabel(k))}</span>`).join('');
   const its = Object.entries(items).map(([id, n]) => `<span class="tag">${esc(ITEMS[id].name)}×${n}</span>`).join('');
   $('bag').innerHTML = keys || its ? `<div class="tags">${keys}${its}</div>` : '<small class="sub">持ち物なし</small>';
+}
+
+// 大きい地図（エルミナージュの地図画面：方眼と座標）
+function showBigMap() {
+  if (ex.mode !== 'dungeon' || ex.battle || battleEnd) return;
+  const st = ex.ex, fl = getFloor(st.dungeon, st.floor), dark = isDark(fl.cellAt(st.x, st.y));
+  $('bigmap-title').textContent = `${DUNGEONS[st.dungeon].name}  ${fl.id}`;
+  $('bigmap-coord').textContent = dark ? '現在地：X?? Y??' : `現在地：X ${st.x}  Y ${st.y}  ${DIR_NAME[st.dir]}向き`;
+  drawMap($('mapfull'), st, { full: true });
+  $('bigmap').hidden = false;
 }
 
 // ── 戦闘 ──
@@ -99,67 +132,70 @@ function nextActor(from) {
 }
 function resetCommands() { cmds = []; sub = null; cmdIdx = nextActor(0); }
 
+// 戦闘：敵は画面の中央に大きく、右上に敵グループの小窓、左上に行動する人と縦のコマンド
 function renderBattle() {
   const b = ex.battle || battleEnd.battle;
   const groups = aliveGroups(b);
-  const enemyHtml = b.groups.map((g) => {
+  const stage = groups.map((g) => {
     const n = g.members.filter((e) => !e.dead).length;
-    if (!n) return '';
     const status = [g.members.some((e) => !e.dead && e.sleep) && '睡眠', g.members.some((e) => !e.dead && e.confuse) && '混乱', g.members.some((e) => !e.dead && e.silence) && '沈黙'].filter(Boolean).join('・');
-    return `<div class="eg"><span class="eicon">${g.identified ? g.def.icon : '❔'}</span>
-      <b>${groups.indexOf(g) + 1}）${esc(groupName(g))}</b> <span class="sub">×${n}</span> ${status ? `<span class="cond">${status}</span>` : ''}</div>`;
+    const icon = g.identified ? g.def.icon : '❔';
+    return `<div class="foe ${g.def.traits ? 'boss' : ''}"><div class="foe-art">${Array.from({ length: Math.min(n, 3) }, () => `<span>${icon}</span>`).join('')}</div>
+      <div class="foe-name">${esc(groupName(g))}${status ? ` <em>${status}</em>` : ''}</div></div>`;
+  }).join('');
+  const box = groups.map((g, i) => {
+    const n = g.members.filter((e) => !e.dead).length;
+    return `<div><span class="gi">${i + 1}</span>${esc(groupName(g))}<span class="dots">${'●'.repeat(Math.min(n, 9))}</span></div>`;
   }).join('');
   let ctl = '';
   if (battleEnd) {
-    ctl = `<div class="bres"><b>${{ win: '勝利！', flee: '逃げ切った', lose: '全滅……' }[b.result]}</b>
-      ${battleEnd.msgs.map((m) => `<div>${esc(m)}</div>`).join('')}
-      <button data-b="end">探索に戻る</button></div>`;
+    ctl = `<div class="who">${{ win: '勝利！', flee: '逃げ切った', lose: '全滅……' }[b.result]}</div>
+      <div class="bres">${battleEnd.msgs.map((m) => `<div>${esc(m)}</div>`).join('')}</div>
+      <div class="vmenu"><button data-b="end" class="vbar on">探索に戻る</button></div>`;
   } else if (b.turn === 0 && b.surprise === 'enemy') {
-    ctl = '<button data-b="go">不意を突かれた！（次へ）</button>';
+    ctl = '<div class="who">不意を突かれた！</div><div class="vmenu"><button data-b="go" class="vbar on">次へ</button></div>';
   } else if (cmdIdx >= b.party.length) {
-    ctl = '<button data-b="go">実行</button>';
+    ctl = '<div class="vmenu"><button data-b="go" class="vbar on">実行</button></div>';
   } else ctl = commandMenu(b, b.party[cmdIdx], groups);
-  $('battle').innerHTML = `
-    <div class="enemies">${enemyHtml || '<span class="sub">敵はいない</span>'}</div>
-    <div class="blog">${b.log.slice(-9).map((m) => `<div>${esc(m)}</div>`).join('')}</div>
-    <div class="bctl">${ctl}</div>`;
-  const bl = $('battle').querySelector('.blog'); if (bl) bl.scrollTop = bl.scrollHeight;
+  $('battle').innerHTML = `<div class="foes">${stage || ''}</div>
+    <div class="groupbox">${box}</div>
+    <div class="cmdwin">${ctl}</div>`;
 }
 
 function commandMenu(b, m, groups) {
-  const head = `<div class="who"><b>${esc(m.name)}</b>の行動 <small class="sub">${m.row === 'front' ? '前列' : '後列'}・射程${m.range}</small></div>`;
-  const back = cmdIdx > nextActor(0) || sub ? '<button data-b="back" class="minor">戻る</button>' : '';
-  const auto = '<button data-b="auto" class="minor">おまかせ（残り全員）</button>';
+  const head = `<div class="who">${esc(m.name)}<small>${m.row === 'front' ? '前列' : '後列'}・射程${m.range}</small></div>`;
+  const back = cmdIdx > nextActor(0) || sub ? '<button data-b="back" class="vbar minor">戻る</button>' : '';
+  const auto = '<button data-b="auto" class="vbar minor">おまかせ</button>';
   if (!sub) {
     const reach = reachableGroups(b, m);
     const spells = castable(b, m);
     const btns = [
-      `<button data-b="attack" ${reach.length ? '' : 'disabled'}>戦う${reach.length ? '' : '（届かない）'}</button>`,
-      `<button data-b="spell" ${spells.length ? '' : 'disabled'}>呪文</button>`,
-      m.live ? `<button data-b="live" ${m.live.left > 0 ? '' : 'disabled'}>ライブ「${esc(m.live.name)}」×${m.live.left}</button>` : '',
-      has(m, 'dance') ? '<button data-b="dance">踊る</button>' : '',
-      has(m, 'unitLive') && unitLiveReady(b) ? '<button data-b="unitLive">ユニットライブ</button>' : '',
-      '<button data-b="defend">守る</button>',
-      '<button data-b="guard">かばう</button>',
-      b.canFlee ? '<button data-b="flee">逃げる</button>' : '',
+      `<button class="vbar" data-b="attack" ${reach.length ? '' : 'disabled'}>戦う${reach.length ? '' : '（届かない）'}</button>`,
+      `<button class="vbar" data-b="spell" ${spells.length ? '' : 'disabled'}>呪文</button>`,
+      m.live ? `<button class="vbar" data-b="live" ${m.live.left > 0 ? '' : 'disabled'}>ライブ「${esc(m.live.name)}」×${m.live.left}</button>` : '',
+      has(m, 'dance') ? '<button class="vbar" data-b="dance">踊る</button>' : '',
+      has(m, 'unitLive') && unitLiveReady(b) ? '<button class="vbar" data-b="unitLive">ユニットライブ</button>' : '',
+      '<button class="vbar" data-b="defend">守る</button>',
+      '<button class="vbar" data-b="guard">かばう</button>',
+      b.canFlee ? '<button class="vbar" data-b="flee">逃げる</button>' : '',
     ];
-    return `${head}<div class="cmds">${btns.join('')}</div><div class="cmds2">${back}${auto}</div>`;
+    return `${head}<div class="vmenu">${btns.join('')}</div><div class="vmenu minor-row">${back}${auto}</div>`;
   }
   if (sub.type === 'attack') {
     const reach = reachableGroups(b, m);
-    return `${head}<div class="sub">どのグループを攻撃する？</div><div class="cmds">${groups.map((g, i) => `<button data-tg="${i}" ${reach.includes(g) ? '' : 'disabled'}>${i + 1}）${esc(groupName(g))}</button>`).join('')}</div><div class="cmds2">${back}</div>`;
+    return `${head}<div class="ask">どのグループを攻撃する？</div><div class="vmenu">${groups.map((g, i) => `<button class="vbar" data-tg="${i}" ${reach.includes(g) ? '' : 'disabled'}>${i + 1}）${esc(groupName(g))}</button>`).join('')}</div><div class="vmenu minor-row">${back}</div>`;
   }
   if (sub.type === 'spell') {
-    return `${head}<div class="cmds">${castable(b, m).map((s) => `<button data-sp="${s.id}" title="${esc(s.text)}">${esc(s.name)} <small>${m.mp[s.family]}回</small></button>`).join('')}</div><div class="cmds2">${back}</div>`;
+    return `${head}<div class="vmenu">${castable(b, m).map((s) => `<button class="vbar" data-sp="${s.id}" title="${esc(s.text)}">${esc(s.name)} <small>${m.mp[s.family]}回</small></button>`).join('')}</div><div class="vmenu minor-row">${back}</div>`;
   }
   // 対象を選ぶ（呪文・ライブ・かばう・踊る）
   const kind = sub.kind;
   const tgt = kind ? KIND_TARGET[kind] : 'ally';
   if (tgt === 'enemy' || tgt === 'group') {
-    return `${head}<div class="sub">${esc(sub.label)}：どの敵に？</div><div class="cmds">${groups.map((g, i) => `<button data-tg="${i}">${i + 1}）${esc(groupName(g))}</button>`).join('')}</div><div class="cmds2">${back}</div>`;
+    return `${head}<div class="ask">${esc(sub.label)}：どの敵に？</div><div class="vmenu">${groups.map((g, i) => `<button class="vbar" data-tg="${i}">${i + 1}）${esc(groupName(g))}</button>`).join('')}</div><div class="vmenu minor-row">${back}</div>`;
   }
   const allies = b.party.map((t, i) => [t, i]).filter(([t]) => (kind === 'revive' ? t.cond === 'dead' : !t.fled && t.hp > 0 && t.cond !== 'dead' && t.cond !== 'ash') && (sub.type === 'guard' || sub.type === 'dance' ? t !== m : true));
-  return `${head}<div class="sub">${esc(sub.label)}：だれに？</div><div class="cmds">${allies.map(([t, i]) => `<button data-ta="${i}">${esc(t.name)} <small>HP${t.hp}</small></button>`).join('')}</div><div class="cmds2">${back}</div>`;
+  return `${head}<div class="ask">${esc(sub.label)}：だれに？</div><div class="vmenu">${allies.map(([t, i]) => `<button class="vbar" data-ta="${i}">${esc(t.name)} <small>HP${t.hp}</small></button>`).join('')}</div><div class="vmenu minor-row">${back}</div>`;
 }
 
 function setCommand(c) {
@@ -280,7 +316,10 @@ function closeModal() {
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('button');
   if (!b || b.disabled) return;
+  if (!$('bigmap').hidden && b.dataset.x !== 'mapclose') return;
   if (b.closest('#battle')) { battleClick(b); return; }
+  if (b.id === 'hudmap' || b.dataset.x === 'map') { showBigMap(); return; }
+  if (b.dataset.x === 'mapclose') { $('bigmap').hidden = true; return; }
   if (b.dataset.a) doAction(b.dataset.a);
   else if (b.dataset.m) closeModal();
   else if (b.closest('#town')) townDo(b);
@@ -299,6 +338,11 @@ function townDo(el) {
 const KEYMAP = { ArrowUp: 'forward', w: 'forward', ArrowLeft: 'turnL', a: 'turnL', ArrowRight: 'turnR', d: 'turnR',
   ArrowDown: 'turnBack', s: 'turnBack', q: 'strafeL', e: 'strafeR', ' ': 'search', f: 'search', Enter: 'stairs' };
 document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'm' || ev.key === 'M' || (ev.key === 'Escape' && !$('bigmap').hidden)) {
+    if (ev.target.closest('input, select, textarea')) return;
+    if ($('bigmap').hidden) showBigMap(); else $('bigmap').hidden = true;
+    return;
+  }
   const a = KEYMAP[ev.key];
   if (!a || ev.target.closest('input, select, textarea')) return;
   ev.preventDefault();

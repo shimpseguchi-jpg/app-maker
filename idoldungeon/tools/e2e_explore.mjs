@@ -1,7 +1,7 @@
 // ロボットが迷宮を通しで遊ぶテスト
 //   劇場地下迷宮：鍵→スイッチ→B2Fのボス→街へ  →  奈落の大劇場：鍵→スイッチ→B4Fのボス→街へ
 // 道順は探索エンジンで探し、ブラウザではキーボードで操作する。回転床などで予定とずれたら、その場で道順を引き直す
-// 戦闘は「おまかせ」で進める。流れを確かめるのが目的なので、パーティは Lv24 に育てておく（強さの調整は tools/sim_battle.mjs・sim_play.mjs）
+// 戦闘は「おまかせ」で進める。流れを確かめるのが目的なので、パーティは Lv30 に育てておく（Lv24 だと休まずに奈落を進むうちに、たまに全滅する）（強さの調整は tools/sim_battle.mjs・sim_play.mjs）
 // 使いかた：リポジトリのルートで npx http-server -p 8123 -c-1 . を動かしてから
 //   node idoldungeon/tools/e2e_explore.mjs
 import { chromium } from 'playwright';
@@ -53,7 +53,7 @@ await page.goto(url);
 const PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 const start = newExpedition(PARTY);
 const grow = seeded(1);
-for (const s of PARTY) gainExp(unitOf(start, s.idol), expForLevel(24), '', grow);
+for (const s of PARTY) gainExp(unitOf(start, s.idol), expForLevel(30), '', grow);
 start.hp = {}; start.mp = {};
 syncParty(start);
 await page.evaluate((ex) => { localStorage.clear(); localStorage.setItem('idoldungeon.expedition', JSON.stringify(ex)); }, start);

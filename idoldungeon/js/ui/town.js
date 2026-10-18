@@ -12,6 +12,7 @@ import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppra
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
 import { SLOTS, saveSlot, readSlot, exportText, importText } from '../save.js';
+import { sceneSvg, sceneInfo } from './scenes.js';
 
 export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -21,12 +22,17 @@ let ioText = '';
 let trainee = null;   // 訓練所で選んでいるアイドル
 let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
 
+// エルミナージュの施設画面：背景画の上に、左上の縦メニュー（施設）と、こげ茶の板（中身）。施設の人のひとことは下の窓
 export function renderTown(ex) {
-  const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="${id === tab ? 'on' : ''}">${nm}</button>`).join('');
+  const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="vbar ${id === tab ? 'on' : ''}">${nm}</button>`).join('');
+  const go = openDungeons(ex).map((d) => `<button data-t="enter" data-id="${d.id}" class="vbar go" ${ex.slots.length ? '' : 'disabled'}>${esc(d.name)}へ<small>${d.floors.length}階</small></button>`).join('');
   const body = { tavern, inn, shop, temple, training, castle, record }[tab](ex);
-  return `<div class="tabs town-tabs">${tabs}</div><div class="town-body">${body}</div>
-    <div class="town-go">${openDungeons(ex).map((d) => `<button data-t="enter" data-id="${d.id}" ${ex.slots.length ? '' : 'disabled'}>${esc(d.name)}へ <small>${d.floors.length}階</small></button>`).join('')}</div>`;
+  return `${sceneSvg(tab)}
+    <nav class="vmenu town-menu" aria-label="施設">${tabs}<div class="vmenu-sep">出発</div>${go}</nav>
+    <section class="panel town-panel"><h2 class="plate">${esc(sceneInfo(tab).name)}</h2>${body}</section>`;
 }
+// 下の窓に出す、施設の人のひとこと
+export const townSpeech = () => ({ speaker: sceneInfo(tab).speaker, line: sceneInfo(tab).line, place: sceneInfo(tab).name });
 
 function tavern(ex) {
   const party = partyView(ex);
