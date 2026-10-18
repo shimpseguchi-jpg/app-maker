@@ -1,7 +1,9 @@
 // 戦闘（エルミナージュ準拠。docs/DESIGN.md「11. 戦闘」）
 //   6人パーティ（前列3・後列3） vs 敵グループ（最大4）。全員のコマンドを決めてからターンを解決する
-//   行動順は素早さ＋運。射程 S/M/L で届く敵の列が決まる。逃げるは選んだ人だけが逃げる
+//   行動順は素早さ＋運（毎ターン決め直す）。射程 S/M/L で届く敵の列が決まる。逃げるは選んだ人だけが逃げる
 // 画面から独立。rng を渡せば結果は決まる
+// 1ターンの解決後、b.order（行動順）と b.steps（1人ずつの行動：ログの範囲・当たった数字・その時点の HP）を残す。
+//   画面はこれを使って、エルミナージュのように1人ずつ順に見せる
 import { ENEMIES } from '../data/enemies.js';
 import { SPELLS_BY_ID, SPELL_LIST, KIND_TARGET } from '../data/spells.js';
 
@@ -10,6 +12,10 @@ const DISABLED = new Set(['dead', 'ash', 'stone', 'paralyze']);
 const rint = (rng, a, b) => a + Math.floor(rng() * (b - a + 1));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const has = (m, id) => m.abilities?.some((a) => a.id === id);
+const avg = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
+// 行動順の乱数の幅。素早さがこれ以上違えば、速いほうが必ず先に動く
+export const INIT_SPREAD = 10;
+export const initiative = (spd, rng) => spd + rng() * INIT_SPREAD;
 
 // ── 戦闘の準備 ──
 // party: expedition.js の battleParty() の結果
@@ -31,10 +37,11 @@ export function createBattle(party, groups, opts = {}) {
   identify(b, rng);
   for (const g of b.groups) b.log.push(`${groupName(g)}が${g.members.length}体現れた！`);
   if (b.zone.anti) b.log.push('ここは呪文禁止エリアだ');
-  // 先制・不意打ち（ボスは不意打ちしない）
+  // 先制・不意打ち：パーティと敵の素早さの差で起こりやすさが変わる（ボスは不意打ちしない）
   const p = rng() * 100;
-  const partyFirst = 12 + (b.party.some((m) => has(m, 'thunderStep')) ? 10 : 0);
-  const enemyFirst = b.kind === 'boss' || b.party.some((m) => has(m, 'ambush')) || (b.zone.dark && b.party.some((m) => has(m, 'stealth'))) ? 0 : 10;
+  const gap = avg(b.party.map((m) => m.stats.spd)) - avg(b.groups.flatMap((g) => g.members.map(() => g.def.spd)));
+  const partyFirst = clamp(12 + gap / 2, 4, 30) + (b.party.some((m) => has(m, 'thunderStep')) ? 10 : 0);
+  const enemyFirst = b.kind === 'boss' || b.party.some((m) => has(m, 'ambush')) || (b.zone.dark && b.party.some((m) => has(m, 'stealth'))) ? 0 : clamp(10 - gap / 2, 3, 25);
   b.surprise = p < partyFirst ? 'party' : p < partyFirst + enemyFirst ? 'enemy' : null;
   if (b.surprise === 'party') b.log.push('敵はまだこちらに気づいていない！');
   if (b.surprise === 'enemy') b.log.push('不意を突かれた！');
@@ -93,7 +100,7 @@ export function runTurn(b, commands, rng = Math.random) {
       if (!c || !canAct(m)) return;
       if (c.type === 'defend') { m.defending = true; return; }
       if (c.type === 'guard') { guards[c.ally] = i; return; }
-      let init = m.stats.spd * (0.75 + rng() * 0.5);
+      let init = initiative(m.stats.spd, rng);
       if (b.turn === 1 && (has(m, 'ready') || has(m, 'quickStart'))) init += 1000;
       actors.push({ side: 'p', i, init, c });
     });
@@ -102,23 +109,41 @@ export function runTurn(b, commands, rng = Math.random) {
     b.groups.forEach((g) => g.members.forEach((e, ei) => {
       if (e.dead) return;
       const n = g.def.traits?.some((t) => t.id === 'twoActions') ? 2 : 1;
-      for (let k = 0; k < n; k++) actors.push({ side: 'e', g, ei, init: g.def.spd * (0.75 + rng() * 0.5) });
+      for (let k = 0; k < n; k++) actors.push({ side: 'e', g, ei, init: initiative(g.def.spd, rng) });
     }));
   }
   actors.sort((a, b2) => b2.init - a.init);
+  b.order = actors.map((a) => (a.side === 'p' ? { side: 'p', i: a.i } : { side: 'e', gi: a.g.gi, ei: a.ei }));
+  b.steps = [];
+  b.hits = [];
   // 双子が同じグループを狙ったら連携攻撃
   const twinTargets = b.party.map((m, i) => (has(m, 'twinAttack') && commands[i]?.type === 'attack' ? commands[i].group : null)).filter((x) => x != null);
   const twinGroup = twinTargets.length >= 2 && twinTargets[0] === twinTargets[1] ? twinTargets[0] : null;
 
-  for (const a of actors) {
+  for (let k = 0; k < actors.length; k++) {
+    const a = actors[k], from = b.log.length;
     if (b.result) break;
     if (a.side === 'p') partyAct(b, a.i, a.c, rng, log, twinGroup);
     else enemyAct(b, a.g, a.ei, rng, log, guards);
     checkEnd(b, log);
+    pushStep(b, k, from);
   }
+  const from = b.log.length;
   if (!b.result) endOfTurn(b, rng, log);
   checkEnd(b, log);
+  pushStep(b, -1, from);
+  delete b.hits;
   return b;
+}
+
+// 1人ぶんの行動を記録する（画面で1人ずつ見せるため）。何も起きなかった行動（眠っていた等）は残さない
+function pushStep(b, k, from) {
+  if (b.log.length > from) {
+    b.steps.push({ k, from, to: b.log.length, hits: b.hits,
+      party: b.party.map((m) => ({ hp: m.hp, cond: m.cond, fled: m.fled, poison: m.poison, sleep: m.sleep, silence: m.silence })),
+      foes: b.groups.map((g) => g.members.map((e) => (e.dead ? 0 : e.hp))) });
+  }
+  b.hits = [];
 }
 
 function partyAct(b, i, c, rng, log, twinGroup) {
@@ -180,7 +205,7 @@ function attack(b, m, gIndex, rng, log, mult) {
   // 攻撃回数：戦士系はレベルとともに増える。8レベルごとに1回、そのあいだは確率でなめらかに（急に強くならないように）
   const extra = casterOnly ? 0 : ((m.power || m.level) - 1) / 8;
   const hits = 1 + Math.floor(extra) + (rng() < extra % 1 ? 1 : 0) + (has(m, 'doubleHit') && rng() < 0.25 ? 1 : 0);
-  let landed = 0, total = 0;
+  let landed = 0, total = 0, kills = 0;
   for (let h = 0; h < hits; h++) {
     const alive = g.members.filter((e) => !e.dead);
     if (!alive.length) break;
@@ -191,6 +216,7 @@ function attack(b, m, gIndex, rng, log, mult) {
     if (has(m, 'silencer') && !g.def.resist.includes('death') && rng() < 0.05) {
       log(`${m.name}の首切り！ ${groupName(g)}を一撃で倒した`);
       hurtEnemy(b, g, e, e.hp, log, true);
+      landed--;
       continue;
     }
     const atk = m.stats.atk * (m.buff ? 1.3 : 1) * mult;
@@ -200,20 +226,25 @@ function attack(b, m, gIndex, rng, log, mult) {
     total += dmg;
     e.sleep = 0;
     if ((has(m, 'charm') || has(m, 'eyeContact')) && rng() < 0.1 && !e.dead) { e.confuse = 1; log(`${groupName(g)}はうっとりしている`); }
-    hurtEnemy(b, g, e, dmg, log, true);
+    if (hurtEnemy(b, g, e, dmg, log, true)) kills++;
   }
-  log(landed ? `${m.name}の攻撃！ ${groupName(g)}に${landed}回命中、${total}のダメージ` : `${m.name}の攻撃は外れた`);
+  if (landed > 0) log(`${m.name}の攻撃！ ${groupName(g)}に${landed}回命中、${total}のダメージ`);
+  else if (landed === 0) { log(`${m.name}の攻撃！ ${groupName(g)}にかわされた`); b.hits?.push({ side: 'e', gi: g.gi, miss: true }); }
+  // 倒したことは、攻撃の結果のあとに出す
+  if (kills) log(`${groupName(g)}を${kills > 1 ? `${kills}体` : ''}倒した`);
 }
 
+// quiet：ダメージと「倒した」を出さない（呼んだ側でまとめて出す）。倒したら true
 function hurtEnemy(b, g, e, dmg, log, quiet = false) {
-  if (e.dead) return;
+  if (e.dead) return false;
   e.hp = Math.max(0, e.hp - dmg);
   if (!quiet) log(`${groupName(g)}に${dmg}のダメージ`);
-  if (e.hp === 0) {
-    e.dead = true;
-    b.exp += g.def.exp; b.gold += g.def.gold;
-    log(`${groupName(g)}を倒した`);
-  }
+  b.hits?.push({ side: 'e', gi: g.gi, dmg, kill: e.hp === 0 });
+  if (e.hp > 0) return false;
+  e.dead = true;
+  b.exp += g.def.exp; b.gold += g.def.gold;
+  if (!quiet) log(`${groupName(g)}を倒した`);
+  return true;
 }
 
 function applyEffect(b, m, eff, target, rng, log) {
@@ -238,8 +269,8 @@ function applyEffect(b, m, eff, target, rng, log) {
       log(n ? `${groupName(g)}の${n}体が${{ sleep: '眠った', silence: '黙り込んだ', confuse: '混乱した' }[st]}` : `${groupName(g)}には効かなかった`);
       break;
     }
-    case 'healOne': { const t = b.party[target] ?? m; if (ableParty(t)) heal(t, Math.round(m.stats.res * 2 * (eff.power || 1) + m.base.men * (1 + rng())), log); break; }
-    case 'healAll': b.party.forEach((t) => ableParty(t) && heal(t, Math.round(m.base.men * 2 * (eff.power || 1) * (0.8 + rng() * 0.4)), log)); break;
+    case 'healOne': { const t = b.party[target] ?? m; if (ableParty(t)) heal(b, t, Math.round(m.stats.res * 2 * (eff.power || 1) + m.base.men * (1 + rng())), log); break; }
+    case 'healAll': b.party.forEach((t) => ableParty(t) && heal(b, t, Math.round(m.base.men * 2 * (eff.power || 1) * (0.8 + rng() * 0.4)), log)); break;
     case 'fullHealAll': b.party.forEach((t) => { if (ableParty(t)) { t.hp = t.maxHp; t.poison = false; t.sleep = 0; t.silence = 0; t.charm = 0; } }); log('全員の HP と状態が回復した'); break;
     case 'cure': { const t = b.party[target] ?? m; if (t.cond === 'paralyze') t.cond = 'ok'; t.poison = false; t.sleep = 0; t.silence = 0; t.charm = 0; log(`${t.name}の状態が回復した`); break; }
     case 'revive': {
@@ -259,10 +290,11 @@ function applyEffect(b, m, eff, target, rng, log) {
   }
 }
 
-function heal(t, amount, log) {
+function heal(b, t, amount, log) {
   const before = t.hp;
   t.hp = Math.min(t.maxHp, t.hp + Math.max(1, amount));
   log(`${t.name}の HP が ${t.hp - before} 回復した`);
+  b.hits?.push({ side: 'p', i: b.party.indexOf(t), heal: t.hp - before });
 }
 
 function enemyAct(b, g, ei, rng, log, guards) {
@@ -295,7 +327,7 @@ function enemyAct(b, g, ei, rng, log, guards) {
     let t = (front.length ? front : targets)[rint(rng, 0, (front.length ? front : targets).length - 1)];
     t = redirect(b, t, guards, rng, log);
     const p = clamp(g.def.hit - t.stats.eva, 15, 95);
-    if (rng() * 100 >= p) { log(`${nm}の攻撃！ ${t.name}はかわした`); return; }
+    if (rng() * 100 >= p) { log(`${nm}の攻撃！ ${t.name}はかわした`); b.hits?.push({ side: 'p', i: b.party.indexOf(t), miss: true }); return; }
     let dmg = Math.max(1, Math.round(g.def.atk * (0.8 + rng() * 0.4)) - t.stats.def);
     if (t.defending) dmg = Math.ceil(dmg / 2);
     log(`${nm}の攻撃！`);
@@ -339,10 +371,11 @@ function redirect(b, t, guards, rng, log) {
 }
 
 function hurtParty(b, t, dmg, log) {
-  if (t.shield) { t.shield = false; log(`${t.name}はひらりとかわした`); return; }
+  if (t.shield) { t.shield = false; log(`${t.name}はひらりとかわした`); b.hits?.push({ side: 'p', i: b.party.indexOf(t), miss: true }); return; }
   t.hp = Math.max(0, t.hp - dmg);
   t.sleep = 0;
   log(`${t.name}に${dmg}のダメージ`);
+  b.hits?.push({ side: 'p', i: b.party.indexOf(t), dmg });
   if (t.hp === 0) {
     if (t.reviveLeft) { t.reviveLeft = false; t.hp = 1; t.usedRevive = true; log(`${t.name}は倒れかけたが、立ち上がった！（リスタート）`); return; }
     t.cond = 'dead'; t.poison = false;
@@ -362,7 +395,7 @@ function endOfTurn(b, rng, log) {
   }
   for (const g of b.groups) for (const e of g.members) {
     if (e.dead) continue;
-    if (e.poison) hurtEnemy(b, g, e, rint(rng, 1, 4), log, true);
+    if (e.poison && hurtEnemy(b, g, e, rint(rng, 1, 4), log, true)) log(`${groupName(g)}は毒で倒れた`);
     if (e.sleep) e.sleep--;
     if (e.silence) e.silence--;
     if (e.confuse) e.confuse--;

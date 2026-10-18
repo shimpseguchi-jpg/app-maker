@@ -29,6 +29,11 @@ const log = [];
 let cmds = [], cmdIdx = 0, sub = null;
 // 決着した戦闘（後始末は済んでいる。結果を見せるあいだだけ持つ）
 let battleEnd = null;
+// ターンの再生（エルミナージュのように、素早さの順に1人ずつ行動を見せる）。play = { b, idx, pre }
+//   b.steps[idx] がいま見せている行動。pre はターンが始まる前の HP（最初の行動の前の見た目）
+let play = null, playTimer = 0;
+// 敵が現れる動きは、新しい戦闘のときだけ
+let foesShown = null;
 
 function load() {
   try {
@@ -75,7 +80,8 @@ function render() {
 // 下の窓：街では施設の人のひとこと、戦闘中は戦闘の記録、迷宮ではできごと
 function renderLog(town, battle) {
   let lines, speaker = '';
-  if (battle) lines = (ex.battle || battleEnd.battle).log.slice(-5);
+  if (battle && play) { const s = play.b.steps[play.idx]; lines = play.b.log.slice(s.from, s.to).slice(-5); }
+  else if (battle) lines = (ex.battle || battleEnd.battle).log.slice(-5);
   else if (town) { const t = townSpeech(); speaker = t.speaker; lines = [`「${t.line}」`, ...log.slice(-2)]; }
   else lines = log.slice(-4);
   $('log').innerHTML = (speaker ? `<div class="speaker">${esc(speaker)}</div>` : '') + lines.map((m) => `<div>${esc(m)}</div>`).join('');
@@ -83,7 +89,11 @@ function renderLog(town, battle) {
 
 // 6人の顔（エルミナージュの下の列：名前・顔・レベル・大きな HP・ゲージ）
 function renderParty() {
-  const list = ex.battle ? ex.battle.party.map((m) => ({ ...m, idol: IDOLS[m.id] })) : partyView(ex);
+  const bt = ex.battle || play?.b;
+  const view = bt && viewOf(bt);
+  const step = play && play.b.steps[play.idx];
+  const actor = step && play.b.order[step.k];
+  const list = bt ? bt.party.map((m, i) => ({ ...m, ...view.party[i], idol: IDOLS[m.id] })) : partyView(ex);
   const tiles = list.map((m, i) => {
     const pct = Math.max(0, Math.round((m.hp / m.maxHp) * 100));
     const flags = [];
@@ -95,10 +105,13 @@ function renderParty() {
     const u = unitOf(ex, m.id);
     const mp = ex.battle ? m.mp : ex.mp[m.id];
     const live = ex.battle ? m.live?.left : ex.live[m.id]?.left;
-    const active = ex.battle && !ex.battle.result && i === cmdIdx ? ' active' : '';
+    const active = !play && ex.battle && !ex.battle.result && i === cmdIdx ? ' active' : '';
+    const acting = actor?.side === 'p' && actor.i === i ? ' acting' : '';
+    const hits = step ? step.hits.filter((h) => h.side === 'p' && h.i === i) : [];
     const down = ['dead', 'ash', 'stone', 'paralyze'].includes(m.cond) || m.fled ? ' down' : '';
-    const tip = `${m.idol.name}（${CLASSES[m.cls].name} Lv${u.level}）HP ${m.hp}/${m.maxHp}${mp && Object.keys(mp).length ? ' 呪文' + Object.values(mp).join('/') : ''}${live != null ? ` 歌${live}` : ''} 次のLvまで ${Math.max(0, expForLevel(u.level + 1) - u.exp)}`;
-    return `<div class="pt${active}${down}" style="--c:${m.idol.color}" title="${esc(tip)}">
+    const tip = `${m.idol.name}（${CLASSES[m.cls].name} Lv${u.level}）HP ${m.hp}/${m.maxHp}${m.stats ? ` 素早さ${m.stats.spd}` : ''}${mp && Object.keys(mp).length ? ' 呪文' + Object.values(mp).join('/') : ''}${live != null ? ` 歌${live}` : ''} 次のLvまで ${Math.max(0, expForLevel(u.level + 1) - u.exp)}`;
+    return `<div class="pt${active}${acting}${down}${hits.some((h) => h.dmg) ? ' hit' : ''}" style="--c:${m.idol.color}" title="${esc(tip)}">
+      ${popOf(hits)}
       <div class="pt-name">${esc(shortName(m.id))}</div>
       <div class="pt-face">${portrait(m.id)}</div>
       ${flags.length ? `<div class="pt-cond">${esc(flags[0])}</div>` : ''}
@@ -135,20 +148,31 @@ function resetCommands() { cmds = []; sub = null; cmdIdx = nextActor(0); }
 // 戦闘：敵は画面の中央に大きく、右上に敵グループの小窓、左上に行動する人と縦のコマンド
 function renderBattle() {
   const b = ex.battle || battleEnd.battle;
-  const groups = aliveGroups(b);
+  const view = viewOf(b);
+  const step = play && play.b === b ? b.steps[play.idx] : null;
+  const actor = step && b.order[step.k];
+  // 再生中は、この行動の前に生きていたグループまで出す（倒れたグループは消えていく）
+  const before = step ? (play.idx ? b.steps[play.idx - 1] : play.pre) : view;
+  const alive = (v, g) => v.foes[g.gi].filter((hp) => hp > 0).length;
+  const groups = step ? b.groups.filter((g) => alive(before, g) > 0) : aliveGroups(b);
+  const first = foesShown !== b;
+  foesShown = b;
   const stage = groups.map((g) => {
-    const n = g.members.filter((e) => !e.dead).length;
+    const n = alive(view, g);
     const status = [g.members.some((e) => !e.dead && e.sleep) && '睡眠', g.members.some((e) => !e.dead && e.confuse) && '混乱', g.members.some((e) => !e.dead && e.silence) && '沈黙'].filter(Boolean).join('・');
     const icon = g.identified ? g.def.icon : '❔';
-    return `<div class="foe ${g.def.traits ? 'boss' : ''}"><div class="foe-art">${Array.from({ length: Math.min(n, 3) }, () => `<span>${icon}</span>`).join('')}</div>
-      <div class="foe-name">${esc(groupName(g))}${status ? ` <em>${status}</em>` : ''}</div></div>`;
+    const hits = step ? step.hits.filter((h) => h.side === 'e' && h.gi === g.gi) : [];
+    const cls = [g.def.traits && 'boss', actor?.side === 'e' && actor.gi === g.gi && 'acting', hits.some((h) => h.dmg) && 'hit', n === 0 && 'dying'].filter(Boolean).join(' ');
+    return `<div class="foe ${cls}">${popOf(hits)}<div class="foe-art">${Array.from({ length: Math.max(1, Math.min(n, 3)) }, () => `<span>${icon}</span>`).join('')}</div>
+      <div class="foe-name">${esc(groupName(g))}${status && !step ? ` <em>${status}</em>` : ''}</div></div>`;
   }).join('');
   const box = groups.map((g, i) => {
-    const n = g.members.filter((e) => !e.dead).length;
+    const n = alive(view, g);
     return `<div><span class="gi">${i + 1}</span>${esc(groupName(g))}<span class="dots">${'●'.repeat(Math.min(n, 9))}</span></div>`;
   }).join('');
   let ctl = '';
-  if (battleEnd) {
+  if (step) ctl = orderStrip(b, step);
+  else if (battleEnd) {
     ctl = `<div class="who">${{ win: '勝利！', flee: '逃げ切った', lose: '全滅……' }[b.result]}</div>
       <div class="bres">${battleEnd.msgs.map((m) => `<div>${esc(m)}</div>`).join('')}</div>
       <div class="vmenu"><button data-b="end" class="vbar on">探索に戻る</button></div>`;
@@ -157,13 +181,42 @@ function renderBattle() {
   } else if (cmdIdx >= b.party.length) {
     ctl = '<div class="vmenu"><button data-b="go" class="vbar on">実行</button></div>';
   } else ctl = commandMenu(b, b.party[cmdIdx], groups);
-  $('battle').innerHTML = `<div class="foes">${stage || ''}</div>
+  $('battle').innerHTML = `<div class="foes${first ? ' first' : ''}">${stage || ''}</div>
     <div class="groupbox">${box}</div>
     <div class="cmdwin">${ctl}</div>`;
 }
 
+// 戦闘の見た目に使う HP など（再生中はその行動のあと、ふだんは今の状態）
+function viewOf(b) {
+  if (play && play.b === b) return b.steps[play.idx];
+  return snapOf(b);
+}
+function snapOf(b) {
+  return { party: b.party.map((m) => ({ hp: m.hp, cond: m.cond, fled: m.fled, poison: m.poison, sleep: m.sleep, silence: m.silence })),
+    foes: b.groups.map((g) => g.members.map((e) => (e.dead ? 0 : e.hp))) };
+}
+// 当たった数字（ダメージは合計、回復は緑、外れは MISS）
+function popOf(hits) {
+  if (!hits.length) return '';
+  const dmg = hits.reduce((s, h) => s + (h.dmg || 0), 0), heal = hits.reduce((s, h) => s + (h.heal || 0), 0);
+  if (dmg) return `<div class="pop">${dmg}</div>`;
+  if (heal) return `<div class="pop heal">+${heal}</div>`;
+  return '<div class="pop miss">MISS</div>';
+}
+// 行動順（素早さ＋運で毎ターン決まる）。済んだ人は暗く、いま動いている人は明るく
+function orderStrip(b, step) {
+  const chips = b.order.map((o, k) => {
+    const st = step.k === -1 || k < step.k ? ' done' : k === step.k ? ' now' : '';
+    if (o.side === 'p') { const m = b.party[o.i]; return `<span class="oc${st}" style="--c:${IDOLS[m.id].color}">${esc(shortName(m.id))}</span>`; }
+    const g = b.groups[o.gi];
+    return `<span class="oc e${st}" title="${esc(groupName(g))}">${g.identified ? g.def.icon : '❔'}</span>`;
+  }).join('');
+  return `<div class="who">ターン ${b.turn}<small>行動順（素早さ順）</small></div><div class="order">${chips}</div>
+    <div class="vmenu minor-row"><button data-b="next" class="vbar on">次へ ▶</button><button data-b="skip" class="vbar minor">とばす</button></div>`;
+}
+
 function commandMenu(b, m, groups) {
-  const head = `<div class="who">${esc(m.name)}<small>${m.row === 'front' ? '前列' : '後列'}・射程${m.range}</small></div>`;
+  const head = `<div class="who">${esc(m.name)}<small>${m.row === 'front' ? '前列' : '後列'}・射程${m.range}・素早さ${m.stats.spd}</small></div>`;
   const back = cmdIdx > nextActor(0) || sub ? '<button data-b="back" class="vbar minor">戻る</button>' : '';
   const auto = '<button data-b="auto" class="vbar minor">おまかせ</button>';
   if (!sub) {
@@ -206,19 +259,39 @@ function setCommand(c) {
 }
 
 function runBattleTurn() {
+  const bt = ex.battle, pre = snapOf(bt);
   battleTurn(ex, cmds);
-  if (ex.battle.result) {
-    const bt = ex.battle;
+  if (bt.result) {
     const r = finishBattle(ex);
     battleEnd = { battle: bt, msgs: r.msgs, wiped: r.wiped };
   } else resetCommands();
+  clearTimeout(playTimer);
+  play = bt.steps?.length ? { b: bt, idx: 0, pre } : null;
   render();
+  if (play) playTimer = setTimeout(nextStep, stepDelay());
 }
+// 1人の行動を見せる時間（メッセージが多いほど長く）。押せばすぐ次へ
+function stepDelay() {
+  const s = play.b.steps[play.idx];
+  return 750 + 250 * Math.min(5, s.to - s.from);
+}
+function nextStep() {
+  clearTimeout(playTimer);
+  if (!play) return;
+  play.idx++;
+  if (play.idx >= play.b.steps.length) play = null;
+  render();
+  if (play) playTimer = setTimeout(nextStep, stepDelay());
+}
+function skipPlay() { clearTimeout(playTimer); play = null; render(); }
 
 function battleClick(b) {
   const bt = ex.battle || battleEnd?.battle;
   const m = bt.party[cmdIdx];
   const d = b.dataset;
+  if (d.b === 'next') { nextStep(); return; }
+  if (d.b === 'skip') { skipPlay(); return; }
+  if (play) return;
   if (d.b === 'end') {
     say(battleEnd.msgs);
     const wiped = battleEnd.wiped;
@@ -314,6 +387,8 @@ function closeModal() {
 }
 
 document.addEventListener('click', (ev) => {
+  // 再生中は、画面やメッセージを押すと次の行動へ
+  if (play && ev.target.closest('#screen, #log') && !ev.target.closest('button')) { nextStep(); return; }
   const b = ev.target.closest('button');
   if (!b || b.disabled) return;
   if (!$('bigmap').hidden && b.dataset.x !== 'mapclose') return;
@@ -338,6 +413,8 @@ function townDo(el) {
 const KEYMAP = { ArrowUp: 'forward', w: 'forward', ArrowLeft: 'turnL', a: 'turnL', ArrowRight: 'turnR', d: 'turnR',
   ArrowDown: 'turnBack', s: 'turnBack', q: 'strafeL', e: 'strafeR', ' ': 'search', f: 'search', Enter: 'stairs' };
 document.addEventListener('keydown', (ev) => {
+  if (play && (ev.key === ' ' || ev.key === 'Enter')) { ev.preventDefault(); nextStep(); return; }
+  if (play && ev.key === 'Escape') { skipPlay(); return; }
   if (ev.key === 'm' || ev.key === 'M' || (ev.key === 'Escape' && !$('bigmap').hidden)) {
     if (ev.target.closest('input, select, textarea')) return;
     if ($('bigmap').hidden) showBigMap(); else $('bigmap').hidden = true;

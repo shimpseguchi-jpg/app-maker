@@ -168,13 +168,36 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 /* ── 戦闘（敵は中央に大きく、右上に敵グループの小窓、左上にコマンド） ── */
 .battle-layer { position: absolute; inset: 0; z-index: 2; }
 .foes { position: absolute; left: 22%; right: 22%; top: 12%; bottom: 30%; display: flex; align-items: flex-end; justify-content: center; gap: 4%; }
-.foe { text-align: center; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .8)); animation: foe-in .35s ease-out; }
+.foe { position: relative; text-align: center; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .8)); }
+.foes.first .foe { animation: foe-in .35s ease-out; }
 .foe-art { display: flex; justify-content: center; font-size: clamp(2.2rem, 8vw, 5rem); line-height: 1; }
 .foe-art span:nth-child(2) { transform: translateY(-10%) scale(.9); }
 .foe-art span:nth-child(3) { transform: translateY(-18%) scale(.82); }
 .foe.boss .foe-art { font-size: clamp(3.4rem, 13vw, 8rem); }
 .foe-name { margin-top: 4px; font-size: clamp(.7rem, 1.8vw, .95rem); text-shadow: 0 0 4px #000, 0 1px 2px #000; }
 .foe-name em { font-style: normal; color: var(--bad); font-size: .85em; }
+/* ターンの再生：行動している敵は赤く光って前へ、当たった敵は揺れる、倒れたグループは消えていく */
+.foe.acting .foe-art { filter: drop-shadow(0 0 12px rgba(255, 90, 60, .95)); animation: foe-lunge .45s ease-out; }
+.foe.hit .foe-art { animation: foe-hit .35s linear; }
+.foe.dying { animation: foe-out .8s ease-in forwards; }
+@keyframes foe-lunge { 40% { transform: translateY(6%) scale(1.12); } }
+@keyframes foe-hit { 20% { transform: translateX(-6%); filter: brightness(2.2); } 50% { transform: translateX(5%); } 80% { transform: translateX(-2%); } }
+@keyframes foe-out { to { opacity: 0; transform: scale(.85); filter: grayscale(1); } }
+.pop { position: absolute; left: 50%; top: 22%; z-index: 4; pointer-events: none; white-space: nowrap; transform: translateX(-50%);
+  font: 800 clamp(1.1rem, 3.8vw, 2.1rem)/1 var(--sans); color: #fff; text-shadow: 0 0 4px #000, 0 2px 0 #8a1c10, 0 0 10px rgba(255, 80, 40, .8); animation: pop .9s ease-out both; }
+.pop.heal { color: #b6ffd0; text-shadow: 0 0 4px #000, 0 2px 0 #0d5a30, 0 0 10px rgba(60, 220, 120, .7); }
+.pop.miss { color: #e8e0d0; font-size: clamp(.8rem, 2.4vw, 1.15rem); text-shadow: 0 0 4px #000, 0 1px 2px #000; }
+.foe .pop { top: 10%; font-size: clamp(1.4rem, 5vw, 2.8rem); }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.2); } 100% { opacity: 1; transform: translate(-50%, -12px) scale(1); } }
+.pt.acting { box-shadow: 0 0 0 2px #fff6d8, 0 0 16px rgba(255, 246, 216, .75); transform: translateY(-5px); transition: transform .15s; z-index: 1; }
+.pt.hit .pt-face { animation: pt-hit .35s linear; }
+@keyframes pt-hit { 20% { transform: translateX(-4px); filter: brightness(1.8) sepia(1) hue-rotate(-40deg); } 50% { transform: translateX(3px); } }
+.cmdwin .order { display: flex; flex-wrap: wrap; gap: 3px; padding: 2px 0 4px; }
+.oc { padding: 1px 6px; font-size: clamp(.68rem, 1.6vw, .85rem); line-height: 1.5; background: rgba(12, 8, 6, .85); border: 1px solid var(--gold-lo); border-left: 3px solid var(--c, #c43a2a); text-shadow: 0 1px 2px #000; }
+.oc.e { padding: 0 4px; }
+.oc.done { opacity: .35; }
+.oc.now { background: var(--gold-hi); color: #1a0f08; font-weight: 700; text-shadow: none; box-shadow: 0 0 8px rgba(242, 217, 142, .7); }
+@media (prefers-reduced-motion: reduce) { .foe.acting .foe-art, .foe.hit .foe-art, .pt.hit .pt-face, .pop { animation: none; } }
 @keyframes foe-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
 .groupbox { position: absolute; top: 44px; right: 10px; min-width: 24%; padding: 4px 8px; font-size: clamp(.65rem, 1.6vw, .85rem);
   background: rgba(12, 8, 6, .82); border: 1px solid var(--gold); box-shadow: 0 0 0 1px #000; }

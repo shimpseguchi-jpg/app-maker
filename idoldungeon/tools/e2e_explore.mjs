@@ -60,7 +60,7 @@ await page.evaluate((ex) => { localStorage.clear(); localStorage.setItem('idoldu
 await page.reload();
 
 const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('idoldungeon.expedition')));
-let battles = 0, presses = 0;
+let battles = 0, presses = 0, plays = 0;
 const results = {};
 for (const d of ['d1', 'd2']) {
   await page.click(`[data-t=enter][data-id=${d}]`);
@@ -74,8 +74,8 @@ for (const d of ['d1', 'd2']) {
       presses++;
       if (await page.isVisible('#battle')) battles++;
       while (await page.isVisible('#battle')) {
-        for (const sel of ['[data-b=end]', '[data-b=auto]', '[data-b=go]']) {
-          if (await page.isVisible(sel)) { await page.click(sel); break; }
+        for (const sel of ['[data-b=skip]', '[data-b=end]', '[data-b=auto]', '[data-b=go]']) {
+          if (await page.isVisible(sel)) { if (sel === '[data-b=skip]') plays++; await page.click(sel); break; }
         }
       }
       if (await page.isVisible('#modal')) throw new Error('全滅した');
@@ -97,6 +97,7 @@ ok(results.d2.floors === 5, '奈落の大劇場の5つの階をオートマッ�
 ok(ex.items.length >= 2, 'ボスのドロップ（昇格アイテム）');
 ok(ex.scores.some((sc) => !sc.known), 'ボスのドロップ（未鑑定の楽譜）');
 ok(ex.ex.keys.includes('propKey') && ex.ex.flags.d2gate && ex.ex.maps.d1.keys.includes('silverKey'), '両方の迷宮の鍵とスイッチ（迷宮ごとに記録）');
+ok(plays > 0, '戦闘のターンを1人ずつ再生する（行動順の表示と「とばす」）');
 ok(!errors.length, 'ページのエラー: ' + errors.join(' / '));
 console.log(`操作 ${presses} 回・戦闘 ${battles} 回 / 所持金 ${ex.gold}G / スクリーンショット ${shot}`);
 console.log(fail ? `${fail} ng` : 'ok');

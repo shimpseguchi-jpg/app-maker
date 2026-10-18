@@ -141,6 +141,45 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ok(bossGroups('b1', 3).length === 3 && bossEnemy('b1', 1).traits.some((t) => t.id === 'twoActions'), '再戦で取り巻き・連続行動');
 }
 
+// ── 行動順（素早さ＋0〜10 の乱数。毎ターン決め直す）と、1人ずつの記録 ──
+{
+  const firstSide = (spd, seed) => {
+    const rng = seeded(seed);
+    const b = noSurprise(createBattle(partyOf('makoto'), [{ enemy: dummy({ spd, hit: 0 }), count: 1 }], { rng }));
+    runTurn(b, [{ type: 'attack', group: 0 }], rng);
+    return b.order[0].side;
+  };
+  const spd = partyOf('makoto')[0].stats.spd;
+  const seeds = Array.from({ length: 40 }, (_, i) => i + 1);
+  ok(seeds.every((s) => firstSide(spd - 11, s) === 'p'), '素早さが10以上高ければ必ず先に動く');
+  ok(seeds.every((s) => firstSide(spd + 11, s) === 'e'), '素早さが10以上低ければ必ずあとに動く');
+  const mixed = seeds.map((s) => firstSide(spd, s));
+  ok(mixed.includes('p') && mixed.includes('e'), '素早さが同じなら運で入れ替わる');
+
+  const rng = seeded(5);
+  const b = noSurprise(createBattle(partyOf('makoto', 'hibiki'), [{ enemy: dummy({ hp: 1, eva: 0 }), count: 2 }], { rng }));
+  runTurn(b, [{ type: 'attack', group: 0 }, { type: 'defend' }], rng);
+  ok(b.order.length === 3 && b.order.filter((o) => o.side === 'p').length === 1, '行動順：守る人は並ばない（ターンの最初から効く）');
+  const st = b.steps.find((x) => b.order[x.k]?.side === 'p');
+  ok(st && st.hits.some((h) => h.side === 'e' && h.dmg > 0) && st.foes[0].some((hp) => hp === 0), '1人ずつの記録：当たったダメージと、その時点の敵の HP');
+  const lines = b.log.slice(st.from, st.to);
+  const atk = lines.findIndex((l) => l.includes('の攻撃！')), kill = lines.findIndex((l) => l.includes('倒した'));
+  ok(atk >= 0 && kill > atk, '「倒した」は攻撃の結果のあとに出る');
+  ok(!('hits' in b), '途中の作業用の値は残さない');
+
+  // 先制・不意打ち：パーティが速いほど先制しやすい
+  const rate = (espd) => {
+    let party = 0, enemy = 0;
+    for (let i = 0; i < 400; i++) {
+      const s = createBattle(partyOf('makoto'), [{ enemy: dummy({ spd: espd }), count: 1 }], { rng: seeded(100 + i) }).surprise;
+      party += s === 'party'; enemy += s === 'enemy';
+    }
+    return { party, enemy };
+  };
+  const slow = rate(1), fast = rate(99);
+  ok(slow.party > fast.party && slow.enemy < fast.enemy, '素早さの差で先制・不意打ちの起こりやすさが変わる');
+}
+
 // ── 経験値とレベルアップ ──
 {
   const u = { level: 1, exp: 0, base: { pow: 10, vo: 10, men: 10, sta: 10, dan: 10, vis: 10 } };
