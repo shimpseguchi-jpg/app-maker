@@ -1,7 +1,8 @@
 // 戦闘ルールのテスト
 // node idoldungeon/tools/test_battle.mjs
 import { createBattle, runTurn, reachableGroups, aliveGroups, castable, unitLiveReady, autoCommands, canAct, groupName } from '../js/engine/battle.js';
-import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore } from '../js/engine/expedition.js';
+import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore,
+  dungeonBoss, cardUnlocked, CARD_MODE_READY, PLAY_MODES, DRPG_BONUS, syncParty } from '../js/engine/expedition.js';
 import { equip } from '../js/engine/town.js';
 import { ENEMIES, ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { SPELL_LIST, KIND_TARGET } from '../js/data/spells.js';
@@ -209,6 +210,33 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ex.battle.result = 'flee';
   finishBattle(ex);
   ok(ex.ex.x === 4 && !ex.ex.trip.g1a, 'ルームガーダーから逃げると部屋の外へ戻る');
+}
+
+// ── 2つのモード：カードモードの解放と、DRPGボーナス（報酬はカードモードの1.5倍） ──
+{
+  const ex = newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }]);
+  ok(dungeonBoss('d1') === 'b1' && dungeonBoss('d2') === 'b2', '迷宮のボス');
+  ok(!cardUnlocked(ex, 'd1') && enterDungeon(ex, 'd1', 'card')[0].includes('DRPGモードで倒す') && ex.mode === 'town', 'カードモードはボスを倒すまで入れない');
+  ex.ex.trip.b1 = 'boss';
+  ok(cardUnlocked(ex, 'd1') && !cardUnlocked(ex, 'd2'), 'ボスを倒した迷宮だけカードモードが解放される');
+  if (!CARD_MODE_READY) ok(enterDungeon(ex, 'd1', 'card')[0].includes('準備中') && ex.mode === 'town', 'カードモードの中身ができるまでは入れない');
+  ok(enterDungeon(ex, 'd1')[0].includes('入った') && ex.play === 'drpg', 'ふつうに入ると DRPGモード');
+  const fight = (play) => {
+    ex.play = play;
+    ex.hp = {}; ex.cond = {}; syncParty(ex); // 全員元気な状態で比べる
+    startBattle(ex, { kind: 'wander' }, seeded(21));
+    const rng = seeded(22);
+    while (!ex.battle.result) battleTurn(ex, autoCommands(ex.battle), rng);
+    const { exp, gold } = ex.battle;
+    const before = { exp: unitOf(ex, 'makoto').exp, gold: ex.gold };
+    const r = finishBattle(ex, seeded(23));
+    return { exp, gold, got: unitOf(ex, 'makoto').exp - before.exp, money: ex.gold - before.gold, msgs: r.msgs };
+  };
+  const d = fight('drpg');
+  ok(d.money === d.gold && d.got === Math.floor(d.exp / 3) && d.msgs.some((m) => m.includes('DRPGボーナス')), `DRPGモードは今までどおりの報酬で、ボーナスの内訳が出る（${d.msgs.join(' / ')}）`);
+  const c = fight('card');
+  ok(c.money === Math.floor(c.gold * 2 / 3) && c.got === Math.floor((c.exp * 2 / 3) / 3) && !c.msgs.some((m) => m.includes('ボーナス')), 'カードモードの報酬は DRPGモードの 2/3');
+  ok(Math.abs(PLAY_MODES.drpg.reward / PLAY_MODES.card.reward - DRPG_BONUS) < 1e-9, 'DRPGボーナスは1.5倍');
 }
 
 // ── 同じ乱数なら同じ結果 ──

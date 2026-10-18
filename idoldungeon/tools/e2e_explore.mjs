@@ -63,6 +63,7 @@ const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('idoldun
 let battles = 0, presses = 0, plays = 0;
 const results = {};
 for (const d of ['d1', 'd2']) {
+  await page.click('[data-tab=depart]');
   await page.click(`[data-t=enter][data-id=${d}]`);
   for (const goal of goalsOf(d)) {
     for (let guard = 0; guard < 3000; guard++) {

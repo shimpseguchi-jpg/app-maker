@@ -57,7 +57,8 @@ function render() {
   $('pos').textContent = town || battle ? '' : dark ? 'X?? Y??' : `X${String(st.x).padStart(2, '0')}  Y${String(st.y).padStart(2, '0')}`;
   $('zone').textContent = town ? '' : dark ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
   $('gold').textContent = `${ex.gold} G`;
-  $('screen').dataset.mode = town ? 'town' : battle ? 'battle' : 'dungeon';
+  // 画面の切り替え（スマホの並べ方は body の data-mode で決める）
+  $('screen').dataset.mode = document.body.dataset.mode = town ? 'town' : battle ? 'battle' : 'dungeon';
   $('town').hidden = !town; $('battle').hidden = !battle; $('pad').hidden = town || battle;
   $('hudmap').hidden = town || battle; $('compass').hidden = town || battle;
   if (town) $('town').innerHTML = renderTown(ex);
@@ -70,7 +71,7 @@ function render() {
     // 方角：針は北を指す（向いている方角が上）。まん中に向いている方角
     $('compass').innerHTML = dark ? '<b>？</b>' : `<i class="needle" style="transform:rotate(${-st.dir * 90}deg)"></i><b>${DIR_NAME[st.dir]}</b>`;
     if (!dark) drawMap($('map'), st, { theme: fl.theme, mini: true });
-    else { const c = $('map').getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, 150, 150); }
+    else { const c = $('map').getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, $('map').width, $('map').height); }
   }
   renderLog(town, battle);
   renderParty();

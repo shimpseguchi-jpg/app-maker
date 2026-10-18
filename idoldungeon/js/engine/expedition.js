@@ -27,12 +27,24 @@ export function newExpedition(slots, dungeonId = 'd1') {
 // 古いセーブにも新しい項目をそろえる
 export function normalize(ex) {
   for (const [k, v] of Object.entries({ units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {}, items: [], bought: 0,
-    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0 })) {
+    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0, play: 'drpg' })) {
     if (ex[k] == null) ex[k] = structuredClone(v);
   }
   ex.slots = ex.slots.map((s) => ({ idol: s.idol }));
   return ex;
 }
+
+// ── 2つのモード（docs/DESIGN.md 17章）。DRPGモード＝歩いて地図を埋める、カードモード＝Reigns 型 ──
+// 報酬は DRPGモードがカードモードの 1.5倍。調整済みの今の数値を DRPG の値とし、カードモードは 2/3 にする
+export const PLAY_MODES = { drpg: { name: 'DRPGモード', reward: 1 }, card: { name: 'カードモード', reward: 2 / 3 } };
+export const DRPG_BONUS = 1.5;
+export const rewardRate = (ex) => PLAY_MODES[ex.play]?.reward ?? 1;
+// カードモードの中身（カード・画面）はマイルストーン8・9で作る。それまでは解放されても入れない
+export const CARD_MODE_READY = false;
+export const dungeonBoss = (dungeonId) => DUNGEONS[dungeonId].floors.flatMap((f) => f.specials || []).find((sp) => sp.type === 'boss')?.boss;
+const bossBeaten = (ex, bossId) => (ex.ex.bossClears[bossId] || 0) > 0 || ex.ex.trip[bossId] === 'boss';
+// カードモードは迷宮ごとに、その迷宮のボスを DRPGモードで倒すと解放
+export const cardUnlocked = (ex, dungeonId) => bossBeaten(ex, dungeonBoss(dungeonId));
 
 // ── 楽譜（楽曲の装備品）。未鑑定のうちは曲名が分からず、装備できない ──
 export function addScore(ex, songId, known = false) {
@@ -239,17 +251,22 @@ export function finishBattle(ex, rng = Math.random) {
   }
   if (b.result === 'win') {
     // 経験値はためておき、宿屋に泊まったときにレベルが上がる（エルミナージュ準拠）
+    // モードで報酬が変わる。DRPGモードではボーナスの内訳を出す
+    const rate = rewardRate(ex);
     const earners = b.party.filter((m) => !m.fled && !DOWN.has(m.cond));
-    const share = earners.length ? Math.floor(b.exp / earners.length) : 0;
-    msgs.push(`経験値 ${share} ずつ、${b.gold}G を手に入れた`);
-    ex.gold += b.gold;
+    const share = earners.length ? Math.floor((b.exp * rate) / earners.length) : 0;
+    const gold = Math.floor(b.gold * rate);
+    const bonus = (n) => n - Math.round(n / DRPG_BONUS);
+    msgs.push(`経験値 ${share} ずつ、${gold}G を手に入れた`);
+    if (ex.play === 'drpg' && share + gold > 0) msgs.push(`（DRPGボーナス：経験値 ＋${bonus(share)}・＋${bonus(gold)}G）`);
+    ex.gold += gold;
     for (const m of earners) unitOf(ex, m.id).exp += share;
     if (ev.kind === 'guardian') {
       ex.ex.trip[ev.id] = 'guardian';
-      const g = 80 + Math.floor(rng() * 40);
+      const g = Math.floor((80 + Math.floor(rng() * 40)) * rate);
       ex.gold += g;
       msgs.push(`宝箱を開けた。${g}G が入っていた`);
-      if (rng() < 0.6) {
+      if (rng() < 0.6 * rate) {
         const sc = addScore(ex, randomSong(Math.min(5, ex.ex.floor + 2), rng));
         msgs.push(`${scoreName(sc)}を見つけた`);
       }
@@ -257,6 +274,7 @@ export function finishBattle(ex, rng = Math.random) {
       const clears = ex.ex.bossClears[ev.id] || 0;
       const d = rollDrops(ev.id, clears, rng);
       ex.ex.trip[ev.id] = 'boss';
+      d.gold = Math.floor(d.gold * rate);
       ex.gold += d.gold; ex.items.push(...d.items);
       msgs.push(`${BOSSES[ev.id].name}を倒した！ ${d.gold}G を手に入れた`);
       for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
@@ -288,11 +306,16 @@ export function openDungeons(ex) {
   return Object.values(DUNGEONS).filter((d) => !d.unlock || (ex.ex.bossClears[d.unlock] || 0) > 0 || ex.ex.trip[d.unlock] === 'boss');
 }
 
-export function enterDungeon(ex, dungeonId = ex.ex.dungeon) {
+export function enterDungeon(ex, dungeonId = ex.ex.dungeon, play = 'drpg') {
   if (!ex.slots.some((s) => !DOWN.has(ex.cond[s.idol]))) return ['動けるメンバーがいない。酒場でパーティを組もう'];
   if (!openDungeons(ex).some((d) => d.id === dungeonId)) return ['まだその迷宮には行けない'];
+  if (play === 'card') {
+    if (!cardUnlocked(ex, dungeonId)) return ['カードモードは、この迷宮のボスを DRPGモードで倒すと遊べる'];
+    if (!CARD_MODE_READY) return ['カードモードは準備中'];
+  }
   switchDungeon(ex.ex, dungeonId);
   ex.mode = 'dungeon';
+  ex.play = play;
   ex.ex.seen[0] ||= {};
   ex.ex.seen[0][`${ex.ex.x},${ex.ex.y}`] = 1;
   return [`${DUNGEONS[dungeonId].name}に入った`];

@@ -7,14 +7,14 @@ import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
-import { partyView, scoreName, unitOf, enterDungeon, openDungeons } from '../engine/expedition.js';
+import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, CARD_MODE_READY, DRPG_BONUS } from '../engine/expedition.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
 import { SLOTS, saveSlot, readSlot, exportText, importText } from '../save.js';
 import { sceneSvg, sceneInfo } from './scenes.js';
 
-export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録']];
+export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['depart', '迷宮へ']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let tab = 'tavern';
 let shopMode = 'buy';
@@ -24,15 +24,31 @@ let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
 
 // エルミナージュの施設画面：背景画の上に、左上の縦メニュー（施設）と、こげ茶の板（中身）。施設の人のひとことは下の窓
 export function renderTown(ex) {
-  const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="vbar ${id === tab ? 'on' : ''}">${nm}</button>`).join('');
-  const go = openDungeons(ex).map((d) => `<button data-t="enter" data-id="${d.id}" class="vbar go" ${ex.slots.length ? '' : 'disabled'}>${esc(d.name)}へ<small>${d.floors.length}階</small></button>`).join('');
-  const body = { tavern, inn, shop, temple, training, castle, record }[tab](ex);
+  const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="vbar ${id === tab ? 'on' : ''} ${id === 'depart' ? 'go' : ''}">${nm}</button>`).join('');
+  const body = { tavern, inn, shop, temple, training, castle, record, depart }[tab](ex);
   return `${sceneSvg(tab)}
-    <nav class="vmenu town-menu" aria-label="施設">${tabs}<div class="vmenu-sep">出発</div>${go}</nav>
+    <nav class="vmenu town-menu" aria-label="施設">${tabs}</nav>
     <section class="panel town-panel"><h2 class="plate">${esc(sceneInfo(tab).name)}</h2>${body}</section>`;
 }
 // 下の窓に出す、施設の人のひとこと
 export const townSpeech = () => ({ speaker: sceneInfo(tab).speaker, line: sceneInfo(tab).line, place: sceneInfo(tab).name });
+
+// 出発：迷宮とモードを選ぶ（docs/DESIGN.md 17章）。カードモードはその迷宮のボスを DRPGモードで倒すと解放
+function depart(ex) {
+  const can = ex.slots.length > 0;
+  const list = openDungeons(ex).map((d) => {
+    const open = cardUnlocked(ex, d.id);
+    const note = !open ? 'この迷宮のボスを DRPGモードで倒すと解放' : CARD_MODE_READY ? 'カードを左右に振って一気に進む' : '準備中';
+    return `<div class="depart">
+      <h3>${esc(d.name)} <small class="sub">${d.floors.length}階</small></h3>
+      <div class="depart-modes">
+        <button data-t="enter" data-id="${d.id}" class="mode" ${can ? '' : 'disabled'}><b>DRPGモード</b><small>歩いて地図を埋める。経験値・お金・楽譜 ×${DRPG_BONUS}</small></button>
+        <button data-t="enterCard" data-id="${d.id}" class="mode" ${can && open && CARD_MODE_READY ? '' : 'disabled'}><b>カードモード${open ? '' : '（未解放）'}</b><small>${note}</small></button>
+      </div>
+    </div>`;
+  }).join('');
+  return `${list}${can ? '' : '<p class="sub">酒場でパーティを組もう</p>'}`;
+}
 
 function tavern(ex) {
   const party = partyView(ex);
@@ -167,6 +183,7 @@ export function townAction(ex, el, rng = Math.random) {
   if (d.equip) return { msgs: equip(ex, d.equip, el.value ? Number(el.value) : null) };
   switch (d.t) {
     case 'enter': return { msgs: enterDungeon(ex, d.id) };
+    case 'enterCard': return { msgs: enterDungeon(ex, d.id, 'card') };
     case 'appraiseAll': return { msgs: appraiseAll(ex) };
     case 'change': confirm = { kind: 'change', cls: d.cls }; return { msgs: [] };
     case 'promote': confirm = { kind: 'promote', cls: d.cls, item: d.item }; return { msgs: [] };

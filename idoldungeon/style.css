@@ -257,24 +257,73 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 .map-box canvas { width: 100%; height: auto; aspect-ratio: 1; display: block; border: 1px solid var(--gold-lo); }
 .map-box .coord { margin: 6px 0; font-family: var(--sans); color: var(--gold-hi); }
 
-/* スマホなど狭い画面：重ねていた部品を絵の下に並べる */
+/* 出発：迷宮とモードを選ぶ */
+.depart { margin-bottom: 10px; }
+.depart-modes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.town-panel .mode { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 8px 12px; text-align: left; }
+.mode b { font-family: var(--serif); font-size: 1.05rem; color: var(--gold-hi); }
+.mode small { color: var(--sub); font-size: .78rem; }
+.mode:disabled b { color: var(--sub); }
+button { touch-action: manipulation; }
+
+/* ── スマホ（DRPGモード）：エルミナージュ2 DS Remix の上下2画面を縦に積む「DS二画面型」（docs/DESIGN.md 17.2） ──
+   画面の高さに合わせ、ページはスクロールさせない。部品はすべて .game の格子に並べ直す（.screen などは display: contents）
+   上：迷宮の絵（場所・方角・メッセージを重ねる）／中：6人の帯／下：地図と持ち物、その下に操作ボタン（親指の届く範囲） */
 @media (max-width: 700px) {
-  .screen { aspect-ratio: auto; overflow: visible; border: 0; box-shadow: none; background: none; display: grid; gap: 8px; }
-  #view { position: relative; aspect-ratio: 16 / 9; height: auto; border: 2px solid var(--gold); }
-  .screen[data-mode="town"] .town-layer, .screen[data-mode="battle"] .battle-layer { position: relative; }
-  .partybar { position: relative; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0; }
-  .pt { aspect-ratio: 1.5 / 1; }
-  .hud-loc { top: 6px; right: 8px; }
-  .hud-map { width: 28%; }
-  .hud-compass { left: calc(28% + 14px); }
-  .battle-layer { display: grid; gap: 6px; }
-  .battle-layer .foes { position: relative; inset: auto; min-height: 120px; padding: 10px; background: linear-gradient(180deg, #1a120c, #0a0604); border: 2px solid var(--gold); }
-  .groupbox, .cmdwin { position: relative; inset: auto; width: auto; max-height: none; top: auto; right: auto; left: auto; }
-  .town-layer { display: grid; gap: 8px; }
-  .town-layer .scene { position: relative; height: 150px; border: 2px solid var(--gold); }
-  .town-menu { position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
-  .town-menu .vmenu-sep { grid-column: 1 / -1; }
-  .town-panel { position: relative; inset: auto; width: auto; max-height: none; }
+  body.explore { overflow: hidden; }
+  .game {
+    height: 100dvh; max-width: none; margin: 0; gap: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "view view" "party party" "map info" "pad pad";
+  }
+  body[data-mode="battle"] .game { grid-template-areas: "view view" "party party" "cmd cmd" "cmd cmd"; }
+  body[data-mode="town"] .game { grid-template-areas: "view view" "panel panel" "panel panel" "menu menu"; }
+  .screen, .under, .battle-layer, .town-layer { display: contents; }
+
+  /* 上：迷宮の絵と、その上に重ねるもの */
+  #view { grid-area: view; position: relative; width: 100%; height: clamp(180px, 31dvh, 290px); border-bottom: 2px solid var(--gold); }
+  body[data-mode="battle"] #view { height: clamp(220px, 36dvh, 330px); }
+  .town-layer .scene { grid-area: view; position: relative; height: clamp(150px, 25dvh, 230px); border-bottom: 2px solid var(--gold); }
+  .hud-loc { grid-area: view; position: relative; top: auto; right: auto; align-self: start; justify-self: end; margin: 8px 10px 0 0; }
+  .hud-compass { grid-area: view; position: relative; top: auto; left: auto; align-self: start; justify-self: start; margin: 8px 0 0 8px; }
+  #log { grid-area: view; align-self: end; z-index: 3; min-height: 0; margin: 0 8px 8px; padding: 6px 10px; font-size: .9rem; line-height: 1.5;
+    background: rgba(14, 9, 6, .88); border-width: 1px; box-shadow: none; }
+  body[data-mode="dungeon"] #log > div:nth-last-child(n+3) { display: none; }
+  body[data-mode="battle"] #log > div:nth-last-child(n+4) { display: none; }
+  body[data-mode="town"] #log > div:nth-child(n+4) { display: none; }
+  body[data-mode="town"] #log { margin-top: 26px; }
+
+  /* 中：6人の帯 */
+  .partybar { grid-area: party; position: relative; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; padding: 6px; background: #140e0a; border-bottom: 1px solid var(--gold-lo); }
+  body[data-mode="town"] .partybar { display: none; }
+  .pt { aspect-ratio: 1 / 1.22; }
+  .pt-name { font-size: .68rem; }
+  .pt-hp { font-size: 1.05rem; }
+
+  /* 下：地図と持ち物、操作ボタン */
+  .hud-map { grid-area: map; position: relative; top: auto; left: auto; width: auto; height: calc(100% - 16px); max-width: 54vw; aspect-ratio: 1; margin: 8px; align-self: center; justify-self: start; }
+  .info { grid-area: info; margin: 8px 8px 8px 0; padding: 8px 10px; overflow-y: auto; align-content: start; min-height: 0; }
+  .info .row { display: grid; gap: 6px; }
+  body[data-mode="battle"] .info, body[data-mode="town"] .info { display: none; }
+  .pad { grid-area: pad; max-width: none; gap: 6px; padding: 8px 8px 12px; background: linear-gradient(180deg, #24170d, #140e0a); border-top: 1px solid var(--gold-lo); }
+  .pad button { min-height: 50px; padding: 6px; }
+  .pad .wide { grid-column: span 3; }
+
+  /* 戦闘：敵とグループの一覧は絵の上、コマンドは下に2列の大きなボタン */
+  .battle-layer .foes { grid-area: view; position: relative; inset: auto; align-self: center; z-index: 2; padding: 0 8px 40px; }
+  .groupbox { grid-area: view; position: relative; top: auto; right: auto; align-self: start; justify-self: end; z-index: 3; margin: 40px 8px 0 0; }
+  .cmdwin { grid-area: cmd; position: relative; top: auto; left: auto; width: auto; max-height: none; min-height: 0; overflow-y: auto;
+    padding: 10px 10px 14px; gap: 8px; align-content: end; background: linear-gradient(180deg, #2a1c12, #170f0a); }
+  .cmdwin .vmenu:not(.minor-row) { grid-template-columns: 1fr 1fr; }
+  .cmdwin .vbar { min-height: 50px; font-size: 1rem; }
+  .cmdwin .order { grid-column: 1 / -1; }
+
+  /* 街：施設の中身だけスクロール、施設のボタンは下に固定 */
+  .town-panel { grid-area: panel; position: relative; inset: auto; width: auto; max-height: none; min-height: 0; margin: 8px; }
+  .town-menu { grid-area: menu; position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px;
+    padding: 8px 8px 12px; background: #120c08; border-top: 2px solid var(--gold); }
+  .town-menu .vbar { clip-path: none; text-align: center; padding: 12px 2px; min-height: 48px; border-radius: 4px; font-size: .9rem; }
+  .tv-row select { flex: 1 1 140px; }
 }
 
 /* ── パーティ編成の試し場（party.html） ── */
