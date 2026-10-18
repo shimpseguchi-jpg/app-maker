@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120c08">
+<title>迷宮探索 - アイドル迷宮（仮）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="explore">
+<div class="game">
+  <!-- エルミナージュの画面構成：迷宮（または施設・戦闘）の絵の上に、場所名・地図・方角・6人の顔を重ねる -->
+  <div class="screen" id="screen">
+    <canvas id="view" width="800" height="450" aria-label="迷宮の一人称視点"></canvas>
+    <div id="town" class="town-layer" hidden></div>
+    <div id="battle" class="battle-layer" hidden></div>
+    <div class="hud-loc" id="hudloc"><b id="where">劇中の街</b><span id="pos"></span><span id="zone"></span></div>
+    <button class="hud-map" id="hudmap" title="地図を大きく (M)" aria-label="地図を大きく"><canvas id="map" width="150" height="150"></canvas></button>
+    <div class="hud-compass" id="compass" aria-hidden="true"></div>
+    <div class="partybar" id="party"></div>
+  </div>
+  <div class="msgwin" id="log" aria-live="polite"></div>
+  <div class="under">
+    <div id="pad" class="pad">
+      <button data-a="strafeL" title="左へ横歩き (Q)">⇠</button>
+      <button data-a="forward" title="前へ (↑ / W)">▲</button>
+      <button data-a="strafeR" title="右へ横歩き (E)">⇢</button>
+      <button data-a="turnL" title="左を向く (← / A)">↶</button>
+      <button data-a="turnBack" title="後ろを向く (↓ / S)">⟲</button>
+      <button data-a="turnR" title="右を向く (→ / D)">↷</button>
+      <button data-a="search" class="wide" title="調べる (Space / F)">調べる</button>
+      <button data-a="stairs" class="wide" id="stairs-btn" hidden>階段</button>
+    </div>
+    <aside class="info panel">
+      <div class="gold"><span>所持金</span><b id="gold"></b></div>
+      <div id="bag" class="bag"></div>
+      <div class="row"><button data-x="map">地図（M）</button><a class="btn" href="./">タイトルへ</a></div>
+    </aside>
+  </div>
+</div>
+<div id="bigmap" class="modal" hidden><div class="modal-box map-box"><h2 class="plate" id="bigmap-title">地図</h2><canvas id="mapfull" width="560" height="560"></canvas><div class="coord" id="bigmap-coord"></div><div class="row"><button data-x="mapclose">閉じる</button></div></div></div>
+<div id="modal" class="modal" hidden><div class="modal-box" id="modal-box"></div></div>
+<script type="module" src="js/explore.js"></script>
+</body>
+</html>
