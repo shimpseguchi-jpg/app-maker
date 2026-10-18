@@ -1,4 +1,4 @@
-// 劇中の街の施設（エルミナージュ準拠：酒場・宿屋・商店・寺院・城。訓練所はマイルストーン5）
+// 劇中の街の施設（エルミナージュ準拠：酒場・宿屋・商店・寺院・城・訓練所）
 import { IDOLS, IDOL_LIST } from '../data/idols.js';
 import { SONGS } from '../data/songs.js';
 import { PROMOTE_ITEMS, ITEMS } from '../data/items.js';
@@ -8,6 +8,10 @@ import { CONDITIONS, REVIVE_FEE, DOWN, tryRevive } from './revive.js';
 import { gainExp, expForLevel } from './growth.js';
 import { shopStock } from './boss.js';
 import { unitOf, partyView, syncParty, familiesOf, addScore, scoreName, equippedScore } from './expedition.js';
+import { CLASSES, PROMOTE_LEVEL } from '../data/classes.js';
+import { itemFits } from '../data/items.js';
+import { canChangeClass, changeClass, canPromote, promote } from './classes.js';
+import { buildMembers, computeParty, BASE_STATS, STAT_NAME } from './party.js';
 
 export const PARTY_MAX = 6;
 const name = (id) => IDOLS[id].name;
@@ -178,4 +182,57 @@ export function bestiary(ex) {
     const b = ex.book[e.id];
     return { id: e.id, known: !!b?.seen, kills: b?.kills || 0, enemy: e };
   });
+}
+
+// ── 訓練所：転職（エルミナージュ式）と昇格（聖魔の光石式） ──
+// 戻り値：転職できるクラス・昇格先の一覧と、できない理由
+export function trainingInfo(ex, id) {
+  const u = unitOf(ex, id);
+  const cur = CLASSES[u.cls];
+  const blocked = ex.lost[id] ? '迷宮に取り残されている' : DOWN.has(ex.cond[id]) ? `${CONDITIONS[ex.cond[id]].name}のため訓練できない` : null;
+  const changes = Object.values(CLASSES).filter((c) => c.change && c.id !== u.cls).map((c) => ({
+    cls: c, ok: !blocked && canChangeClass(u, c.id),
+    reqs: Object.entries(c.req || {}).map(([k, need]) => ({ stat: k, need, have: u.base[k], ok: u.base[k] >= need })),
+  }));
+  const promotions = cur.tier === 1 ? cur.promote.map((pid) => {
+    const items = [...new Set(ex.items)].filter((it) => itemFits(it, u.cls));
+    const reason = blocked || (u.level < PROMOTE_LEVEL ? `Lv${PROMOTE_LEVEL} から` : !items.length ? '昇格アイテムがない' : null);
+    return { cls: CLASSES[pid], items, ok: !reason, reason };
+  }) : [];
+  return { unit: u, cls: cur, blocked, changes, promotions };
+}
+
+// 転職・昇格の後：HP は新しい最大値、呪文の回数は新しいレベルで数え直す
+function afterTraining(ex, id) {
+  const solo = computeParty(buildMembers([{ idol: id, ...unitOf(ex, id) }])).members[0];
+  ex.hp[id] = solo.stats.hp;
+  delete ex.mp[id];
+  const inParty = partyView(ex).find((m) => m.id === id); // パーティにいればシナジー込みの最大値で全快
+  if (inParty) ex.hp[id] = inParty.maxHp;
+  syncParty(ex);
+}
+
+export function doChangeClass(ex, id, clsId) {
+  const info = trainingInfo(ex, id);
+  if (info.blocked) return [info.blocked];
+  const u = info.unit;
+  if (!canChangeClass(u, clsId)) return ['能力が条件に届いていない'];
+  const from = CLASSES[u.cls].name;
+  ex.units[id] = changeClass(u, clsId, IDOLS[id]);
+  afterTraining(ex, id);
+  return [`${name(id)}は${from}から${CLASSES[clsId].name}に転職した（Lv1 から。覚えた魔法はそのまま）`];
+}
+
+export function doPromote(ex, id, clsId, itemId) {
+  const info = trainingInfo(ex, id);
+  if (info.blocked) return [info.blocked];
+  const u = info.unit;
+  if (!ex.items.includes(itemId) || !canPromote(u, clsId, itemId)) return ['昇格できない'];
+  const from = CLASSES[u.cls].name;
+  const bonus = CLASSES[clsId].bonus || {};
+  ex.units[id] = promote(u, clsId, itemId);
+  ex.items.splice(ex.items.indexOf(itemId), 1);
+  afterTraining(ex, id);
+  const up = BASE_STATS.filter((k) => bonus[k]).map((k) => `${STAT_NAME[k]}+${bonus[k]}`).join(' ');
+  return [`${name(id)}は「${ITEMS[itemId].name}」を使い、${from}から${CLASSES[clsId].name}に昇格した！`, `昇格ボーナス：${up}`];
 }

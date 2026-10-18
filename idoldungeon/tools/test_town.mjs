@@ -1,7 +1,9 @@
 // 街（酒場・宿屋・商店・寺院・城・記録）と、全滅したときの死体の扱いのテスト
 // node idoldungeon/tools/test_town.mjs
 import { newExpedition, normalize, addScore, partyView, unitOf, move, enterDungeon, wipeOut, startBattle, finishBattle, STARTER_SONGS } from '../js/engine/expedition.js';
-import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, stay, ROOMS, shopList, buy, sellList, sell, appraise, treat, retrieve, donate, bestiary } from '../js/engine/town.js';
+import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, stay, ROOMS, shopList, buy, sellList, sell, appraise, treat, retrieve, donate, bestiary,
+  trainingInfo, doChangeClass, doPromote } from '../js/engine/town.js';
+import { IDOLS } from '../js/data/idols.js';
 import { exportText, importText, summary } from '../js/save.js';
 import { expForLevel } from '../js/engine/growth.js';
 import { SONGS } from '../js/data/songs.js';
@@ -133,6 +135,45 @@ const fresh = () => newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }, { ido
   const b = bestiary(ex).find((x) => x.id === id);
   ok(b.known && b.kills >= 1, '倒した敵が図鑑に載る');
   ok(bestiary(ex).some((x) => !x.known), 'まだ出会っていない敵は ？？？');
+}
+
+// ── 訓練所：転職と昇格 ──
+{
+  const ex = fresh();
+  // 千早（魔道士）を育ててから転職：Lv1・経験値0・能力は本来の値。魔法は残る
+  const u = unitOf(ex, 'chihaya');
+  joinParty(ex, 'chihaya');
+  u.exp = expForLevel(5); stay(ex, 'suite');
+  ok(u.level === 5, '千早 Lv5');
+  const info = trainingInfo(ex, 'chihaya');
+  ok(info.changes.find((x) => x.cls.id === 'priest').ok, '僧侶には転職できる（メンタル11以上）');
+  ok(!info.changes.find((x) => x.cls.id === 'samurai').ok, '侍には条件が足りない');
+  ok(info.changes.find((x) => x.cls.id === 'samurai').reqs.some((r) => !r.ok), 'どの能力が足りないか分かる');
+  ok(info.promotions.every((p) => !p.ok && p.reason.includes('Lv')), 'Lv10 未満は昇格できない');
+  doChangeClass(ex, 'chihaya', 'priest');
+  const v = unitOf(ex, 'chihaya');
+  ok(v.cls === 'priest' && v.level === 1 && v.exp === 0, '転職：Lv1・経験値0');
+  ok(v.base.vo === IDOLS.chihaya.base.vo && v.learned.includes('arcane') && v.history.includes('mage'), '転職：能力は本来の値、理魔法は覚えたまま');
+  const m = partyView(ex).find((x) => x.id === 'chihaya');
+  ok(ex.hp.chihaya === m.maxHp && ex.mp.chihaya.arcane >= 1 && ex.mp.chihaya.heal >= 1, '転職後は HP 全快、理魔法と回復魔法の両方の回数');
+  ok(doChangeClass(ex, 'chihaya', 'samurai')[0].includes('条件'), '条件を満たさない転職は断られる');
+  // 昇格：Lv10・合うアイテムが必要。アイテムは使うとなくなる
+  const w = unitOf(ex, 'makoto');
+  w.exp = expForLevel(10); stay(ex, 'stable');
+  ok(w.level === 10, '真 Lv10');
+  ok(trainingInfo(ex, 'makoto').promotions.every((p) => p.reason === '昇格アイテムがない'), 'アイテムがないと昇格できない');
+  ex.items.push('knightCrest', 'heroCrest');
+  const pr = trainingInfo(ex, 'makoto').promotions;
+  ok(pr.map((p) => p.cls.id).join() === 'warrior,hero' && pr.every((p) => p.ok && p.items.join() === 'heroCrest'), '戦士はヒーローの証で、ウォーリアか勇者へ');
+  const pow = w.base.pow;
+  const msgs = doPromote(ex, 'makoto', 'hero', 'heroCrest');
+  const h = unitOf(ex, 'makoto');
+  ok(h.cls === 'hero' && h.level === 1 && h.exp === 0 && h.base.pow === pow + 2, '昇格：Lv1・能力は残りボーナス加算');
+  ok(!ex.items.includes('heroCrest') && ex.items.includes('knightCrest'), '使ったアイテムだけなくなる');
+  ok(msgs.some((x) => x.includes('パワー+2')), '昇格ボーナスを日本語で表示');
+  ok(!trainingInfo(ex, 'makoto').promotions.length, '上位職はもう昇格しない');
+  ex.cond.hibiki = 'dead';
+  ok(trainingInfo(ex, 'hibiki').blocked && doChangeClass(ex, 'hibiki', 'mercenary')[0].includes('訓練できない'), '死亡中は訓練できない');
 }
 
 // ── 記録 ──

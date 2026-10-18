@@ -138,3 +138,12 @@ a { color: var(--accent); }
 .bk.unknown { opacity: .6; }
 .plain { margin: 0; padding-left: 1.2em; font-size: .9rem; }
 .ok { color: var(--ok); }
+
+/* ── 訓練所 ── */
+.wait.on { outline: 2px solid var(--accent); }
+.tr-head { border-left: 5px solid var(--c); background: #1f1938; border-radius: 8px; padding: 6px 10px; display: grid; gap: 4px; }
+.tr-head .stats { margin-top: 0; }
+.confirm { background: #2a2147; border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; }
+.confirm p { margin: 0; }
+.ng { color: #ff8a8a; }
+.promo-grid { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }

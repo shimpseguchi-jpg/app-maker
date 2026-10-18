@@ -1,23 +1,29 @@
 // 劇中の街の画面（施設はタブで切り替え）。ルールは engine/town.js
 import { SONGS } from '../data/songs.js';
-import { CLASSES } from '../data/classes.js';
+import { CLASSES, PROMOTE_LEVEL } from '../data/classes.js';
+import { IDOLS, IDOL_LIST } from '../data/idols.js';
+import { BASE_STATS, STAT_NAME } from '../engine/party.js';
+import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
 import { partyView, scoreName, unitOf, enterDungeon } from '../engine/expedition.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
-  shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary } from '../engine/town.js';
+  shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
+  trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
 import { SLOTS, saveSlot, readSlot, exportText, importText } from '../save.js';
 
-export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['castle', '城'], ['record', '記録']];
+export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let tab = 'tavern';
 let shopMode = 'buy';
 let ioText = '';
+let trainee = null;   // 訓練所で選んでいるアイドル
+let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
 
 export function renderTown(ex) {
   const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="${id === tab ? 'on' : ''}">${nm}</button>`).join('');
-  const body = { tavern, inn, shop, temple, castle, record }[tab](ex);
+  const body = { tavern, inn, shop, temple, training, castle, record }[tab](ex);
   return `<div class="tabs town-tabs">${tabs}</div><div class="town-body">${body}</div>
     <div class="town-go"><button data-t="enter" ${ex.slots.length ? '' : 'disabled'}>迷宮へ入る</button></div>`;
 }
@@ -85,6 +91,42 @@ function temple(ex) {
     <div class="town-grid">${partyView(ex).map((m) => `<button data-t="donate" data-id="${m.id}" ${ex.gold < 100 ? 'disabled' : ''}>${esc(m.idol.name)}のために 100G</button>`).join('')}</div>`;
 }
 
+function training(ex) {
+  trainee ||= ex.slots[0]?.idol || IDOL_LIST[0];
+  const pick = IDOL_LIST.map((id) => { const u = unitOf(ex, id); return `<button data-trainee="${id}" class="wait ${id === trainee ? 'on' : ''}" style="--c:${IDOLS[id].color}">
+    ${esc(IDOLS[id].name)} <small>${esc(CLASSES[u.cls].name)} Lv${u.level}</small></button>`; }).join('');
+  const info = trainingInfo(ex, trainee);
+  const u = info.unit, c = info.cls;
+  const stats = BASE_STATS.map((k) => `<span>${STAT_NAME[k]}<b>${u.base[k]}</b></span>`).join('');
+  const spells = SPELL_LIST.filter((s) => (u.learned || []).includes(s.family) || c.effects.some((e) => e.id === s.family)).filter((s) => s.lv <= u.level).map((s) => s.name);
+  const head = `<div class="tr-head" style="--c:${IDOLS[trainee].color}"><b>${esc(IDOLS[trainee].name)}</b>
+      <span>${esc(c.name)}（${c.tier === 1 ? '下位職' : '上位職'}・射程${c.range}）Lv${u.level}</span>
+      <small class="sub">${esc(c.role || '')}${u.history?.length ? `　これまで：${u.history.map((h) => CLASSES[h].name).join('→')}` : ''}</small>
+      <div class="stats">${stats}</div>
+      ${spells.length ? `<small class="sub">使える呪文：${spells.map(esc).join('・')}</small>` : ''}
+      ${info.blocked ? `<p class="cond">${esc(info.blocked)}</p>` : ''}</div>`;
+  if (confirm) {
+    const target = CLASSES[confirm.cls];
+    const warn = confirm.kind === 'change'
+      ? 'Lv1・経験値0 に戻り、能力はアイドル本来の値に戻ります。覚えた魔法は残ります。'
+      : `「${ITEMS[confirm.item].name}」を使います。Lv1・経験値0 に戻りますが、能力は残り、昇格ボーナスが足されます。`;
+    return `${head}<div class="confirm"><b>${esc(target.name)}に${confirm.kind === 'change' ? '転職' : '昇格'}しますか？</b><p class="sub">${warn}</p>
+      <div class="row"><button data-t="trainYes">決定</button><button data-t="trainNo">やめる</button></div></div>`;
+  }
+  const promo = info.promotions.length ? `<h3>昇格 <small class="sub">Lv${PROMOTE_LEVEL} 以上・昇格アイテムを使って2つの上位職から1つ</small></h3>
+    <div class="promo-grid">${info.promotions.map((p) => `<div class="slot"><b>${esc(p.cls.name)}</b> <small class="sub">${esc(p.cls.role)}・ボーナス ${BASE_STATS.filter((k) => p.cls.bonus?.[k]).map((k) => `${STAT_NAME[k]}+${p.cls.bonus[k]}`).join(' ')}</small>
+      ${p.ok ? `<div class="row">${p.items.map((it) => `<button data-t="promote" data-cls="${p.cls.id}" data-item="${it}">${esc(ITEMS[it].name)}で昇格</button>`).join('')}</div>` : `<small class="cond">${esc(p.reason)}</small>`}</div>`).join('')}</div>`
+    : c.tier === 2 ? '<p class="sub">上位職です（これ以上の昇格はない）</p>' : '<p class="sub">踊り子は昇格しない特別職です</p>';
+  const row = (x) => `<button data-t="change" data-cls="${x.cls.id}" ${x.ok ? '' : 'disabled'} title="${esc(x.cls.role)}">${esc(x.cls.name)}
+    <small>${x.reqs.map((r) => `<span class="${r.ok ? 'ok' : 'ng'}">${STAT_NAME[r.stat]}${r.need}</span>`).join(' ')}</small></button>`;
+  const lower = info.changes.filter((x) => x.cls.tier === 1), upper = info.changes.filter((x) => x.cls.tier === 2);
+  return `<div class="wait-grid">${pick}</div>${head}${promo}
+    <h3>転職 <small class="sub">能力が条件を満たしていれば、どのクラスにもなれる（Lv1 から）</small></h3>
+    <div class="shop">${lower.map(row).join('')}</div>
+    <h3>エルミナージュの上級職 <small class="sub">転職で直接なる</small></h3>
+    <div class="shop">${upper.map(row).join('')}</div>`;
+}
+
 function castle(ex) {
   const list = bestiary(ex);
   const n = list.filter((x) => x.known).length;
@@ -111,6 +153,7 @@ export function townAction(ex, el, rng = Math.random) {
   const d = el.dataset;
   if (d.tab) { tab = d.tab; return { msgs: [] }; }
   if (d.shop) { shopMode = d.shop; return { msgs: [] }; }
+  if (d.trainee) { trainee = d.trainee; confirm = null; return { msgs: [] }; }
   if (d.join) return { msgs: joinParty(ex, d.join) };
   if (d.leave) return { msgs: leaveParty(ex, d.leave) };
   if (d.up) return { msgs: moveMember(ex, d.up, -1) };
@@ -119,6 +162,13 @@ export function townAction(ex, el, rng = Math.random) {
   switch (d.t) {
     case 'enter': return { msgs: enterDungeon(ex) };
     case 'appraiseAll': return { msgs: appraiseAll(ex) };
+    case 'change': confirm = { kind: 'change', cls: d.cls }; return { msgs: [] };
+    case 'promote': confirm = { kind: 'promote', cls: d.cls, item: d.item }; return { msgs: [] };
+    case 'trainNo': confirm = null; return { msgs: [] };
+    case 'trainYes': {
+      const c = confirm; confirm = null;
+      return { msgs: c.kind === 'change' ? doChangeClass(ex, trainee, c.cls) : doPromote(ex, trainee, c.cls, c.item) };
+    }
     case 'stay': return { msgs: stay(ex, d.id, rng) };
     case 'buy': return { msgs: buy(ex, d.id) };
     case 'sell': return { msgs: sell(ex, d.kind, d.kind === 'score' ? Number(d.id) : d.id) };
