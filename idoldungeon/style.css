@@ -38,3 +38,57 @@ section { background: var(--panel); border: 1px solid var(--line); border-radius
 .syn ul { margin: 2px 0 0; padding-left: 1.1em; font-size: .78rem; }
 .cls { color: var(--sub); font-weight: normal; font-size: .75rem; }
 .idol .cls { display: block; }
+
+/* ── 入口 ── */
+a { color: var(--accent); }
+.back { text-decoration: none; margin-right: 4px; }
+.sub { color: var(--sub); }
+.title-screen { max-width: 520px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+.title-screen h1 { font-size: 2rem; margin: 0; }
+.menu { display: grid; gap: 12px; margin: 32px 0; }
+.menu a { display: block; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--text); text-decoration: none; font-size: 1.2rem; }
+.menu a small { display: block; color: var(--sub); font-size: .8rem; }
+
+/* ── 迷宮探索 ── */
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bar h1 { font-size: 1.1rem; }
+.status { display: flex; gap: 12px; font-variant-numeric: tabular-nums; color: var(--sub); }
+.status #zone { color: #ff9a7a; }
+.status #gold { color: var(--accent); }
+.ex-layout { display: grid; gap: 12px; padding: 12px; max-width: 1100px; margin: 0 auto; grid-template-columns: 1fr; }
+@media (min-width: 860px) { .ex-layout { grid-template-columns: minmax(0, 1fr) 280px; } }
+.ex-main, .ex-side { min-width: 0; display: grid; gap: 8px; align-content: start; }
+.view-wrap { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #07060d; }
+#view { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; }
+#map { width: 100%; max-width: 264px; height: auto; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 8px; justify-self: center; }
+.log { min-height: 7.5em; font-size: .85rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.log div:last-child { color: var(--accent); }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 360px; width: 100%; justify-self: center; }
+.pad button, .town button, .town .btn, .modal button { font: inherit; color: var(--text); background: #2f2752; border: 1px solid var(--line); border-radius: 8px; padding: 10px 6px; cursor: pointer; touch-action: manipulation; }
+.pad button { font-size: 1.3rem; }
+.pad .wide { grid-column: span 3; font-size: 1rem; }
+.pad button:active, .town button:active { background: #44397a; }
+.ex-party { display: grid; gap: 6px; }
+.pm { border-left: 5px solid var(--c); background: var(--panel); border-radius: 6px; padding: 4px 8px; font-size: .85rem; }
+.pm small { color: var(--sub); }
+.hpbar { height: 5px; background: #3a3260; border-radius: 3px; overflow: hidden; margin: 2px 0; }
+.hpbar i { display: block; height: 100%; background: var(--ok); }
+.cond { font-size: .75rem; padding: 0 4px; border-radius: 4px; background: #5a2030; color: #ffb3b3; }
+.cond.poison { background: #2d4a20; color: #c8f59a; }
+.bag { font-size: .85rem; }
+.town { padding: 12px 16px; min-height: 280px; }
+.town h2 { margin: 0 0 8px; }
+.town h3 { font-size: .95rem; margin: 14px 0 6px; }
+.town-grid, .shop { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.town button, .town .btn { text-align: left; text-decoration: none; display: block; }
+.town button small, .town .btn small { display: block; color: var(--sub); font-size: .75rem; }
+.town button:disabled { opacity: .45; cursor: default; }
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.modal[hidden] { display: none; }
+.modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; max-width: 420px; width: 100%; }
+.modal-box h2 { margin-top: 0; }
+.modal .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.modal .row button { flex: 1; }
+[hidden] { display: none !important; }
+.view-wrap { width: 100%; max-width: calc(56vh * 4 / 3); justify-self: center; }
+@media (max-width: 859px) { .view-wrap { max-width: none; } }

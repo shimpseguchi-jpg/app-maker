@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1530">
+<meta name="description" content="アイドルマスターの二次創作ダンジョンRPG（開発中）。パーティ編成とシナジーの試作画面">
+<title>パーティ編成 - アイドル迷宮（仮）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1><a href="./" class="back">←</a> パーティ編成 <small>アイドル迷宮（仮）</small></h1>
+  <p class="note">ここで組んだ先頭6人が、迷宮を探索するパーティになります（街にいるときに反映）。</p>
+</header>
+<main class="layout">
+  <section>
+    <h2>アイドル <small>タップで加入・脱退（最大6人、先頭3人が前列）</small></h2>
+    <div id="roster" class="roster"></div>
+  </section>
+  <section>
+    <h2>パーティ</h2>
+    <div id="party" class="party"></div>
+  </section>
+  <section>
+    <h2>シナジー</h2>
+    <div id="synergies"></div>
+  </section>
+</main>
+<noscript>JavaScript を有効にしてください</noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
