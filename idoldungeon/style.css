@@ -257,6 +257,19 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 .map-box canvas { width: 100%; height: auto; aspect-ratio: 1; display: block; border: 1px solid var(--gold-lo); }
 .map-box .coord { margin: 6px 0; font-family: var(--sans); color: var(--gold-hi); }
 
+/* 施設の説明（1行）と、出発前のチェック */
+.howto { margin: 0 0 8px !important; padding: 6px 10px; font-size: .85rem; line-height: 1.6; background: rgba(0, 0, 0, .3); border-left: 3px solid var(--gold); }
+.howto b { color: var(--gold-hi); }
+.prep { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 4px; }
+.prep li { display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: rgba(0, 0, 0, .28); border-radius: 3px; font-size: .86rem; }
+.prep li > span { flex: none; width: 1.4em; text-align: center; font-weight: 700; font-family: var(--sans); }
+.prep li.ok { color: var(--sub); }
+.prep li.ok > span { color: var(--ok); }
+.prep li.todo > span { color: #ffb84a; }
+.town-panel .prep button { margin-left: auto; flex: none; padding: 4px 10px; font-size: .8rem; }
+.town-panel ol.plain li, .town-panel ul.plain li { margin: 3px 0; line-height: 1.6; }
+.town-panel .plain b { color: var(--gold-hi); }
+
 /* 出発：迷宮とモードを選ぶ */
 .depart { margin-bottom: 10px; }
 .depart-modes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
@@ -371,9 +384,9 @@ body[data-play="card"] .screen { background: radial-gradient(circle at 50% 38%, 
 
   /* 街：施設の中身だけスクロール、施設のボタンは下に固定 */
   .town-panel { grid-area: panel; position: relative; inset: auto; width: auto; max-height: none; min-height: 0; margin: 8px; }
-  .town-menu { grid-area: menu; position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px;
+  .town-menu { grid-area: menu; position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
     padding: 8px 8px 12px; background: #120c08; border-top: 2px solid var(--gold); }
-  .town-menu .vbar { clip-path: none; text-align: center; padding: 12px 2px; min-height: 48px; border-radius: 4px; font-size: .9rem; }
+  .town-menu .vbar { clip-path: none; text-align: center; padding: 12px 0; min-height: 48px; border-radius: 4px; font-size: .84rem; letter-spacing: 0; }
   .tv-row select { flex: 1 1 140px; }
 
   /* カードモード：上にメッセージと6人、残りをカード */

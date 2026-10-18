@@ -80,14 +80,14 @@ export function stay(ex, roomId, rng = Math.random) {
   ex.gold -= fee;
   ex.days++;
   const msgs = [`${room.name}に泊まった${fee ? `（${fee}G）` : ''}`];
+  syncParty(ex); // レベルが上がる前の最大 HP を覚えておく（上がったぶんは syncParty が今の HP に足す）
   for (const s of ex.slots) {
     const id = s.idol;
     if (DOWN.has(ex.cond[id])) continue;
     const u = unitOf(ex, id);
-    const before = partyView(ex).find((m) => m.id === id);
     msgs.push(...gainExp(u, 0, name(id), rng)); // ためた経験値でレベルアップ
     const m = partyView(ex).find((x) => x.id === id);
-    ex.hp[id] = Math.min(m.maxHp, ex.hp[id] + Math.max(0, m.maxHp - before.maxHp) + Math.ceil(m.maxHp * room.hp));
+    ex.hp[id] = Math.min(m.maxHp, ex.hp[id] + Math.ceil(m.maxHp * room.hp)); // レベルアップで増えた最大 HP のぶんは syncParty が足す
     if (room.cure && ex.cond[id] === 'poison') ex.cond[id] = 'ok';
     for (const f of familiesOf(m)) ex.mp[id][f] = spellPool(f, m.level, m.base);
     if (m.live && ex.live[id]) ex.live[id].left = m.live.uses;
@@ -241,4 +241,37 @@ export function doPromote(ex, id, clsId, itemId) {
   afterTraining(ex, id);
   const up = BASE_STATS.filter((k) => bonus[k]).map((k) => `${STAT_NAME[k]}+${bonus[k]}`).join(' ');
   return [`${name(id)}は「${ITEMS[itemId].name}」を使い、${from}から${CLASSES[clsId].name}に昇格した！`, `昇格ボーナス：${up}`];
+}
+
+// ── 出発前のチェック（街の「迷宮へ」に出す）。ok=false の項目に、行くとよい施設（tab）をつける ──
+export function prepCheck(ex) {
+  const party = partyView(ex);
+  const names = (list) => list.map((m) => m.idol.name).join('・');
+  const out = [];
+  const add = (ok, text, tab) => out.push({ ok, text, tab });
+  const up = party.filter((m) => !DOWN.has(m.cond));
+  if (!party.length) { add(false, 'パーティがいない。酒場で組もう', 'tavern'); return out; }
+  const free = roster(ex).filter((r) => !r.inParty && !r.lost && !DOWN.has(r.cond));
+  add(party.length >= PARTY_MAX || !free.length, party.length >= PARTY_MAX ? 'パーティは6人そろっている' : `パーティは${party.length}人。待機中の仲間を加えられる`, 'tavern');
+  const down = party.filter((m) => DOWN.has(m.cond));
+  add(!down.length, down.length ? `倒れている仲間がいる：${names(down)}` : '全員動ける', 'temple');
+  const sick = up.filter((m) => m.cond === 'poison');
+  if (sick.length) add(false, `毒の仲間がいる：${names(sick)}（寺院か、宿屋のエコノミー以上で治る）`, 'temple');
+  const hurt = up.filter((m) => m.hp < m.maxHp);
+  add(!hurt.length, hurt.length ? `HP が減っている：${names(hurt)}` : 'HP は満タン', 'inn');
+  const tired = up.filter((m) => familiesOf(m).some((f) => (ex.mp[m.id]?.[f] ?? 0) < spellPool(f, m.level, m.base)) || (m.live && (ex.live[m.id]?.left ?? m.live.uses) < m.live.uses));
+  add(!tired.length, tired.length ? `呪文・ライブの回数が減っている：${names(tired)}` : '呪文・ライブの回数は全快', 'inn');
+  const ready = up.filter((m) => expToNext(unitOf(ex, m.id)) === 0);
+  if (ready.length) add(false, `泊まればレベルアップ：${names(ready)}`, 'inn');
+  const worn = new Set(Object.values(ex.equip));
+  const spare = ex.scores.filter((sc) => sc.known && !worn.has(sc.uid));
+  const bare = party.filter((m) => !ex.equip[m.id]);
+  add(!bare.length || !spare.length, bare.length && spare.length ? `楽譜を装備していない仲間がいる：${names(bare)}（使える楽譜 ${spare.length}枚）` : bare.length ? '楽譜は全部装備ずみ（新しい楽譜は商店で買える）' : '全員が楽譜を装備している', 'tavern');
+  const unknown = ex.scores.filter((sc) => !sc.known).length;
+  if (unknown) add(false, `未鑑定の楽譜が${unknown}枚（鑑定するまで装備できない）`, hasAppraiser(ex) ? 'tavern' : 'shop');
+  const promo = party.filter((m) => trainingInfo(ex, m.id).promotions.some((p) => p.ok));
+  if (promo.length) add(false, `昇格できる：${names(promo)}`, 'training');
+  const lost = Object.keys(ex.lost).map((id) => IDOLS[id].name);
+  if (lost.length) add(false, `迷宮に取り残された仲間がいる：${lost.join('・')}`, 'temple');
+  return out;
 }

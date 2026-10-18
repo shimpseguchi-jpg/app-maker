@@ -7,7 +7,7 @@ import { SPELLS_BY_ID, KIND_TARGET } from './data/spells.js';
 import { CONDITIONS } from './engine/revive.js';
 import { getFloor, viewCells, DIR_NAME, isDark, isAntiMagic } from './engine/dungeon.js';
 import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf } from './engine/expedition.js';
-import { renderTown, townAction, townSpeech } from './ui/town.js';
+import { renderTown, townAction, townSpeech, openTab } from './ui/town.js';
 import { portrait, shortName } from './ui/portrait.js';
 import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveReady, autoCommands } from './engine/battle.js';
 import { expForLevel } from './engine/growth.js';
@@ -558,6 +558,10 @@ document.addEventListener('keydown', (ev) => {
   doAction(a);
 });
 
-if (ex.mode === 'town') { syncParty(ex); say(['劇中の街にいる。酒場でパーティを組んで、迷宮へ']); }
+if (ex.mode === 'town') {
+  syncParty(ex);
+  say(['劇中の街にいる。準備のしかたは「遊び方」、出発前の確認は「迷宮へ」で']);
+  if (location.hash === '#help') openTab('help');
+}
 if (ex.battle) resetCommands();
 render();

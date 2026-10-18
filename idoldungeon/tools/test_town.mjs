@@ -2,7 +2,7 @@
 // node idoldungeon/tools/test_town.mjs
 import { newExpedition, normalize, addScore, partyView, unitOf, move, enterDungeon, wipeOut, startBattle, finishBattle, STARTER_SONGS } from '../js/engine/expedition.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, stay, ROOMS, shopList, buy, sellList, sell, appraise, treat, retrieve, donate, bestiary,
-  trainingInfo, doChangeClass, doPromote } from '../js/engine/town.js';
+  trainingInfo, doChangeClass, doPromote, prepCheck } from '../js/engine/town.js';
 import { IDOLS } from '../js/data/idols.js';
 import { exportText, importText, summary } from '../js/save.js';
 import { expForLevel } from '../js/engine/growth.js';
@@ -189,6 +189,30 @@ const fresh = () => newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }, { ido
   // 古いセーブ（楽譜・取り残しなどの項目がない）も読める
   const old = normalize({ ex: ex.ex, mode: 'town', slots: [{ idol: 'makoto', song: 'ready' }], hp: {}, cond: {}, gold: 1 });
   ok(Array.isArray(old.scores) && old.lost && old.book && !old.slots[0].song, '古いセーブを新しい形にそろえる');
+}
+
+// ── 出発前のチェック（街の「迷宮へ」） ──
+{
+  const ex = newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }]);
+  const todo = (c) => c.filter((x) => !x.ok).map((x) => x.tab);
+  let c = prepCheck(ex);
+  ok(todo(c).includes('tavern') && c.some((x) => !x.ok && x.text.includes('2人')) && c.some((x) => !x.ok && x.text.includes('楽譜を装備していない')), `人数と楽譜の装備（${todo(c)}）`);
+  for (const id of ['haruka', 'ritsuko', 'ami', 'yukiho']) joinParty(ex, id);
+  const known = ex.scores.filter((sc) => sc.known);
+  equip(ex, 'makoto', known[0].uid); equip(ex, 'hibiki', known[1].uid);
+  c = prepCheck(ex);
+  ok(todo(c).length === 0, `準備が整えば全部 ✓（${c.filter((x) => !x.ok).map((x) => x.text).join(' / ')}）`);
+  ex.hp.makoto = 1;
+  ex.cond.hibiki = 'dead';
+  ex.mp.yukiho = Object.fromEntries(Object.keys(ex.mp.yukiho).map((f) => [f, 0]));
+  unitOf(ex, 'haruka').exp = expForLevel(2);
+  addScore(ex, 'ready');
+  ex.lost.chihaya = { dungeon: 'd1', floor: 1, card: true };
+  c = prepCheck(ex);
+  const t = c.filter((x) => !x.ok).map((x) => x.text).join(' / ');
+  ok(['HP が減っている：菊地真', '倒れている仲間がいる：我那覇響', '呪文・ライブの回数が減っている：萩原雪歩', '泊まればレベルアップ：天海春香', '未鑑定の楽譜が1枚', '迷宮に取り残された仲間がいる：如月千早'].every((x) => t.includes(x)), `HP・倒れた仲間・回数・レベルアップ・未鑑定・取り残された仲間（${t}）`);
+  ok(c.find((x) => x.text.includes('倒れている')).tab === 'temple' && c.find((x) => x.text.includes('HP が')).tab === 'inn' && c.find((x) => x.text.includes('未鑑定')).tab === 'shop', '行くとよい施設がつく');
+  ok(prepCheck(newExpedition([]))[0].text.includes('パーティがいない'), 'パーティがいないとき');
 }
 
 console.log(`${pass} ok / ${fail} ng`);

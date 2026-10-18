@@ -12,11 +12,11 @@ import { enterCardMode } from '../engine/cards.js';
 import { CARD_DUNGEONS } from '../data/cards.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
-  trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
+  trainingInfo, doChangeClass, doPromote, prepCheck } from '../engine/town.js';
 import { SLOTS, saveSlot, readSlot, exportText, importText } from '../save.js';
 import { sceneSvg, sceneInfo } from './scenes.js';
 
-export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['depart', '迷宮へ']];
+export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['help', '遊び方'], ['depart', '迷宮へ']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let tab = 'tavern';
 let shopMode = 'buy';
@@ -27,18 +27,33 @@ let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
 // エルミナージュの施設画面：背景画の上に、左上の縦メニュー（施設）と、こげ茶の板（中身）。施設の人のひとことは下の窓
 export function renderTown(ex) {
   const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="vbar ${id === tab ? 'on' : ''} ${id === 'depart' ? 'go' : ''}">${nm}</button>`).join('');
-  const body = { tavern, inn, shop, temple, training, castle, record, depart }[tab](ex);
+  const body = (HOWTO[tab] ? `<p class="howto">${HOWTO[tab]}</p>` : '') + { tavern, inn, shop, temple, training, castle, record, help, depart }[tab](ex);
   return `${sceneSvg(tab)}
     <nav class="vmenu town-menu" aria-label="施設">${tabs}</nav>
     <section class="panel town-panel"><h2 class="plate">${esc(sceneInfo(tab).name)}</h2>${body}</section>`;
 }
+// 施設を開いたときに出す（遊び方の章も参照）
+export const openTab = (id) => { if (TABS.some(([t]) => t === id)) tab = id; };
+// 各施設でできること（いちばん上に1行で出す）
+const HOWTO = {
+  tavern: 'パーティを組み（6人まで。先頭3人が前列）、<b>楽譜を装備</b>するところ。楽譜は1人1枚、名前の横の欄から選ぶ。',
+  inn: '泊まると<b>呪文とライブの回数が全快</b>し、<b>ためた経験値でレベルが上がる</b>。HP の回復は部屋しだい。',
+  shop: '楽譜と昇格アイテムを買う・売る。迷宮で拾った<b>未鑑定の楽譜</b>はここで鑑定すると装備できる。',
+  temple: '倒れた仲間の<b>治療・蘇生</b>と、迷宮に取り残された仲間の<b>回収</b>。寄付すると経験値になる。',
+  training: '<b>転職</b>（能力が条件を満たせば Lv1 から別のクラスへ）と<b>昇格</b>（Lv10 以上で昇格アイテムを使い上位職へ）。',
+  castle: '出会った魔物の記録と、持っている昇格アイテムを見られる。',
+};
 // 下の窓に出す、施設の人のひとこと
 export const townSpeech = () => ({ speaker: sceneInfo(tab).speaker, line: sceneInfo(tab).line, place: sceneInfo(tab).name });
 
 // 出発：迷宮とモードを選ぶ（docs/DESIGN.md 17章）。カードモードはその迷宮のボスを DRPGモードで倒すと解放
 function depart(ex) {
   const can = ex.slots.length > 0;
-  const list = openDungeons(ex).map((d) => {
+  const checks = prepCheck(ex);
+  const todo = checks.filter((c) => !c.ok);
+  const list = `<h3>出発前のチェック <small class="sub">${todo.length ? `${todo.length}件` : '準備は万全！'}</small></h3>
+    <ul class="prep">${checks.map((c) => `<li class="${c.ok ? 'ok' : 'todo'}"><span>${c.ok ? '✓' : '！'}</span>${esc(c.text)}${c.ok ? '' : `<button data-tab="${c.tab}">${esc(TABS.find(([t]) => t === c.tab)[1])}へ</button>`}</li>`).join('')}</ul>`;
+  const dungeons = openDungeons(ex).map((d) => {
     const open = cardUnlocked(ex, d.id);
     const c = CARD_DUNGEONS[d.id];
     const note = !open ? 'この迷宮のボスを DRPGモードで倒すと解放' : `カードを左右に振って進む。${c.floors}階×${c.perFloor}枚＋ボス`;
@@ -50,7 +65,7 @@ function depart(ex) {
       </div>
     </div>`;
   }).join('');
-  return `${list}${can ? '' : '<p class="sub">酒場でパーティを組もう</p>'}`;
+  return `${list}<h3>迷宮とモードを選ぶ</h3>${dungeons}`;
 }
 
 function tavern(ex) {
@@ -110,8 +125,8 @@ function temple(ex) {
   return `<h3>治療・蘇生 <small class="sub">料金はレベルに応じる。灰の蘇生に失敗しても灰のまま</small></h3>
     ${sick.length ? `<div class="town-grid">${sick.map((r) => `<button data-t="treat" data-id="${r.id}">${esc(r.idol.name)} <small>${CONDITIONS[r.cond].name}・${treatFee(ex, r.id)}G</small></button>`).join('')}</div>` : '<p class="sub">治療が必要な仲間はいない</p>'}
     <h3>死体の回収</h3>
-    ${lost.length ? `<div class="town-grid">${lost.map((r) => { const at = ex.lost[r.id]; return `<button data-t="retrieve" data-id="${r.id}">${esc(r.idol.name)} <small>${retrieveFee(ex, r.id)}G・${getFloor(at.dungeon || 'd1', at.floor).name} X${at.x} Y${at.y}</small></button>`; }).join('')}</div>
-      <p class="sub">自分たちで探しに行けば無料（そのマスに行くと連れて帰る。パーティに空きが必要）</p>` : '<p class="sub">迷宮に取り残された仲間はいない</p>'}
+    ${lost.length ? `<div class="town-grid">${lost.map((r) => { const at = ex.lost[r.id]; return `<button data-t="retrieve" data-id="${r.id}">${esc(r.idol.name)} <small>${retrieveFee(ex, r.id)}G・${getFloor(at.dungeon || 'd1', at.floor).name}${at.card ? '（カードモード）' : ` X${at.x} Y${at.y}`}</small></button>`; }).join('')}</div>
+      <p class="sub">自分たちで探しに行けば無料（DRPGモードはそのマスに行く、カードモードはその階の「仲間の死体」カードで連れて帰る。パーティに空きが必要）</p>` : '<p class="sub">迷宮に取り残された仲間はいない</p>'}
     <h3>寄付 <small class="sub">寄付した額と同じ経験値</small></h3>
     <div class="town-grid">${partyView(ex).map((m) => `<button data-t="donate" data-id="${m.id}" ${ex.gold < 100 ? 'disabled' : ''}>${esc(m.idol.name)}のために 100G</button>`).join('')}</div>`;
 }
@@ -162,6 +177,53 @@ function castle(ex) {
       : `<div class="bk unknown"><span class="eicon">❔</span><b>？？？</b> <small class="sub">${x.kills ? `倒した数 ${x.kills}` : 'まだ出会っていない'}</small></div>`).join('')}</div>
     ${Object.keys(clears).length ? `<p class="sub">ボス撃破：${Object.values(clears).map((c) => `${c}回`).join('、')}（倒したボスは強化されて再出現する）</p>` : ''}
     <p class="sub">${ex.items.length ? '持っている昇格アイテム：' + [...new Set(ex.items)].map((id) => `${ITEMS[id].name}×${ex.items.filter((x) => x === id).length}`).join('、') : ''}</p>`;
+}
+
+// 遊び方：準備のしかたと、迷宮・戦闘の基本
+function help() {
+  return `<h3>冒険の流れ</h3>
+    <ol class="plain">
+      <li><b>酒場</b>でパーティを組み、<b>楽譜を装備</b>する</li>
+      <li><b>迷宮へ</b>から出発。「出発前のチェック」で準備の抜けを確かめられる</li>
+      <li>迷宮で戦って経験値・お金・楽譜を集め、階段で街に戻る</li>
+      <li><b>宿屋</b>に泊まる（ここでレベルが上がる）。倒れた仲間は<b>寺院</b>へ</li>
+      <li>ボスを倒すと次の迷宮と、その迷宮のカードモードが開く</li>
+    </ol>
+    <h3>装備：楽譜</h3>
+    <ul class="plain">
+      <li>このゲームの装備品は<b>楽譜</b>（アイドルの曲）。1人1枚まで</li>
+      <li>酒場のパーティ欄で、名前の横の「楽譜」の欄から選ぶ。外すときは「（楽譜なし）」</li>
+      <li>能力が上がったり、戦闘で使える<b>ライブスキル</b>（曲ごとの必殺技。泊まると回数が戻る）が使えるようになる</li>
+      <li>迷宮で拾った楽譜は「？？？の楽譜」（<b>未鑑定</b>）。商店の「鑑定」か、ビショップがいれば酒場の「まとめて鑑定」で使えるようになる</li>
+      <li>新しい楽譜は商店でも買える（ボスを倒すと品ぞろえが増える）</li>
+    </ul>
+    <h3>昇格アイテム</h3>
+    <ul class="plain">
+      <li>ボスが落とす・商店で買える。装備するものではなく、<b>訓練所の「昇格」で使う</b></li>
+      <li>Lv10 以上の下位職が、クラスに合うアイテムを使うと上位職になれる（Lv1 に戻るが、能力は残り、ボーナスが足される）</li>
+    </ul>
+    <h3>パーティの組み方</h3>
+    <ul class="plain">
+      <li>先頭3人が前列、残りが後列。敵の攻撃は主に前列に来る</li>
+      <li>射程：S は目の前の敵グループだけ、M は2つ先まで、L はどこへでも届く。<b>後列だと1つ短くなる</b>（射程 S の子は後列から攻撃できない）。戦士系は前列、弓や魔法の子は後列へ</li>
+      <li>アイドルは「赤系」「高校生」「スポーツ好き」などの<b>属性</b>を持つ。同じ属性が重なったり組み合わさったりすると、パーティ全体に効果が出る（タイトルの「パーティ編成」で試せる）</li>
+    </ul>
+    <h3>迷宮の2つのモード</h3>
+    <ul class="plain">
+      <li><b>DRPGモード</b>：歩いて地図を埋める。↑ 前へ・← → 向きを変える・↓ 振り返る・Q / E 横歩き・Space 調べる・M 地図（スマホは画面のボタン）。経験値・お金・楽譜が 1.5倍</li>
+      <li><b>カードモード</b>：その迷宮のボスを DRPGモードで倒すと遊べる。カードを左右に振って（ボタンや ← → キーでも）ボスまで進む。いつでも街に戻れるが、拾った物の半分を失う</li>
+    </ul>
+    <h3>戦闘</h3>
+    <ul class="plain">
+      <li>全員のコマンドを決めると、<b>素早さの順</b>に1人ずつ動く。「おまかせ」で残り全員を自動で決められる</li>
+      <li>呪文とライブスキルは回数制。宿屋に泊まると戻る</li>
+      <li>「逃げる」は選んだ人だけが逃げる。ボスからは逃げられない</li>
+    </ul>
+    <h3>全滅しても</h3>
+    <ul class="plain">
+      <li>仲間がいなくなることはない（ロストなし）。死体が迷宮に残るので、寺院でお金を払って回収するか、別のパーティで迎えに行く</li>
+      <li>みんな倒れてお金もないときは、寺院がただで助けてくれる</li>
+    </ul>`;
 }
 
 function record() {
