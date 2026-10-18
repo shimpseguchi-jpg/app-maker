@@ -1,5 +1,4 @@
 // パーティの最終能力値（基本能力 → シナジー・楽曲の補正 → 派生ステータス）
-// 派生ステータスの式は仮。戦闘エンジンを作るときに調整する
 import { IDOLS } from '../data/idols.js';
 import { SONGS } from '../data/songs.js';
 import { CLASSES } from '../data/classes.js';
@@ -14,16 +13,18 @@ export const STAT_NAME = {
 export const FRONT_SIZE = 3;
 export const PARTY_SIZE = 6;
 
+// 派生ステータス。Lv1 は控えめで、レベルとともに伸びる（数値は tools/sim_battle.mjs で調整）
 export function derive(b, level = 1) {
+  const L = level - 1;
   return {
-    hp: 8 + b.sta * 2 + b.pow + (level - 1) * Math.ceil(b.sta / 2),
-    atk: b.pow * 2,
-    mat: b.vo * 2,
-    def: Math.floor(b.sta / 2),
-    res: Math.floor(b.men / 2),
-    hit: 50 + b.dan + Math.floor(b.vis / 2),
-    eva: Math.floor((b.dan + b.vis) / 2),
-    spd: b.dan * 2,
+    hp: 6 + b.sta + Math.floor(b.pow / 2) + L * (2 + Math.floor(b.sta / 4)),
+    atk: b.pow + Math.floor(level * 1.5),
+    mat: b.vo + Math.floor(level * 1.5),
+    def: Math.floor(b.sta / 4) + Math.floor(level / 4),
+    res: Math.floor(b.men / 4) + Math.floor(level / 4),
+    hit: 50 + b.dan + Math.floor(b.vis / 2) + level * 2,
+    eva: Math.floor((b.dan + b.vis) / 3) + level,
+    spd: b.dan * 2 + level,
     crit: Math.floor(b.vis / 3),
   };
 }

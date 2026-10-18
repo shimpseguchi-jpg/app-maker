@@ -75,6 +75,14 @@ def({ id: 'lord', name: 'ロード', tier: 2, src: ['elm'], change: true, req: {
 
 // 転職・昇格しても引き継がれる「魔法」（エルミナージュでは覚えた呪文は転職後も残る。罠解除などのクラス技能は残らない）
 export const SPELLS = new Set(['arcane', 'heal', 'dark', 'alchemy', 'summon', 'sleepStaff']);
+// 魔法の系統（呪文の回数は系統ごと。js/data/spells.js）
+export const SPELL_FAMILIES = ['arcane', 'heal', 'dark', 'alchemy'];
+
+// 攻撃の射程（エルミナージュ準拠。武器を実装するまではクラスで決める）
+//   S：目の前の敵の列だけ ／ M：2列先まで ／ L：どこからでも全部の敵。後列からは1列ぶん短くなる
+const RANGE_M = ['knight', 'cavalier', 'pegasus', 'wyvern', 'general', 'greatknight', 'paladin', 'falcoknight', 'wyvernknight', 'wyvernlord'];
+const RANGE_L = ['archer', 'warrior', 'sniper', 'ranger'];
+for (const c of Object.values(CLASSES)) c.range = RANGE_L.includes(c.id) ? 'L' : RANGE_M.includes(c.id) ? 'M' : 'S';
 
 export const CLASS_LIST = Object.keys(CLASSES);
 export const PROMOTE_LEVEL = 10; // 昇格できるレベル（聖魔の光石と同じく Lv10 から）

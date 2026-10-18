@@ -1,25 +1,45 @@
-// 冒険全体の状態：ダンジョンの位置（dungeon.js）＋パーティの HP・状態・所持金・アイテム
-// 戦闘はまだ仮（勝った／逃げたを選ぶだけ）。戦闘エンジンができたら置き換える
-import { newExplore, act, useStairs, retreat, returnToTown, SEARCHERS, KEY_NAMES } from './dungeon.js';
+// 冒険全体の状態：ダンジョンの位置（dungeon.js）＋パーティの育成・HP・状態・呪文の回数・所持金・アイテム、戦闘（battle.js）
+import { newExplore, act, useStairs, retreat, returnToTown, getFloor, isDark, isAntiMagic, SEARCHERS, KEY_NAMES } from './dungeon.js';
 import { buildMembers, computeParty } from './party.js';
 import { bossAt, rollDrops, shopStock } from './boss.js';
+import { createBattle, runTurn } from './battle.js';
+import { gainExp } from './growth.js';
 import { BOSSES } from '../data/bosses.js';
+import { IDOLS } from '../data/idols.js';
+import { CLASSES, SPELL_FAMILIES } from '../data/classes.js';
+import { ENCOUNTERS, FIXED_GROUPS, BOSS_GUARD, BOSS_ESCORT } from '../data/enemies.js';
+import { spellPool } from '../data/spells.js';
 import { ITEMS, PROMOTE_ITEMS } from '../data/items.js';
 import { tryRevive, REVIVE_FEE, DOWN, isWiped, CONDITIONS } from './revive.js';
 
 export function newExpedition(slots, dungeonId = 'd1') {
-  const ex = { ex: newExplore(dungeonId), mode: 'town', slots, hp: {}, cond: {}, gold: 500, items: [], bought: 0, log: [] };
+  const ex = { ex: newExplore(dungeonId), mode: 'town', slots, units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {},
+    gold: 500, items: [], bought: 0, battle: null, battleEv: null };
   syncParty(ex);
   return ex;
 }
 
-// パーティ編成が変わったときなどに、HP の最大値と現在値をそろえる
+// アイドルごとの育成状態（クラス・レベル・経験値・能力・覚えた魔法）
+export function unitOf(ex, idolId) {
+  ex.units ||= {};
+  const idol = IDOLS[idolId];
+  return (ex.units[idolId] ||= { cls: idol.cls, level: 1, exp: 0, base: { ...idol.base }, learned: [] });
+}
+const slotsOf = (ex) => ex.slots.map((s) => ({ ...s, ...unitOf(ex, s.idol) }));
+export const familiesOf = (m) => SPELL_FAMILIES.filter((f) => m.abilities.some((a) => a.id === f || (f === 'dark' && a.id === 'sleepStaff')));
+
+// パーティ編成が変わったとき・レベルが上がったときに、HP・呪文の回数・ライブスキルの回数をそろえる
 export function syncParty(ex) {
-  const { members } = computeParty(buildMembers(ex.slots));
+  const { members } = computeParty(buildMembers(slotsOf(ex)));
+  ex.mp ||= {}; ex.live ||= {}; ex.usedRevive ||= {};
   for (const m of members) {
     if (ex.hp[m.id] == null) ex.hp[m.id] = m.stats.hp;
     ex.hp[m.id] = Math.min(ex.hp[m.id], m.stats.hp);
     ex.cond[m.id] ||= 'ok';
+    const mp = (ex.mp[m.id] ||= {});
+    for (const f of familiesOf(m)) if (mp[f] == null) mp[f] = spellPool(f, m.level, m.base);
+    const key = m.song || '';
+    if (m.live && ex.live[m.id]?.song !== key) ex.live[m.id] = { song: key, left: m.live.uses };
   }
   return members;
 }
@@ -52,12 +72,12 @@ export function move(ex, action, rng = Math.random) {
         if (e.effect === 'poison') ex.cond[m.id] = 'poison';
       }
     } else if (e.type === 'battle') {
-      pending = { type: 'battle', ...e, name: e.name || (e.kind === 'boss' ? bossAt(e.id, ex.ex.bossClears[e.id] || 0).name : 'さまよう敵（仮）') };
       if (e.kind === 'boss') {
         const b = bossAt(e.id, ex.ex.bossClears[e.id] || 0);
-        pending.boss = b;
         msgs.push(b.clears ? `${b.name}が強くなって待ち構えていた！（再戦${b.clears}回目）` : `${b.name}が立ちはだかった！`);
-      } else msgs.push(`${pending.name}が現れた！`);
+      } else msgs.push(e.kind === 'wander' ? '何かが近づいてくる！' : `${e.name}が待ち構えていた！`);
+      startBattle(ex, e, rng);
+      pending = { type: 'battle' };
     } else if (e.type === 'stairs') {
       pending = { type: 'stairs', up: e.up, toTown: e.toTown };
     }
@@ -86,37 +106,115 @@ function checkWipe(ex, msgs) {
 // 全滅：寺院の回収係が街まで運ぶ（回収料として所持金の半分）。エルミナージュの救助隊は今後
 export function rescue(ex) {
   ex.gold = Math.floor(ex.gold / 2);
+  ex.battle = null; ex.battleEv = null;
   toTown(ex);
   return ['寺院の回収係に運ばれて、街に戻った（回収料：所持金の半分）'];
 }
 
-// 仮の戦闘の決着
-export function resolveBattle(ex, battle, result, rng = Math.random) {
+// ── 戦闘 ──
+// 戦闘に出るメンバー（battle.js の party の形）
+export function battleParty(ex) {
+  return partyView(ex).map((m) => ({
+    id: m.id, name: m.idol.name, row: m.row, hp: m.hp, maxHp: m.maxHp, cond: m.cond, stats: m.stats, base: m.base,
+    abilities: m.abilities, tags: m.tags, cls: m.cls, range: CLASSES[m.cls].range, level: m.level,
+    families: familiesOf(m), mp: { ...(ex.mp[m.id] || {}) },
+    live: m.live ? { ...m.live, left: ex.live[m.id]?.left ?? m.live.uses } : null,
+    reviveLeft: m.abilities.some((a) => a.id === 'revive') && !ex.usedRevive[m.id],
+  }));
+}
+
+// ボスを敵データの形にする（再戦の強化・特性つき）
+export function bossEnemy(id, clears) {
+  const b = bossAt(id, clears);
+  const resistAll = b.traits.some((t) => t.id === 'resistAll');
+  return { id, name: b.name, uname: '巨大な影', icon: '👹', level: b.level, ...b.stats, hit: 80 + clears * 3, eva: 8,
+    exp: Math.round(600 * (1 + 0.5 * clears)), gold: 0, traits: b.traits,
+    resist: resistAll ? ['sleep', 'silence', 'confuse', 'death'] : ['death'],
+    acts: [{ kind: 'attack', w: 3 }, { kind: 'dmgAll', power: 0.8, w: 1, name: '大見得' }] };
+}
+
+export function bossGroups(id, clears) {
+  const groups = [{ enemy: bossEnemy(id, clears), count: 1 }, { enemy: BOSS_ESCORT[0], count: BOSS_ESCORT[1] }];
+  if (bossAt(id, clears).traits.some((t) => t.id === 'summonGuard')) groups.push({ enemy: BOSS_GUARD, count: 2 });
+  return groups;
+}
+
+function rollGroups(spec, rng) {
+  return spec.map(([enemy, min, max]) => ({ enemy, count: min + Math.floor(rng() * (max - min + 1)) }));
+}
+
+export function startBattle(ex, ev, rng = Math.random) {
+  const st = ex.ex, fl = getFloor(st.dungeon, st.floor), ch = fl.cellAt(st.x, st.y);
+  let groups;
+  if (ev.kind === 'boss') {
+    const clears = st.bossClears[ev.id] || 0;
+    groups = bossGroups(ev.id, clears);
+  } else if (ev.kind === 'wander') {
+    const table = ENCOUNTERS[st.dungeon][st.floor];
+    groups = rollGroups(table[Math.floor(rng() * table.length)], rng);
+  } else groups = rollGroups(FIXED_GROUPS[ev.id], rng);
+  ex.battleEv = ev;
+  ex.battle = createBattle(battleParty(ex), groups, {
+    kind: ev.kind, canFlee: ev.kind !== 'boss', zone: { dark: isDark(ch), anti: isAntiMagic(ch) }, rng });
+  return ex.battle;
+}
+
+// 1ターン進める。戻り値はこのターンの記録
+export function battleTurn(ex, commands, rng = Math.random) {
+  const b = ex.battle, from = b.log.length;
+  runTurn(b, commands, rng);
+  return b.log.slice(from);
+}
+
+// 戦闘の後始末（HP・状態・回数を戻し、報酬を配る）。戻り値 { msgs, wiped }
+export function finishBattle(ex, rng = Math.random) {
+  const b = ex.battle, ev = ex.battleEv || {};
   const msgs = [];
-  if (result === 'flee') {
-    if (battle.kind !== 'wander') retreat(ex.ex);
-    msgs.push('逃げ出した');
-    return msgs;
+  for (const m of b.party) {
+    ex.hp[m.id] = m.hp;
+    ex.cond[m.id] = DOWN.has(m.cond) ? m.cond : m.poison ? 'poison' : 'ok';
+    ex.mp[m.id] = { ...m.mp };
+    if (m.live && ex.live[m.id]) ex.live[m.id].left = m.live.left;
+    if (m.usedRevive) ex.usedRevive[m.id] = true;
   }
-  if (battle.kind === 'boss') {
-    const clears = ex.ex.bossClears[battle.id] || 0;
-    const d = rollDrops(battle.id, clears, rng);
-    ex.ex.trip[battle.id] = 'boss';
-    ex.gold += d.gold; ex.items.push(...d.items);
-    msgs.push(`${BOSSES[battle.id].name}を倒した！ ${d.gold}G を手に入れた`);
-    for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
-    msgs.push(`★${d.songRank}の楽譜も落ちていた（楽譜の入手は今後実装）`);
-  } else if (battle.kind === 'guardian') {
-    ex.ex.trip[battle.id] = 'guardian';
-    const g = 80 + Math.floor(rng() * 40);
-    ex.gold += g;
-    msgs.push(`${battle.name}を倒した！ 宝箱から ${g}G を手に入れた`);
-  } else {
-    const g = 10 + Math.floor(rng() * 20);
-    ex.gold += g;
-    msgs.push(`${battle.name}を倒した！ ${g}G を手に入れた`);
+  if (b.result === 'win') {
+    const earners = b.party.filter((m) => !m.fled && !DOWN.has(m.cond));
+    const share = earners.length ? Math.floor(b.exp / earners.length) : 0;
+    msgs.push(`経験値 ${share} ずつ、${b.gold}G を手に入れた`);
+    ex.gold += b.gold;
+    for (const m of earners) {
+      const u = unitOf(ex, m.id);
+      const before = u.level;
+      msgs.push(...gainExp(u, share, m.name, rng));
+      if (u.level > before) {
+        // 上がったぶん、HP の最大値と呪文の回数が増える
+        const hpBefore = m.maxHp;
+        const after = partyView(ex).find((x) => x.id === m.id);
+        ex.hp[m.id] += after.maxHp - hpBefore;
+        for (const f of familiesOf(after)) ex.mp[m.id][f] = Math.min(spellPool(f, after.level, after.base), (ex.mp[m.id][f] || 0) + 1);
+      }
+    }
+    if (ev.kind === 'guardian') {
+      ex.ex.trip[ev.id] = 'guardian';
+      const g = 80 + Math.floor(rng() * 40);
+      ex.gold += g;
+      msgs.push(`宝箱を開けた。${g}G が入っていた`);
+    } else if (ev.kind === 'boss') {
+      const clears = ex.ex.bossClears[ev.id] || 0;
+      const d = rollDrops(ev.id, clears, rng);
+      ex.ex.trip[ev.id] = 'boss';
+      ex.gold += d.gold; ex.items.push(...d.items);
+      msgs.push(`${BOSSES[ev.id].name}を倒した！ ${d.gold}G を手に入れた`);
+      for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
+      msgs.push(`★${d.songRank}の楽譜も落ちていた（楽譜の入手は今後実装）`);
+    }
+  } else if (b.result === 'flee') {
+    if (ev.kind !== 'wander') retreat(ex.ex);
   }
-  return msgs;
+  const wiped = b.result === 'lose';
+  ex.battle = null; ex.battleEv = null;
+  syncParty(ex);
+  return { msgs, wiped };
 }
 
 export function climb(ex) {
@@ -146,8 +244,11 @@ export function inn(ex) {
   for (const m of partyView(ex)) {
     if (DOWN.has(ex.cond[m.id])) continue;
     ex.hp[m.id] = m.maxHp; ex.cond[m.id] = 'ok';
+    // 呪文とライブスキルの回数も全快（エルミナージュ準拠）
+    for (const f of familiesOf(m)) ex.mp[m.id][f] = spellPool(f, m.level, m.base);
+    if (m.live && ex.live[m.id]) ex.live[m.id].left = m.live.uses;
   }
-  return [`宿屋で休んだ（${INN_FEE}G）。HP と状態異常が回復した`];
+  return [`宿屋で休んだ（${INN_FEE}G）。HP・状態異常・呪文の回数が回復した`];
 }
 
 export function temple(ex, idolId, rng = Math.random) {

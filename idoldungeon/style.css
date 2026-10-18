@@ -92,3 +92,22 @@ a { color: var(--accent); }
 [hidden] { display: none !important; }
 .view-wrap { width: 100%; max-width: calc(56vh * 4 / 3); justify-self: center; }
 @media (max-width: 859px) { .view-wrap { max-width: none; } }
+
+/* ── 戦闘 ── */
+.battle { padding: 10px 12px; display: grid; gap: 8px; min-height: 300px; align-content: start; }
+.enemies { display: grid; gap: 4px; }
+.eg { background: #1a1630; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.eicon { font-size: 1.6rem; line-height: 1; }
+.blog { background: #0e0c1c; border-radius: 8px; padding: 6px 10px; font-size: .82rem; height: 10.5em; overflow-y: auto; }
+.blog div:last-child { color: var(--accent); }
+.bctl .who { margin-bottom: 6px; }
+.cmds, .cmds2 { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.cmds2 { margin-top: 6px; }
+.battle button { font: inherit; color: var(--text); background: #2f2752; border: 1px solid var(--line); border-radius: 8px; padding: 9px 6px; cursor: pointer; touch-action: manipulation; }
+.battle button:disabled { opacity: .4; cursor: default; }
+.battle button.minor { background: #221c3e; font-size: .85rem; }
+.battle button small { color: var(--sub); }
+.bres { display: grid; gap: 4px; }
+.bres b { font-size: 1.2rem; color: var(--accent); }
+.pm.active { outline: 2px solid var(--accent); }
+@media (max-width: 859px) { .ex-side #party { order: -1; } }

@@ -9,7 +9,7 @@ function def(b) { BOSSES[b.id] = b; }
 
 // 仮のボス（第1ダンジョン）。名前・見た目は今後決める
 def({ id: 'b1', dungeon: 'd1', name: '迷宮の番人（仮）', level: 12, gold: 1500, songRank: 2,
-  base: { hp: 400, atk: 40, mat: 30, def: 12, res: 10, spd: 20 },
+  base: { hp: 650, atk: 50, mat: 36, def: 10, res: 10, spd: 26 },
   drops: { crests: ['heroCrest', 'knightCrest', 'orionBolt', 'elysianWhip', 'guidingRing', 'oceanSeal'] },
   rematch: [
     { from: 1, id: 'twoActions', name: '連続行動', text: '1ターンに2回行動する' },

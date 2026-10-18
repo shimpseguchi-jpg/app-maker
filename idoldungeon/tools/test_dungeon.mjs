@@ -3,7 +3,7 @@
 import { DUNGEONS } from '../js/data/floors.js';
 import { BOSSES } from '../js/data/bosses.js';
 import { getFloor, newExplore, act, edgeInfo, useStairs, returnToTown, isSolid, DX, DY, viewCells } from '../js/engine/dungeon.js';
-import { newExpedition, move, resolveBattle, enterDungeon, climb, partyView, inn, temple, buy, shopList } from '../js/engine/expedition.js';
+import { newExpedition, move, finishBattle, enterDungeon, climb, partyView, inn, temple, buy, shopList } from '../js/engine/expedition.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -176,9 +176,11 @@ const walk = (st, seq, ctx = { rng: rng0 }) => seq.split(' ').map((a) => act(st,
   // ボス
   Object.assign(ex.ex, { floor: 2, x: 6, y: 9, dir: 2 });
   const r = move(ex, 'forward', () => 0.999);
-  ok(r.pending?.type === 'battle' && r.pending.kind === 'boss', 'ボス戦の待ち');
+  ok(r.pending?.type === 'battle' && ex.battleEv?.kind === 'boss' && ex.battle.groups[0].def.id === 'b1', 'ボス戦が始まる');
+  ok(!ex.battle.canFlee, 'ボス戦は逃げられない');
   const g0 = ex.gold;
-  resolveBattle(ex, r.pending, 'win', () => 0.999);
+  ex.battle.result = 'win'; ex.battle.exp = 600; // 勝ったことにして後始末だけ確かめる
+  finishBattle(ex, () => 0.999);
   ok(ex.gold > g0 && ex.items.length === 1, 'ボスのドロップ');
   ok(shopList(ex).find((i) => i.id === 'masterSeal').stock === 1, 'ボスを倒すとマスタープルフが入荷');
   Object.assign(ex.ex, { floor: 0, x: 5, y: 1, dir: 2 });
