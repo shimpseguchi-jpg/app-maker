@@ -2,7 +2,7 @@
 import { BASE_STATS } from './party.js';
 
 // そのレベルに上がるのに必要な累計経験値
-export const expForLevel = (lv) => (lv <= 1 ? 0 : Math.round(60 * (lv - 1) ** 2 + 40 * (lv - 1)));
+export const expForLevel = (lv) => (lv <= 1 ? 0 : Math.round(30 * (lv - 1) ** 2 + 20 * (lv - 1)));
 export const MAX_LEVEL = 99;
 
 // unit: { level, exp, base } に経験値を足し、上がったレベルぶん能力を伸ばす。戻り値はメッセージ

@@ -67,7 +67,7 @@ export function appraiseAll(ex) {
 
 // ── 宿屋：部屋で回復の量が違う。経験値が足りていれば泊まったときにレベルが上がる ──
 export const ROOMS = [
-  { id: 'stable', name: '馬小屋', fee: 0, hp: 0, cure: false, text: '呪文・ライブの回数だけ回復' },
+  { id: 'stable', name: '馬小屋', fee: 0, hp: 0.1, cure: false, text: 'HP 少し（1割）・呪文とライブの回数' },
   { id: 'economy', name: 'エコノミー', fee: 10, hp: 0.5, cure: true, text: 'HP 半分・毒も治る' },
   { id: 'suite', name: 'スイート', fee: 40, hp: 1, cure: true, text: 'HP 全快・毒も治る' },
 ];
@@ -150,19 +150,25 @@ export const treatFee = (ex, id) => (REVIVE_FEE[ex.cond[id]] || 20) * unitOf(ex,
 export function treat(ex, id, rng = Math.random) {
   const st = ex.cond[id];
   if (!TREAT.has(st)) return ['治療の必要はない'];
-  const fee = treatFee(ex, id);
+  let fee = treatFee(ex, id);
+  // 寺院の慈悲：だれも動けず、お金も足りないときは、1人だけ無料で蘇生してくれる（詰み防止）
+  const charity = (st === 'dead' || st === 'ash') && ex.gold < fee && IDOL_LIST.every((x) => ex.lost[x] || DOWN.has(ex.cond[x] || 'ok'));
+  if (charity) fee = 0;
   if (ex.gold < fee) return [`お金が足りない（${fee}G）`];
   ex.gold -= fee;
+  if (charity) { ex.cond[id] = 'ok'; ex.hp[id] = 1; return [`寺院の人たちが哀れんで、${name(id)}を無料で生き返らせてくれた`]; }
   if (st !== 'dead' && st !== 'ash') { ex.cond[id] = 'ok'; return [`${name(id)}の${CONDITIONS[st].name}が治った（${fee}G）`]; }
   const r = tryRevive(unitOf(ex, id), st, rng);
   if (r === 'ok') { ex.cond[id] = 'ok'; ex.hp[id] = 1; return [`${name(id)}は生き返った！（${fee}G）`]; }
   ex.cond[id] = 'ash';
   return [`蘇生に失敗した……${name(id)}は灰になった（${fee}G）`];
 }
-export const retrieveFee = (ex, id) => 150 * unitOf(ex, id).level;
+export const retrieveFee = (ex, id) => 50 + 30 * unitOf(ex, id).level;
 export function retrieve(ex, id) {
   if (!ex.lost[id]) return [];
-  const fee = retrieveFee(ex, id);
+  let fee = retrieveFee(ex, id);
+  // 寺院の慈悲：だれも動けず、お金も足りないときは1人だけ無料で運んでくれる
+  if (ex.gold < fee && IDOL_LIST.every((x) => ex.lost[x] || DOWN.has(ex.cond[x] || 'ok'))) fee = 0;
   if (ex.gold < fee) return [`お金が足りない（${fee}G）`];
   ex.gold -= fee;
   delete ex.lost[id];

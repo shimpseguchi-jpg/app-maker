@@ -81,6 +81,22 @@ function secretKey(st, x, y, dir) {
 }
 
 // ── 探索の状態 ──
+// 迷宮ごとに分けて持つもの（鍵・スイッチ・見つけた隠し扉・オートマップ・済んだイベント）
+const PER_DUNGEON = ['keys', 'flags', 'found', 'seen', 'done'];
+const freshPer = () => ({ keys: [], flags: {}, found: {}, seen: {}, done: {} });
+
+// 別の迷宮へ：今の迷宮の記録をしまい、行き先の記録を出して入口に立つ
+export function switchDungeon(st, id) {
+  st.maps ||= {};
+  if (st.dungeon !== id) {
+    st.maps[st.dungeon] = Object.fromEntries(PER_DUNGEON.map((k) => [k, st[k]]));
+    Object.assign(st, st.maps[id] || freshPer());
+    st.dungeon = id;
+  }
+  const s = DUNGEONS[id].start;
+  Object.assign(st, { floor: 0, x: s.x, y: s.y, dir: s.dir, prev: null });
+}
+
 export function newExplore(dungeonId = 'd1') {
   const s = DUNGEONS[dungeonId].start;
   return { dungeon: dungeonId, floor: 0, x: s.x, y: s.y, dir: s.dir, prev: null, steps: 0,
@@ -133,7 +149,7 @@ function step(st, dir, ctx, out, rng) {
   return out;
 }
 
-export const KEY_NAMES = { silverKey: '銀の鍵' };
+export const KEY_NAMES = { silverKey: '銀の鍵', propKey: '小道具部屋の鍵' };
 const keyName = (k) => KEY_NAMES[k] || k;
 
 // マスに入ったときの仕掛け。walked=false はワープ・落下で来たとき（遭遇判定をしない）
@@ -153,6 +169,9 @@ function enterCell(st, ctx, out, rng, walked) {
     out.events.push({ type: 'floor' });
     enterCell(st, ctx, out, rng, false);
     return;
+  } else if (ch === 'r') {
+    // 回転床：知らないうちに向きが変わる（何も言わない。オートマップや座標で気づく）
+    st.dir = Math.floor(rng() * 4);
   } else if (ch === 'u' || ch === 'd') {
     out.events.push({ type: 'stairs', up: ch === 'u', toTown: ch === 'u' && st.floor === 0 });
   }
@@ -166,6 +185,8 @@ function enterCell(st, ctx, out, rng, walked) {
           st.done[sp.id || id] = 1;
           out.msgs.push(sp.text);
           if (sp.give?.key && !st.keys.includes(sp.give.key)) st.keys.push(sp.give.key);
+          // お金・楽譜は冒険の側（expedition.js）で受け取る
+          if (sp.give?.gold || sp.give?.score) out.events.push({ type: 'give', gold: sp.give.gold || 0, score: sp.give.score || null });
         }
         break;
       case 'switch':

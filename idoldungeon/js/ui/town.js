@@ -7,7 +7,7 @@ import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
-import { partyView, scoreName, unitOf, enterDungeon } from '../engine/expedition.js';
+import { partyView, scoreName, unitOf, enterDungeon, openDungeons } from '../engine/expedition.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
@@ -25,7 +25,7 @@ export function renderTown(ex) {
   const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="${id === tab ? 'on' : ''}">${nm}</button>`).join('');
   const body = { tavern, inn, shop, temple, training, castle, record }[tab](ex);
   return `<div class="tabs town-tabs">${tabs}</div><div class="town-body">${body}</div>
-    <div class="town-go"><button data-t="enter" ${ex.slots.length ? '' : 'disabled'}>迷宮へ入る</button></div>`;
+    <div class="town-go">${openDungeons(ex).map((d) => `<button data-t="enter" data-id="${d.id}" ${ex.slots.length ? '' : 'disabled'}>${esc(d.name)}へ <small>${d.floors.length}階</small></button>`).join('')}</div>`;
 }
 
 function tavern(ex) {
@@ -85,7 +85,7 @@ function temple(ex) {
   return `<h3>治療・蘇生 <small class="sub">料金はレベルに応じる。灰の蘇生に失敗しても灰のまま</small></h3>
     ${sick.length ? `<div class="town-grid">${sick.map((r) => `<button data-t="treat" data-id="${r.id}">${esc(r.idol.name)} <small>${CONDITIONS[r.cond].name}・${treatFee(ex, r.id)}G</small></button>`).join('')}</div>` : '<p class="sub">治療が必要な仲間はいない</p>'}
     <h3>死体の回収</h3>
-    ${lost.length ? `<div class="town-grid">${lost.map((r) => { const at = ex.lost[r.id]; return `<button data-t="retrieve" data-id="${r.id}">${esc(r.idol.name)} <small>${retrieveFee(ex, r.id)}G・${getFloor(ex.ex.dungeon, at.floor).id} X${at.x} Y${at.y}</small></button>`; }).join('')}</div>
+    ${lost.length ? `<div class="town-grid">${lost.map((r) => { const at = ex.lost[r.id]; return `<button data-t="retrieve" data-id="${r.id}">${esc(r.idol.name)} <small>${retrieveFee(ex, r.id)}G・${getFloor(at.dungeon || 'd1', at.floor).name} X${at.x} Y${at.y}</small></button>`; }).join('')}</div>
       <p class="sub">自分たちで探しに行けば無料（そのマスに行くと連れて帰る。パーティに空きが必要）</p>` : '<p class="sub">迷宮に取り残された仲間はいない</p>'}
     <h3>寄付 <small class="sub">寄付した額と同じ経験値</small></h3>
     <div class="town-grid">${partyView(ex).map((m) => `<button data-t="donate" data-id="${m.id}" ${ex.gold < 100 ? 'disabled' : ''}>${esc(m.idol.name)}のために 100G</button>`).join('')}</div>`;
@@ -160,7 +160,7 @@ export function townAction(ex, el, rng = Math.random) {
   if (d.down) return { msgs: moveMember(ex, d.down, 1) };
   if (d.equip) return { msgs: equip(ex, d.equip, el.value ? Number(el.value) : null) };
   switch (d.t) {
-    case 'enter': return { msgs: enterDungeon(ex) };
+    case 'enter': return { msgs: enterDungeon(ex, d.id) };
     case 'appraiseAll': return { msgs: appraiseAll(ex) };
     case 'change': confirm = { kind: 'change', cls: d.cls }; return { msgs: [] };
     case 'promote': confirm = { kind: 'promote', cls: d.cls, item: d.item }; return { msgs: [] };

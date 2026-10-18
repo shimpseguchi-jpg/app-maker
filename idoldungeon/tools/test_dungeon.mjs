@@ -2,8 +2,8 @@
 // node idoldungeon/tools/test_dungeon.mjs
 import { DUNGEONS } from '../js/data/floors.js';
 import { BOSSES } from '../js/data/bosses.js';
-import { getFloor, newExplore, act, edgeInfo, useStairs, returnToTown, isSolid, DX, DY, viewCells } from '../js/engine/dungeon.js';
-import { newExpedition, move, finishBattle, enterDungeon, climb, partyView } from '../js/engine/expedition.js';
+import { getFloor, newExplore, act, edgeInfo, useStairs, returnToTown, switchDungeon, isSolid, DX, DY, viewCells, KEY_NAMES } from '../js/engine/dungeon.js';
+import { newExpedition, move, finishBattle, enterDungeon, climb, partyView, openDungeons } from '../js/engine/expedition.js';
 import { stay, treat, buy, shopList } from '../js/engine/town.js';
 
 let fail = 0, pass = 0;
@@ -18,7 +18,7 @@ for (const dg of Object.values(DUNGEONS)) {
     const tag = `${dg.id} ${fl.id}`;
     for (let y = 0; y < fl.h; y++) for (let x = 0; x < fl.w; x++) {
       const ch = fl.cellAt(x, y);
-      ok('. #mudpc'.includes(ch), `${tag} (${x},${y}): 不明なマス "${ch}"`);
+      ok('. #mudpcr'.includes(ch), `${tag} (${x},${y}): 不明なマス "${ch}"`);
       for (let d = 0; d < 4; d++) {
         const e = fl.edgeAt(x, y, d);
         ok(' |-DSLG<>^v'.includes(e), `${tag} (${x},${y}) ${d}: 不明な境目 "${e}"`);
@@ -41,6 +41,7 @@ for (const dg of Object.values(DUNGEONS)) {
       if (s.type === 'warp') ok(!isSolid(fls[s.to.floor ?? fi].cellAt(s.to.x, s.to.y)), `${tag}: ワープ先が岩盤`);
       if (s.type === 'boss') ok(BOSSES[s.boss], `${tag}: 未定義のボス ${s.boss}`);
       if (s.type === 'lock') ok(fls.some((f) => f.specials.some((t) => t.give?.key === s.key)), `${tag}: 鍵 ${s.key} がどこにもない`);
+      if (s.type === 'lock') ok(KEY_NAMES[s.key], `${tag}: 鍵 ${s.key} の名前がない`);
     }
   });
 
@@ -156,6 +157,47 @@ const walk = (st, seq, ctx = { rng: rng0 }) => seq.split(' ').map((a) => act(st,
   const pit = act(st, 'forward', { rng: rng0 });
   ok(pit.events.some((e) => e.type === 'pit'), 'ピット');
   ok(act(st, 'forward', { rng: () => 0 }).events.some((e) => e.type === 'battle' && e.kind === 'wander'), '徘徊する敵');
+}
+
+// ── 複数の迷宮 ──
+{
+  const st = newExplore('d1');
+  st.keys.push('silverKey'); st.seen[0] = { '1,1': 1 };
+  switchDungeon(st, 'd2');
+  ok(st.dungeon === 'd2' && st.x === 10 && st.y === 0 && !st.keys.length && !st.seen[0], '別の迷宮へ：入口に立ち、鍵とマップは迷宮ごと');
+  switchDungeon(st, 'd1');
+  ok(st.keys.includes('silverKey') && st.seen[0]['1,1'], '元の迷宮に戻ると記録が戻る');
+  // 回転床：向きが変わる（B2F の回転床の隣から入る）
+  const fl = getFloor('d2', 2);
+  let spin = null;
+  for (let y = 0; y < fl.h && !spin; y++) for (let x = 0; x < fl.w && !spin; x++) {
+    if (fl.cellAt(x, y) !== 'r') continue;
+    for (let d = 0; d < 4; d++) {
+      const px = x - DX[d], py = y - DY[d];
+      const prev = fl.cellAt(px, py);
+      if (prev && prev !== ' ' && prev !== 'r' && !fl.special(px, py) && edgeInfo(fl, { ...st, floor: 2 }, px, py, d).pass) { spin = { x: px, y: py, dir: d }; break; }
+    }
+  }
+  switchDungeon(st, 'd2');
+  Object.assign(st, { floor: 2, ...spin });
+  const dirs = new Set();
+  for (const r of [0.1, 0.3, 0.6, 0.9]) {
+    Object.assign(st, { floor: 2, ...spin });
+    act(st, 'forward', { rng: () => r });
+    dirs.add(st.dir);
+  }
+  ok(spin && dirs.size >= 3, '回転床で向きが変わる');
+  // 宝のイベント（お金と楽譜）
+  const ex = newExpedition([{ idol: 'makoto' }]);
+  ok(openDungeons(ex).map((d) => d.id).join() === 'd1', '最初は劇場地下迷宮だけ');
+  ok(enterDungeon(ex, 'd2')[0].includes('まだ'), '奈落の大劇場はまだ行けない');
+  ex.ex.bossClears.b1 = 1;
+  ok(openDungeons(ex).length === 2, '劇場地下迷宮のボスを倒すと奈落の大劇場が開く');
+  enterDungeon(ex, 'd2');
+  Object.assign(ex.ex, { floor: 0, x: 1, y: 17, dir: 0 });
+  const g = ex.gold, n = ex.scores.length;
+  move(ex, 'forward', () => 0.999);
+  ok(ex.gold === g + 300 && ex.scores.length === n + 1, '隠し部屋の宝（お金と楽譜）');
 }
 
 // ── 冒険（パーティの HP・街） ──

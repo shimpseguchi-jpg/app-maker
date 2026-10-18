@@ -147,3 +147,4 @@ a { color: var(--accent); }
 .confirm p { margin: 0; }
 .ng { color: #ff8a8a; }
 .promo-grid { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.town-go { display: grid; gap: 6px; }

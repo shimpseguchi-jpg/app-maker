@@ -1,13 +1,14 @@
 // 冒険全体の状態：ダンジョンの位置（dungeon.js）＋アイドルの育成・HP・状態・呪文の回数、所持金・アイテム・楽譜、
 // 迷宮に残された仲間、図鑑、戦闘（battle.js）。街の施設は town.js
-import { newExplore, act, useStairs, retreat, returnToTown, getFloor, isDark, isAntiMagic, SEARCHERS, KEY_NAMES } from './dungeon.js';
+import { newExplore, act, useStairs, retreat, returnToTown, switchDungeon, getFloor, isDark, isAntiMagic, SEARCHERS, KEY_NAMES } from './dungeon.js';
+import { DUNGEONS } from '../data/floors.js';
 import { buildMembers, computeParty } from './party.js';
 import { bossAt, rollDrops } from './boss.js';
 import { createBattle, runTurn } from './battle.js';
 import { BOSSES } from '../data/bosses.js';
 import { IDOLS } from '../data/idols.js';
 import { CLASSES, SPELL_FAMILIES } from '../data/classes.js';
-import { ENCOUNTERS, FIXED_GROUPS, BOSS_GUARD, BOSS_ESCORT } from '../data/enemies.js';
+import { ENCOUNTERS, FIXED_GROUPS } from '../data/enemies.js';
 import { spellPool } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { SONGS } from '../data/songs.js';
@@ -107,6 +108,9 @@ export function move(ex, action, rng = Math.random) {
       } else msgs.push(e.kind === 'wander' ? '何かが近づいてくる！' : `${e.name}が待ち構えていた！`);
       startBattle(ex, e, rng);
       pending = { type: 'battle' };
+    } else if (e.type === 'give') {
+      if (e.gold) { ex.gold += e.gold; msgs.push(`${e.gold}G を手に入れた`); }
+      if (e.score) msgs.push(`${scoreName(addScore(ex, e.score))}を手に入れた`);
     } else if (e.type === 'stairs') {
       pending = { type: 'stairs', up: e.up, toTown: e.toTown };
     }
@@ -136,7 +140,7 @@ function checkWipe(ex, msgs) {
 // 全滅：死体はその場に残る（エルミナージュ準拠）。寺院の死体回収か、別のパーティで拾いに行く
 export function wipeOut(ex) {
   const st = ex.ex;
-  for (const s of ex.slots) ex.lost[s.idol] = { floor: st.floor, x: st.x, y: st.y };
+  for (const s of ex.slots) ex.lost[s.idol] = { dungeon: st.dungeon, floor: st.floor, x: st.x, y: st.y };
   const names = ex.slots.map((s) => IDOLS[s.idol].name).join('・');
   ex.slots = [];
   ex.battle = null; ex.battleEv = null;
@@ -148,7 +152,7 @@ export function wipeOut(ex) {
 function pickUpBodies(ex, msgs) {
   const st = ex.ex;
   for (const [id, at] of Object.entries(ex.lost)) {
-    if (at.floor !== st.floor || at.x !== st.x || at.y !== st.y) continue;
+    if ((at.dungeon || 'd1') !== st.dungeon || at.floor !== st.floor || at.x !== st.x || at.y !== st.y) continue;
     if (ex.slots.length >= 6) { msgs.push(`${IDOLS[id].name}が倒れている。でもパーティに空きがない`); continue; }
     delete ex.lost[id];
     ex.slots.push({ idol: id });
@@ -161,7 +165,7 @@ function pickUpBodies(ex, msgs) {
 export function battleParty(ex) {
   return partyView(ex).map((m) => ({
     id: m.id, name: m.idol.name, row: m.row, hp: m.hp, maxHp: m.maxHp, cond: m.cond, stats: m.stats, base: m.base,
-    abilities: m.abilities, tags: m.tags, cls: m.cls, range: CLASSES[m.cls].range, level: m.level,
+    abilities: m.abilities, tags: m.tags, cls: m.cls, range: CLASSES[m.cls].range, level: m.level, power: m.power,
     families: familiesOf(m), mp: { ...(ex.mp[m.id] || {}) },
     live: m.live ? { ...m.live, left: ex.live[m.id]?.left ?? m.live.uses } : null,
     reviveLeft: m.abilities.some((a) => a.id === 'revive') && !ex.usedRevive[m.id],
@@ -172,15 +176,19 @@ export function battleParty(ex) {
 export function bossEnemy(id, clears) {
   const b = bossAt(id, clears);
   const resistAll = b.traits.some((t) => t.id === 'resistAll');
-  return { id, name: b.name, uname: '巨大な影', icon: '👹', level: b.level, ...b.stats, hit: 80 + clears * 3, eva: 8,
-    exp: Math.round(600 * (1 + 0.5 * clears)), gold: 0, traits: b.traits,
+  const def = BOSSES[id];
+  return { id, name: b.name, uname: def.uname || '巨大な影', icon: def.icon || '👹', level: b.level, ...b.stats, hit: (def.hit || 80) + clears * 3, eva: def.eva || 8,
+    exp: Math.round((def.exp || 600) * (1 + 0.5 * clears)), gold: 0, traits: b.traits,
     resist: resistAll ? ['sleep', 'silence', 'confuse', 'death'] : ['death'],
-    acts: [{ kind: 'attack', w: 3 }, { kind: 'dmgAll', power: 0.8, w: 1, name: '大見得' }] };
+    acts: def.acts || [{ kind: 'attack', w: 3 }, { kind: 'dmgAll', power: 0.8, w: 1, name: '大見得' }] };
 }
 
+// ボスと取り巻き（初戦から連れている escort、再戦3回目から呼ぶ guard。js/data/bosses.js）
 export function bossGroups(id, clears) {
-  const groups = [{ enemy: bossEnemy(id, clears), count: 1 }, { enemy: BOSS_ESCORT[0], count: BOSS_ESCORT[1] }];
-  if (bossAt(id, clears).traits.some((t) => t.id === 'summonGuard')) groups.push({ enemy: BOSS_GUARD, count: 2 });
+  const def = BOSSES[id];
+  const groups = [{ enemy: bossEnemy(id, clears), count: 1 }];
+  if (def.escort) groups.push({ enemy: def.escort[0], count: def.escort[1] });
+  if (def.guard && bossAt(id, clears).traits.some((t) => t.id === 'summonGuard')) groups.push({ enemy: def.guard[0], count: def.guard[1] });
   return groups;
 }
 
@@ -275,13 +283,19 @@ export function toTown(ex) {
   ex.mode = 'town';
 }
 
-export function enterDungeon(ex) {
+// 行ける迷宮（エルミナージュのダンジョン選択。前の迷宮のボスを倒すと次が開く）
+export function openDungeons(ex) {
+  return Object.values(DUNGEONS).filter((d) => !d.unlock || (ex.ex.bossClears[d.unlock] || 0) > 0 || ex.ex.trip[d.unlock] === 'boss');
+}
+
+export function enterDungeon(ex, dungeonId = ex.ex.dungeon) {
   if (!ex.slots.some((s) => !DOWN.has(ex.cond[s.idol]))) return ['動けるメンバーがいない。酒場でパーティを組もう'];
+  if (!openDungeons(ex).some((d) => d.id === dungeonId)) return ['まだその迷宮には行けない'];
+  switchDungeon(ex.ex, dungeonId);
   ex.mode = 'dungeon';
-  const msgs = ['迷宮に入った'];
   ex.ex.seen[0] ||= {};
   ex.ex.seen[0][`${ex.ex.x},${ex.ex.y}`] = 1;
-  return msgs;
+  return [`${DUNGEONS[dungeonId].name}に入った`];
 }
 
 export const keyLabel = (k) => KEY_NAMES[k] || k;

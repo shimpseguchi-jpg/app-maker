@@ -1,5 +1,6 @@
 // 転職（エルミナージュ式）と昇格（聖魔の光石式）
-// unit: { idol, cls, level, base: {pow..vis}, learned: [abilityId...], history: [clsId...] }
+// unit: { idol, cls, level, carry, base: {pow..vis}, learned: [abilityId...], history: [clsId...] }
+// carry：これまでのクラスで積んだレベルの合計（能力値の計算に使う。js/engine/party.js の power）
 import { CLASSES, PROMOTE_LEVEL, SPELLS } from '../data/classes.js';
 import { BASE_STATS } from './party.js';
 import { itemFits } from '../data/items.js';
@@ -16,7 +17,7 @@ export function canChangeClass(unit, clsId) {
 }
 export function changeClass(unit, clsId, idol) {
   if (!canChangeClass(unit, clsId)) throw new Error(`転職できない: ${unit.idol} → ${clsId}`);
-  return { ...unit, cls: clsId, level: 1, exp: 0, base: { ...idol.base },
+  return { ...unit, cls: clsId, level: 1, exp: 0, carry: (unit.carry || 0) + unit.level, base: { ...idol.base },
     learned: mergeLearned(unit), history: [...(unit.history || []), unit.cls] };
 }
 
@@ -31,7 +32,7 @@ export function promote(unit, clsId, itemId) {
   const bonus = CLASSES[clsId].bonus || {};
   const base = {};
   for (const k of BASE_STATS) base[k] = unit.base[k] + (bonus[k] || 0);
-  return { ...unit, cls: clsId, level: 1, exp: 0, base, learned: mergeLearned(unit), history: [...(unit.history || []), unit.cls] };
+  return { ...unit, cls: clsId, level: 1, exp: 0, carry: (unit.carry || 0) + unit.level, base, learned: mergeLearned(unit), history: [...(unit.history || []), unit.cls] };
 }
 
 // 今のクラスの魔法を「覚えた」に加える（クラスを変えても魔法は残る）

@@ -50,7 +50,7 @@ function trial(label, level, makeGroups, kind, k = 1) {
 }
 
 const roll = (spec, rng) => spec.map(([enemy, min, max]) => ({ enemy, count: min + Math.floor(rng() * (max - min + 1)) }));
-const wander = (f) => (rng) => { const t = ENCOUNTERS.d1[f]; return roll(t[Math.floor(rng() * t.length)], rng); };
+const wander = (f, d = 'd1') => (rng) => { const t = ENCOUNTERS[d][f]; return roll(t[Math.floor(rng() * t.length)], rng); };
 
 console.log(`各 ${N} 回（パーティ：真・響・春香／律子・千早・雪歩）`);
 for (const lv of [1, 2, 3]) trial('1F 徘徊', lv, wander(0), 'wander', 5);
@@ -61,3 +61,11 @@ for (const lv of [5, 6, 7]) trial('B2F 徘徊', lv, wander(2), 'wander', 5);
 for (const lv of [6, 7, 8]) trial('B2F ボス', lv, () => bossGroups('b1', 0), 'boss');
 for (const lv of [9, 11]) trial('ボス再戦1回目', lv, () => bossGroups('b1', 1), 'boss');
 for (const lv of [12, 14]) trial('ボス再戦2回目', lv, () => bossGroups('b1', 2), 'boss');
+// 奈落の大劇場（d2）
+const only = process.argv[3];
+if (!only || only === 'd2') {
+  for (const [f, lvs] of [[0, [8, 10]], [1, [10, 12]], [2, [12, 14]], [3, [13, 15]], [4, [15, 17]]]) for (const lv of lvs) trial(`d2 ${['1F', 'B1F', 'B2F', 'B3F', 'B4F'][f]} 徘徊`, lv, wander(f, 'd2'), 'wander', 5);
+  for (const lv of [9, 11]) trial('d2 案内係長', lv, (rng) => roll(FIXED_GROUPS.g2a, rng), 'guardian');
+  for (const lv of [11, 13]) trial('d2 舞台監督', lv, (rng) => roll(FIXED_GROUPS.g2b, rng), 'guardian');
+  for (const lv of [18, 20, 22, 24]) trial('奈落の怪人', lv, () => bossGroups('b2', 0), 'boss');
+}

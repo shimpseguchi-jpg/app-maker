@@ -29,13 +29,17 @@ export function derive(b, level = 1) {
   };
 }
 
-// slots: [{ idol: 'haruka', song: 'ready' | null, cls?, level?, base?, learned? }, ...] 先頭 FRONT_SIZE 人が前列
-// cls・level・base・learned は育成状態（js/engine/classes.js の unit）。省略時はアイドルの初期値
+// slots: [{ idol: 'haruka', song: 'ready' | null, cls?, level?, carry?, base?, learned? }, ...] 先頭 FRONT_SIZE 人が前列
+// cls・level・carry・base・learned は育成状態（js/engine/classes.js の unit）。省略時はアイドルの初期値
+// power：派生ステータスに使う「実質のレベル」。今のクラスのレベル＋これまでのクラスで積んだレベル（carry、上限20）
+//   昇格・転職で Lv1 に戻っても、HP や攻撃力が下がりすぎないようにする（聖魔の光石の昇格で強さが残るのと同じ考え）
+export const CARRY_MAX = 20;
 export function buildMembers(slots) {
   return slots.filter(Boolean).slice(0, PARTY_SIZE).map((s, i) => {
     const idol = IDOLS[s.idol];
     return { id: idol.id, idol, tags: idol.tags, row: i < FRONT_SIZE ? 'front' : 'back', song: s.song || null,
-      cls: s.cls || idol.cls, level: s.level || 1, base: s.base || idol.base, learned: s.learned || [] };
+      cls: s.cls || idol.cls, level: s.level || 1, power: (s.level || 1) + Math.min(s.carry || 0, CARRY_MAX),
+      base: s.base || idol.base, learned: s.learned || [] };
   });
 }
 
@@ -84,7 +88,7 @@ export function computeParty(members) {
     const fix = (k, v) => Math.floor((v + (add[k] || 0)) * (100 + (pct[k] || 0)) / 100);
     const base = {};
     for (const k of BASE_STATS) base[k] = fix(k, mem.base[k]);
-    const d = derive(base, mem.level);
+    const d = derive(base, mem.power || mem.level);
     const stats = { ...base };
     for (const k of DERIVED_STATS) stats[k] = fix(k, d[k]);
     const song = mem.song && SONGS[mem.song];

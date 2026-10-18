@@ -177,7 +177,9 @@ function attack(b, m, gIndex, rng, log, mult) {
   if (!g || !reach.includes(g)) g = reach[0];
   if (!g) { log(`${m.name}の攻撃は届かない`); return; }
   const casterOnly = (m.families?.length || 0) > 0 && m.range === 'S' && !has(m, 'bow');
-  const hits = 1 + (casterOnly ? 0 : Math.floor((m.level - 1) / 8)) + (has(m, 'doubleHit') && rng() < 0.25 ? 1 : 0);
+  // 攻撃回数：戦士系はレベルとともに増える。8レベルごとに1回、そのあいだは確率でなめらかに（急に強くならないように）
+  const extra = casterOnly ? 0 : ((m.power || m.level) - 1) / 8;
+  const hits = 1 + Math.floor(extra) + (rng() < extra % 1 ? 1 : 0) + (has(m, 'doubleHit') && rng() < 0.25 ? 1 : 0);
   let landed = 0, total = 0;
   for (let h = 0; h < hits; h++) {
     const alive = g.members.filter((e) => !e.dead);
