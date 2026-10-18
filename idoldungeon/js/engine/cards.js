@@ -10,6 +10,7 @@ import { CARD_DUNGEONS, EXTRA_CARDS, ZONE_CARDS, HINTS, WEIGHTS, HINT_BOOST, EVE
 import { enterDungeon, partyView, startBattle, finishBattle, rollGroups, damage, checkWipe, addScore, scoreName, randomSong,
   rewardRate, toTown } from './expedition.js';
 import { SEARCHERS } from './dungeon.js';
+import { bossStage } from './boss.js';
 import { DOWN } from './revive.js';
 
 const pick = (list, rng) => list[Math.floor(rng() * list.length)];
@@ -49,7 +50,7 @@ function draw(ex, rng) {
   // 仲間の死体：カードモードでこの階に倒れた仲間がいれば、この階で必ず出る
   const bodies = Object.entries(ex.lost).filter(([, at]) => at.card && at.dungeon === c.dungeon && at.floor === c.floor).map(([id]) => id);
   if (bodies.length && !c.corpse[c.floor] && c.step >= 1) { c.corpse[c.floor] = true; return corpseCard(bodies); }
-  if (c.step >= c.perFloor) return c.floor === cfg.floors - 1 ? bossCard(c) : stairsCard();
+  if (c.step >= c.perFloor) return c.floor === cfg.floors - 1 ? bossCard(ex) : stairsCard();
   const w = { ...WEIGHTS };
   if (c.prev === 'route') w.route = 0;
   if (c.guardian[c.floor]) w.guardian = 0;
@@ -65,7 +66,7 @@ function draw(ex, rng) {
 export function makeCard(ex, kind, rng) {
   const c = ex.card, cfg = CARD_DUNGEONS[c.dungeon];
   if (kind === 'stairs') return stairsCard();
-  if (kind === 'boss') return bossCard(c);
+  if (kind === 'boss') return bossCard(ex);
   if (kind === 'route') {
     const keys = Object.keys(HINTS);
     const a = pick(keys, rng), b = pick(keys.filter((k) => k !== a), rng);
@@ -92,9 +93,9 @@ export function makeCard(ex, kind, rng) {
 
 const stairsCard = () => ({ kind: 'stairs', tag: '階段', title: '下り階段', text: '下へ続く階段がある。',
   left: { label: 'この階をもっと探る', hp: 0 }, right: { label: '下りる', hp: 0 } });
-const bossCard = (c) => {
-  const id = CARD_DUNGEONS[c.dungeon].boss;
-  return { kind: 'boss', tag: 'ボス', title: BOSSES[id].name, text: `${BOSSES[id].name}の気配がする。ここが最深部だ。`,
+const bossCard = (ex) => {
+  const id = CARD_DUNGEONS[ex.card.dungeon].boss, stage = bossStage(ex.ex.bossClears[id] || 0);
+  return { kind: 'boss', tag: 'ボス', title: BOSSES[id].name, text: `${BOSSES[id].name}の気配がする。ここが最深部だ。${stage ? `（第${stage + 1}段階の強さ）` : ''}`,
     left: { label: '街へ戻る（拾った物の半分を失う）', hp: 0 }, right: { label: '挑む', hp: 2 }, id };
 };
 const corpseCard = (ids) => ({ kind: 'corpse', tag: '仲間', title: '倒れた仲間', text: `${ids.map((id) => IDOLS[id].name).join('・')}が倒れている……`,

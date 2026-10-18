@@ -2,7 +2,7 @@
 // 敵データの形は戦闘エンジンを作るときに決め直す。ここでは再戦の強化とドロップに要る分だけ
 // base: hp atk mat def res spd（強化前） / level / gold / songRank: ドロップする楽曲のランク
 // drops.crests: 確定で落とす系統別昇格アイテムの候補（1つを抽選）
-// rematch: 再戦ごとに足される特性（n 回目以降に追加）
+// rematch: 強さの段階が上がるごとに足される特性（from 段階目から。5回倒すごとに1段階。engine/boss.js）
 // escort: 初戦から連れている取り巻き [敵, 数] / guard: 再戦3回目（取り巻き）から呼ぶ護衛 [敵, 数]
 // uname icon hit eva exp acts: 戦闘用（省略すると共通の値）
 

@@ -1,6 +1,6 @@
 // カードモードを自動で遊んで、踏破率・全滅率を測る（docs/DESIGN.md 17.3）
 // node idoldungeon/tools/sim_cards.mjs [回数]
-// カードモードが解放された直後（ボスは1回倒されて、1段階強くなっている）に、全快のパーティで挑む
+// カードモードが解放された直後（ボスは DRPG で1回倒されている。5回目までは最初の強さ）に、全快のパーティで挑む
 import { newExpedition, unitOf, syncParty, battleTurn } from '../js/engine/expedition.js';
 import { enterCardMode, chooseCard, finishCardBattle, partyHp, cardWipe } from '../js/engine/cards.js';
 import { autoCommands } from '../js/engine/battle.js';
@@ -49,7 +49,7 @@ function run(dungeon, level, seed) {
 }
 
 console.log(`各 ${N} 回（パーティ：真・響・春香／律子・千早・雪歩。全快で入り、街に戻らずボスまで）`);
-for (const [d, levels] of [['d1', [8, 10, 12, 14]], ['d2', [20, 22, 24, 26]]]) {
+for (const [d, levels] of [['d1', [8, 10, 12]], ['d2', [20, 22, 24, 26]]]) {
   for (const lv of levels) {
     let clear = 0, cards = 0, battles = 0;
     for (let i = 0; i < N; i++) { const r = run(d, lv, i + 1); clear += r.result === 'clear'; cards += r.cards; battles += r.battles; }

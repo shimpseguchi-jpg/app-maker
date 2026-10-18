@@ -2,7 +2,7 @@
 // node idoldungeon/tools/test_battle.mjs
 import { createBattle, runTurn, reachableGroups, aliveGroups, castable, unitLiveReady, autoCommands, canAct, groupName } from '../js/engine/battle.js';
 import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore,
-  dungeonBoss, cardUnlocked, PLAY_MODES, DRPG_BONUS, syncParty } from '../js/engine/expedition.js';
+  dungeonBoss, cardUnlocked, PLAY_MODES, DRPG_BONUS, syncParty, bossLine } from '../js/engine/expedition.js';
 import { equip } from '../js/engine/town.js';
 import { ENEMIES, ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { SPELL_LIST, KIND_TARGET } from '../js/data/spells.js';
@@ -139,7 +139,8 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ok(!d.groups[0].identified && groupName(d.groups[0]) === ENEMIES.bat.uname, 'ダークゾーンでは正体が分からない');
   const boss = createBattle(partyOf('makoto'), bossGroups('b1', 0), { rng: () => 0.15, kind: 'boss' });
   ok(boss.surprise !== 'enemy', 'ボスは不意打ちしない');
-  ok(bossGroups('b1', 3).length === 3 && bossEnemy('b1', 1).traits.some((t) => t.id === 'twoActions'), '再戦で取り巻き・連続行動');
+  ok(bossGroups('b1', 15).length === 3 && bossEnemy('b1', 5).traits.some((t) => t.id === 'twoActions') && !bossEnemy('b1', 4).traits.length, '段階が上がると連続行動・取り巻き（5回倒すごと）');
+  ok(bossLine('b1', 0).includes('立ちはだかった') && bossLine('b1', 3).includes('4回目') && bossLine('b1', 5).includes('第2段階'), 'ボスが現れたときの一言');
 }
 
 // ── 行動順（素早さ＋0〜10 の乱数。毎ターン決め直す）と、1人ずつの記録 ──

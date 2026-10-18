@@ -59,8 +59,9 @@ for (const lv of [3, 4, 5]) trial('B1F 徘徊', lv, wander(1), 'wander', 5);
 for (const lv of [4, 5]) trial('B1F 奈落の見張り', lv, (rng) => roll(FIXED_GROUPS.g1b, rng), 'guardian');
 for (const lv of [5, 6, 7]) trial('B2F 徘徊', lv, wander(2), 'wander', 5);
 for (const lv of [6, 7, 8]) trial('B2F ボス', lv, () => bossGroups('b1', 0), 'boss');
-for (const lv of [9, 11]) trial('ボス再戦1回目', lv, () => bossGroups('b1', 1), 'boss');
-for (const lv of [12, 14]) trial('ボス再戦2回目', lv, () => bossGroups('b1', 2), 'boss');
+for (const lv of [8, 10]) trial('ボス2〜5回目', lv, () => bossGroups('b1', 1), 'boss');
+for (const lv of [12, 14, 16]) trial('ボス第2段階', lv, () => bossGroups('b1', 5), 'boss');
+for (const lv of [16, 18, 20]) trial('ボス第3段階', lv, () => bossGroups('b1', 10), 'boss');
 // 奈落の大劇場（d2）
 const only = process.argv[3];
 if (!only || only === 'd2') {
