@@ -17,6 +17,8 @@ import { CARD_PROMO_RATE } from '../data/cards.js';
 
 // 最初に持っている楽譜（鑑定済み）
 export const STARTER_SONGS = ['ready', 'ohayo'];
+// はじめのパーティ（酒場で組み直せる）
+export const FIRST_PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 
 export function newExpedition(slots, dungeonId = 'd1') {
   const ex = normalize({ ex: newExplore(dungeonId), mode: 'town', slots: slots.map((s) => ({ idol: s.idol })), gold: 500 });
@@ -72,10 +74,14 @@ export const familiesOf = (m) => SPELL_FAMILIES.filter((f) => m.abilities.some((
 // パーティ編成が変わったとき・レベルが上がったときに、HP・呪文の回数・ライブスキルの回数をそろえる
 export function syncParty(ex) {
   const { members } = computeParty(buildMembers(slotsOf(ex)));
-  ex.mp ||= {}; ex.live ||= {}; ex.usedRevive ||= {};
+  ex.mp ||= {}; ex.live ||= {}; ex.usedRevive ||= {}; ex.maxHp ||= {};
   for (const m of members) {
+    // 最大 HP が上がったら（シナジー・レベルアップ）、今の HP も同じだけ上がる。下がったときは最大値に合わせる
+    const prev = ex.maxHp[m.id];
     if (ex.hp[m.id] == null) ex.hp[m.id] = m.stats.hp;
+    else if (prev != null && m.stats.hp > prev && !DOWN.has(ex.cond[m.id])) ex.hp[m.id] += m.stats.hp - prev;
     ex.hp[m.id] = Math.min(ex.hp[m.id], m.stats.hp);
+    ex.maxHp[m.id] = m.stats.hp;
     ex.cond[m.id] ||= 'ok';
     const mp = (ex.mp[m.id] ||= {});
     for (const f of familiesOf(m)) if (mp[f] == null) mp[f] = spellPool(f, m.level, m.base);

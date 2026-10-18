@@ -86,6 +86,16 @@ const SCENES = {
       ${shelf(60, 120, 200, ['#7a2a2a', '#2a3a6a', '#3a6a3a', '#7a5a2a', '#5a3a7a'])}${shelf(540, 120, 200, ['#2a3a6a', '#7a2a2a', '#7a5a2a', '#3a6a3a'])}
       <rect width="800" height="450" fill="url(#glow)"/>`,
   },
+  help: {
+    name: '稽古場', speaker: '演出家', line: '段取りを覚えれば、迷宮の舞台もこわくない。分からなくなったら、いつでもここへ来な。',
+    svg: () => `${bg('#2e2216', '#100a06')}
+      <rect x="60" y="50" width="680" height="250" fill="#3a2a1a" stroke="#5a3e22" stroke-width="8"/>
+      ${[0, 1, 2, 3].map((i) => `<rect x="${90 + i * 160}" y="80" width="130" height="190" fill="#e8dcc0" opacity=".12"/>`).join('')}
+      <rect x="120" y="96" width="240" height="150" fill="#1c2a20" stroke="#6a4a26" stroke-width="6"/>
+      ${[0, 1, 2, 3].map((i) => `<path d="M140 ${124 + i * 28} h${120 + (i % 2) * 60}" stroke="#e8e4d0" stroke-width="3" opacity=".7"/>`).join('')}
+      <rect y="320" width="800" height="130" fill="#4a3018"/>${[0, 1, 2, 3, 4, 5, 6, 7].map((i) => `<path d="M${i * 100} 450 L${400 + (i * 100 - 400) * 0.4} 320" stroke="#2e1c0c" stroke-width="2"/>`).join('')}
+      ${lamp(560, 80)}<rect width="800" height="450" fill="url(#glow)"/>${person(560, '#2a2a3a', '<path d="M-34 206 Q0 186 34 206 v-6 Q0 178 -34 200 Z" fill="#14100c"/>')}`,
+  },
   depart: {
     name: '舞台袖', speaker: '舞台監督', line: '出番だよ。じっくり歩くか、カードで駆け抜けるか。今日はどっちの舞台にする？',
     svg: () => `${bg('#2a0a10', '#0a0204')}
