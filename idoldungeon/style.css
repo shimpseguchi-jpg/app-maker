@@ -111,3 +111,30 @@ a { color: var(--accent); }
 .bres b { font-size: 1.2rem; color: var(--accent); }
 .pm.active { outline: 2px solid var(--accent); }
 @media (max-width: 859px) { .ex-side #party { order: -1; } }
+
+/* ── 街 ── */
+.town { display: grid; gap: 8px; align-content: start; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button { flex: 1; min-width: 64px; padding: 8px 4px !important; text-align: center !important; }
+.tabs button.on { background: var(--accent) !important; color: #1b1530 !important; font-weight: bold; }
+.sub-tabs button { flex: 0 1 auto; min-width: 80px; }
+.town-body { display: grid; gap: 6px; align-content: start; }
+.town-body h3 { margin: 8px 0 2px; }
+.town-go button { width: 100%; text-align: center !important; font-size: 1.05rem; background: #44397a !important; }
+.tv-party { display: grid; gap: 4px; }
+.tv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; border-left: 5px solid var(--c); background: #1f1938; border-radius: 6px; padding: 4px 8px; }
+.tv-row select { background: #15112a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; font: inherit; font-size: .85rem; max-width: 100%; }
+.tv-row .moves { margin-left: auto; display: flex; gap: 4px; }
+.tv-row .moves button { padding: 2px 8px !important; }
+.wait-grid { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.wait-grid .wait { border-left: 5px solid var(--c) !important; }
+.town select, .town textarea { font: inherit; }
+.town textarea { width: 100%; background: #15112a; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font-size: .75rem; }
+.slot { background: #1f1938; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; display: grid; gap: 4px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+.row button { flex: 1; text-align: center !important; }
+.book { display: grid; gap: 4px; }
+.bk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #1f1938; border-radius: 6px; padding: 4px 8px; }
+.bk.unknown { opacity: .6; }
+.plain { margin: 0; padding-left: 1.2em; font-size: .9rem; }
+.ok { color: var(--ok); }

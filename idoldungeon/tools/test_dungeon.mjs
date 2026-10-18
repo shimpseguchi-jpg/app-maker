@@ -3,7 +3,8 @@
 import { DUNGEONS } from '../js/data/floors.js';
 import { BOSSES } from '../js/data/bosses.js';
 import { getFloor, newExplore, act, edgeInfo, useStairs, returnToTown, isSolid, DX, DY, viewCells } from '../js/engine/dungeon.js';
-import { newExpedition, move, finishBattle, enterDungeon, climb, partyView, inn, temple, buy, shopList } from '../js/engine/expedition.js';
+import { newExpedition, move, finishBattle, enterDungeon, climb, partyView } from '../js/engine/expedition.js';
+import { stay, treat, buy, shopList } from '../js/engine/town.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -188,13 +189,13 @@ const walk = (st, seq, ctx = { rng: rng0 }) => seq.split(' ').map((a) => act(st,
   ok(s.pending?.toTown, '1F の上り階段は街へ');
   climb(ex);
   ok(ex.mode === 'town' && ex.ex.bossClears.b1 === 1, '街に戻った・ボス撃破数');
-  inn(ex);
+  stay(ex, 'suite');
   ok(ex.cond.makoto === 'ok' && ex.hp.makoto === partyView(ex)[0].maxHp, '宿屋で回復');
   ex.cond.ami = 'dead'; ex.gold = 99999;
-  temple(ex, 'ami', () => 0);
+  treat(ex, 'ami', () => 0);
   ok(ex.cond.ami === 'ok', '寺院で蘇生');
   ex.cond.ami = 'ash';
-  temple(ex, 'ami', () => 0.999);
+  treat(ex, 'ami', () => 0.999);
   ok(ex.cond.ami === 'ash', '灰の蘇生に失敗しても灰のまま（ロストなし）');
   buy(ex, 'masterSeal');
   ok(shopList(ex).find((i) => i.id === 'masterSeal').stock === 0, 'マスタープルフの在庫が減る');

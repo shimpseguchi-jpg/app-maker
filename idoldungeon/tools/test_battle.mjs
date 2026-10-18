@@ -1,7 +1,8 @@
 // 戦闘ルールのテスト
 // node idoldungeon/tools/test_battle.mjs
 import { createBattle, runTurn, reachableGroups, aliveGroups, castable, unitLiveReady, autoCommands, canAct, groupName } from '../js/engine/battle.js';
-import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups } from '../js/engine/expedition.js';
+import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore } from '../js/engine/expedition.js';
+import { equip } from '../js/engine/town.js';
 import { ENEMIES, ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { SPELL_LIST, KIND_TARGET } from '../js/data/spells.js';
 import { SONGS } from '../js/data/songs.js';
@@ -10,7 +11,13 @@ import { seeded } from '../js/engine/rng.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
-const partyOf = (...slots) => battleParty(newExpedition(slots.map((s) => (typeof s === 'string' ? { idol: s } : s))));
+// { idol, song } の song は、楽譜を持たせて装備させる
+const partyOf = (...slots) => {
+  const list = slots.map((s) => (typeof s === 'string' ? { idol: s } : s));
+  const ex = newExpedition(list);
+  for (const s of list) if (s.song) equip(ex, s.idol, addScore(ex, s.song, true).uid);
+  return battleParty(ex);
+};
 const dummy = (o = {}) => ({ id: 'dummy', name: '的', uname: '的', icon: '🎯', level: 1, hp: 999, atk: 0, mat: 0, def: 0, res: 0, spd: 1, hit: 0, eva: 0, exp: 10, gold: 5, resist: [], acts: [{ kind: 'attack', w: 1 }], ...o });
 const noSurprise = (b) => { b.surprise = null; b.log = []; return b; };
 
@@ -100,7 +107,7 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   const sleeper = dummy({ spd: 99, acts: [{ kind: 'sleepGroup', w: 1 }] });
   const pos = noSurprise(createBattle(partyOf({ idol: 'makoto', song: 'positive' }), [{ enemy: sleeper, count: 3 }], { rng: seeded(8) }));
   runTurn(pos, [{ type: 'defend' }], () => 0.01);
-  ok(!pos.party[0].sleep, 'ポジティブ！なら眠らない');
+  ok(pos.party[0].abilities.some((a) => a.id === 'noFear') && !pos.party[0].sleep, 'ポジティブ！なら眠らない');
 }
 
 // ── シナジー・楽曲の特殊能力 ──

@@ -6,25 +6,20 @@ import { CLASSES } from './data/classes.js';
 import { SPELLS_BY_ID, KIND_TARGET } from './data/spells.js';
 import { CONDITIONS } from './engine/revive.js';
 import { getFloor, viewCells, DIR_NAME, isDark, isAntiMagic } from './engine/dungeon.js';
-import { newExpedition, move, battleTurn, finishBattle, rescue, climb, enterDungeon, partyView, inn, temple, shopList, buy, syncParty, keyLabel, unitOf, INN_FEE } from './engine/expedition.js';
+import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf } from './engine/expedition.js';
+import { renderTown, townAction } from './ui/town.js';
 import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveReady, autoCommands } from './engine/battle.js';
 import { expForLevel } from './engine/growth.js';
 import { drawView } from './ui/view3d.js';
 import { drawMap } from './ui/automap.js';
 
 const KEY = 'idoldungeon.expedition';
-const PARTY_KEY = 'idoldungeon.proto';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const has = (m, id) => m.abilities?.some((a) => a.id === id);
 
-function partySlots() {
-  try {
-    const s = JSON.parse(localStorage.getItem(PARTY_KEY));
-    if (Array.isArray(s) && s.length) return s.filter((x) => IDOLS[x?.idol]).slice(0, 6);
-  } catch (e) { /* 初期編成を使う */ }
-  return [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
-}
+// はじめのパーティ（酒場で組み直せる）
+const FIRST_PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 
 let ex = load();
 let pending = null;
@@ -37,9 +32,9 @@ let battleEnd = null;
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
-    if (s?.ex?.dungeon && DUNGEONS[s.ex.dungeon]) return s;
+    if (s?.ex?.dungeon && DUNGEONS[s.ex.dungeon]) return normalize(s);
   } catch (e) { /* 新しく始める */ }
-  return newExpedition(partySlots());
+  return newExpedition(FIRST_PARTY);
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(ex)); } catch (e) { /* 保存できなくても続行 */ } }
 function say(msgs) { for (const m of msgs) log.push(m); while (log.length > 40) log.shift(); }
@@ -56,7 +51,7 @@ function render() {
   $('zone').textContent = town ? '' : isDark(ch) ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
   $('gold').textContent = `${ex.gold}G`;
   $('view').hidden = town || battle; $('town').hidden = !town; $('battle').hidden = !battle; $('pad').hidden = town || battle;
-  if (town) renderTown();
+  if (town) $('town').innerHTML = renderTown(ex);
   else if (battle) renderBattle();
   else {
     drawView($('view'), st, viewCells(st), { theme: fl.theme });
@@ -94,24 +89,6 @@ function renderParty() {
   const keys = ex.ex.keys.map((k) => `<span class="tag">🔑${esc(keyLabel(k))}</span>`).join('');
   const its = Object.entries(items).map(([id, n]) => `<span class="tag">${esc(ITEMS[id].name)}×${n}</span>`).join('');
   $('bag').innerHTML = keys || its ? `<div class="tags">${keys}${its}</div>` : '<small class="sub">持ち物なし</small>';
-}
-
-function renderTown() {
-  const party = partyView(ex);
-  const hurt = party.filter((m) => ['dead', 'ash', 'paralyze', 'stone'].includes(m.cond));
-  const clears = ex.ex.bossClears;
-  $('town').innerHTML = `
-    <h2>劇中の街</h2>
-    <div class="town-grid">
-      <button data-t="enter">迷宮へ入る</button>
-      <button data-t="inn">宿屋に泊まる <small>${INN_FEE}G・HP・状態異常・呪文の回数を回復</small></button>
-      <a class="btn" href="party.html">パーティを組み直す</a>
-    </div>
-    <h3>寺院</h3>
-    ${hurt.length ? hurt.map((m) => `<button data-t="temple" data-id="${m.id}">${esc(m.idol.name)}を治す <small>${CONDITIONS[m.cond].name}</small></button>`).join('') : '<p class="sub">治療が必要な仲間はいない</p>'}
-    <h3>店 <small class="sub">昇格アイテム</small></h3>
-    <div class="shop">${shopList(ex).map((it) => `<button data-t="buy" data-id="${it.id}" ${it.stock <= 0 ? 'disabled' : ''}>${esc(it.name)} <small>${it.price}G${it.stock === Infinity ? '' : ` 残り${it.stock}`}</small></button>`).join('')}</div>
-    ${Object.keys(clears).length ? `<p class="sub">ボス撃破：${Object.values(clears).map((n) => `${n}回`).join('、')}（倒したボスは強化されて再出現する）</p>` : ''}`;
 }
 
 // ── 戦闘 ──
@@ -282,21 +259,12 @@ function askStairs() {
   if (ch !== 'u' && ch !== 'd') return;
   say(climb(ex));
   if (ex.mode === 'dungeon') say([`${getFloor(st.dungeon, st.floor).id}に${ch === 'd' ? '下りた' : '上った'}`]);
-  else syncSlots();
   render();
-}
-
-// 街にいるあいだは、パーティ編成画面で組んだメンバーを反映する
-function syncSlots() {
-  const slots = partySlots();
-  const same = JSON.stringify(slots.map((s) => [s.idol, s.song])) === JSON.stringify(ex.slots.map((s) => [s.idol, s.song]));
-  if (!same) ex.slots = slots;
-  syncParty(ex);
 }
 
 function showPending() {
   if (pending.type === 'wiped') {
-    $('modal-box').innerHTML = '<h2>全滅</h2><p>パーティは迷宮で倒れた……</p><div class="row"><button data-m="rescue">回収してもらう</button></div>';
+    $('modal-box').innerHTML = '<h2>全滅</h2><p>パーティは迷宮で倒れた……<br>死体はその場に残る。寺院で回収してもらうか、別のパーティで探しに行こう。</p><div class="row"><button data-m="rescue">街へ</button></div>';
     $('modal').hidden = false;
   }
 }
@@ -305,7 +273,7 @@ function closeModal() {
   const p = pending;
   pending = null;
   $('modal').hidden = true;
-  if (p.type === 'wiped') say(rescue(ex));
+  if (p.type === 'wiped') say(wipeOut(ex));
   render();
 }
 
@@ -315,15 +283,18 @@ document.addEventListener('click', (ev) => {
   if (b.closest('#battle')) { battleClick(b); return; }
   if (b.dataset.a) doAction(b.dataset.a);
   else if (b.dataset.m) closeModal();
-  else if (b.dataset.t) {
-    const t = b.dataset.t;
-    if (t === 'enter') { syncSlots(); say(enterDungeon(ex)); }
-    else if (t === 'inn') say(inn(ex));
-    else if (t === 'temple') say(temple(ex, b.dataset.id));
-    else if (t === 'buy') say(buy(ex, b.dataset.id));
-    render();
-  }
+  else if (b.closest('#town')) townDo(b);
 });
+document.addEventListener('change', (ev) => {
+  const el = ev.target.closest('#town select');
+  if (el) townDo(el);
+});
+function townDo(el) {
+  const r = townAction(ex, el);
+  say(r.msgs);
+  if (r.replace) ex = normalize(r.replace);
+  render();
+}
 
 const KEYMAP = { ArrowUp: 'forward', w: 'forward', ArrowLeft: 'turnL', a: 'turnL', ArrowRight: 'turnR', d: 'turnR',
   ArrowDown: 'turnBack', s: 'turnBack', q: 'strafeL', e: 'strafeR', ' ': 'search', f: 'search', Enter: 'stairs' };
@@ -334,6 +305,6 @@ document.addEventListener('keydown', (ev) => {
   doAction(a);
 });
 
-if (ex.mode === 'town') { syncSlots(); say(['街にいる。準備ができたら迷宮へ']); }
+if (ex.mode === 'town') { syncParty(ex); say(['劇中の街にいる。酒場でパーティを組んで、迷宮へ']); }
 if (ex.battle) resetCommands();
 render();

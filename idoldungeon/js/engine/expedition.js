@@ -1,22 +1,51 @@
-// 冒険全体の状態：ダンジョンの位置（dungeon.js）＋パーティの育成・HP・状態・呪文の回数・所持金・アイテム、戦闘（battle.js）
+// 冒険全体の状態：ダンジョンの位置（dungeon.js）＋アイドルの育成・HP・状態・呪文の回数、所持金・アイテム・楽譜、
+// 迷宮に残された仲間、図鑑、戦闘（battle.js）。街の施設は town.js
 import { newExplore, act, useStairs, retreat, returnToTown, getFloor, isDark, isAntiMagic, SEARCHERS, KEY_NAMES } from './dungeon.js';
 import { buildMembers, computeParty } from './party.js';
-import { bossAt, rollDrops, shopStock } from './boss.js';
+import { bossAt, rollDrops } from './boss.js';
 import { createBattle, runTurn } from './battle.js';
-import { gainExp } from './growth.js';
 import { BOSSES } from '../data/bosses.js';
 import { IDOLS } from '../data/idols.js';
 import { CLASSES, SPELL_FAMILIES } from '../data/classes.js';
 import { ENCOUNTERS, FIXED_GROUPS, BOSS_GUARD, BOSS_ESCORT } from '../data/enemies.js';
 import { spellPool } from '../data/spells.js';
-import { ITEMS, PROMOTE_ITEMS } from '../data/items.js';
-import { tryRevive, REVIVE_FEE, DOWN, isWiped, CONDITIONS } from './revive.js';
+import { ITEMS } from '../data/items.js';
+import { SONGS } from '../data/songs.js';
+import { DOWN, isWiped } from './revive.js';
+
+// 最初に持っている楽譜（鑑定済み）
+export const STARTER_SONGS = ['ready', 'ohayo'];
 
 export function newExpedition(slots, dungeonId = 'd1') {
-  const ex = { ex: newExplore(dungeonId), mode: 'town', slots, units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {},
-    gold: 500, items: [], bought: 0, battle: null, battleEv: null };
+  const ex = normalize({ ex: newExplore(dungeonId), mode: 'town', slots: slots.map((s) => ({ idol: s.idol })), gold: 500 });
+  for (const id of STARTER_SONGS) addScore(ex, id, true);
   syncParty(ex);
   return ex;
+}
+
+// 古いセーブにも新しい項目をそろえる
+export function normalize(ex) {
+  for (const [k, v] of Object.entries({ units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {}, items: [], bought: 0,
+    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0 })) {
+    if (ex[k] == null) ex[k] = structuredClone(v);
+  }
+  ex.slots = ex.slots.map((s) => ({ idol: s.idol }));
+  return ex;
+}
+
+// ── 楽譜（楽曲の装備品）。未鑑定のうちは曲名が分からず、装備できない ──
+export function addScore(ex, songId, known = false) {
+  const sc = { uid: ex.seq++, song: songId, known };
+  ex.scores.push(sc);
+  return sc;
+}
+export const scoreName = (sc) => (sc.known ? SONGS[sc.song].title : `？？？の楽譜（★${SONGS[sc.song].rank}）`);
+export const equippedScore = (ex, idolId) => ex.scores.find((sc) => sc.uid === ex.equip[idolId]) || null;
+// rank 以下の楽曲から1つ（ボス・宝箱のドロップ）
+export function randomSong(maxRank, rng, exact = false) {
+  const list = Object.values(SONGS).filter((s) => (exact ? s.rank === maxRank : s.rank <= maxRank));
+  const pool = list.length ? list : Object.values(SONGS).filter((s) => s.rank <= maxRank);
+  return pool[Math.floor(rng() * pool.length)].id;
 }
 
 // アイドルごとの育成状態（クラス・レベル・経験値・能力・覚えた魔法）
@@ -25,7 +54,7 @@ export function unitOf(ex, idolId) {
   const idol = IDOLS[idolId];
   return (ex.units[idolId] ||= { cls: idol.cls, level: 1, exp: 0, base: { ...idol.base }, learned: [] });
 }
-const slotsOf = (ex) => ex.slots.map((s) => ({ ...s, ...unitOf(ex, s.idol) }));
+const slotsOf = (ex) => ex.slots.map((s) => ({ idol: s.idol, song: equippedScore(ex, s.idol)?.song || null, ...unitOf(ex, s.idol) }));
 export const familiesOf = (m) => SPELL_FAMILIES.filter((f) => m.abilities.some((a) => a.id === f || (f === 'dark' && a.id === 'sleepStaff')));
 
 // パーティ編成が変わったとき・レベルが上がったときに、HP・呪文の回数・ライブスキルの回数をそろえる
@@ -86,6 +115,7 @@ export function move(ex, action, rng = Math.random) {
   if (action === 'forward' || action === 'back' || action === 'strafeL' || action === 'strafeR') {
     for (const m of party) if (ex.cond[m.id] === 'poison' && ex.hp[m.id] > 1) ex.hp[m.id]--;
   }
+  pickUpBodies(ex, msgs);
   if (checkWipe(ex, msgs)) pending = { type: 'wiped' };
   return { msgs, pending };
 }
@@ -97,18 +127,33 @@ function damage(ex, m, dmg, msgs) {
 }
 
 function checkWipe(ex, msgs) {
-  const ids = Object.keys(ex.cond).filter((id) => ex.slots.some((s) => s.idol === id));
-  if (!isWiped(ids.map((id) => ex.cond[id]))) return false;
+  const ids = ex.slots.map((s) => s.idol);
+  if (!ids.length || !isWiped(ids.map((id) => ex.cond[id]))) return false;
   msgs.push('パーティは全滅した……');
   return true;
 }
 
-// 全滅：寺院の回収係が街まで運ぶ（回収料として所持金の半分）。エルミナージュの救助隊は今後
-export function rescue(ex) {
-  ex.gold = Math.floor(ex.gold / 2);
+// 全滅：死体はその場に残る（エルミナージュ準拠）。寺院の死体回収か、別のパーティで拾いに行く
+export function wipeOut(ex) {
+  const st = ex.ex;
+  for (const s of ex.slots) ex.lost[s.idol] = { floor: st.floor, x: st.x, y: st.y };
+  const names = ex.slots.map((s) => IDOLS[s.idol].name).join('・');
+  ex.slots = [];
   ex.battle = null; ex.battleEv = null;
   toTown(ex);
-  return ['寺院の回収係に運ばれて、街に戻った（回収料：所持金の半分）'];
+  return [`${names}は迷宮に取り残された……`, '寺院で死体を回収してもらうか、別のパーティで探しに行こう'];
+}
+
+// 迷宮に残された仲間を見つけたら、空きがあれば連れて帰る
+function pickUpBodies(ex, msgs) {
+  const st = ex.ex;
+  for (const [id, at] of Object.entries(ex.lost)) {
+    if (at.floor !== st.floor || at.x !== st.x || at.y !== st.y) continue;
+    if (ex.slots.length >= 6) { msgs.push(`${IDOLS[id].name}が倒れている。でもパーティに空きがない`); continue; }
+    delete ex.lost[id];
+    ex.slots.push({ idol: id });
+    msgs.push(`${IDOLS[id].name}を見つけた！ 連れて帰ろう`);
+  }
 }
 
 // ── 戦闘 ──
@@ -177,28 +222,29 @@ export function finishBattle(ex, rng = Math.random) {
     if (m.live && ex.live[m.id]) ex.live[m.id].left = m.live.left;
     if (m.usedRevive) ex.usedRevive[m.id] = true;
   }
+  // 図鑑：正体の分かった敵と倒した数
+  for (const g of b.groups) {
+    const id = g.def.id;
+    const e = (ex.book[id] ||= { seen: false, kills: 0 });
+    e.seen ||= g.identified || b.result === 'win';
+    e.kills += g.members.filter((x) => x.dead).length;
+  }
   if (b.result === 'win') {
+    // 経験値はためておき、宿屋に泊まったときにレベルが上がる（エルミナージュ準拠）
     const earners = b.party.filter((m) => !m.fled && !DOWN.has(m.cond));
     const share = earners.length ? Math.floor(b.exp / earners.length) : 0;
     msgs.push(`経験値 ${share} ずつ、${b.gold}G を手に入れた`);
     ex.gold += b.gold;
-    for (const m of earners) {
-      const u = unitOf(ex, m.id);
-      const before = u.level;
-      msgs.push(...gainExp(u, share, m.name, rng));
-      if (u.level > before) {
-        // 上がったぶん、HP の最大値と呪文の回数が増える
-        const hpBefore = m.maxHp;
-        const after = partyView(ex).find((x) => x.id === m.id);
-        ex.hp[m.id] += after.maxHp - hpBefore;
-        for (const f of familiesOf(after)) ex.mp[m.id][f] = Math.min(spellPool(f, after.level, after.base), (ex.mp[m.id][f] || 0) + 1);
-      }
-    }
+    for (const m of earners) unitOf(ex, m.id).exp += share;
     if (ev.kind === 'guardian') {
       ex.ex.trip[ev.id] = 'guardian';
       const g = 80 + Math.floor(rng() * 40);
       ex.gold += g;
       msgs.push(`宝箱を開けた。${g}G が入っていた`);
+      if (rng() < 0.6) {
+        const sc = addScore(ex, randomSong(Math.min(5, ex.ex.floor + 2), rng));
+        msgs.push(`${scoreName(sc)}を見つけた`);
+      }
     } else if (ev.kind === 'boss') {
       const clears = ex.ex.bossClears[ev.id] || 0;
       const d = rollDrops(ev.id, clears, rng);
@@ -206,7 +252,8 @@ export function finishBattle(ex, rng = Math.random) {
       ex.gold += d.gold; ex.items.push(...d.items);
       msgs.push(`${BOSSES[ev.id].name}を倒した！ ${d.gold}G を手に入れた`);
       for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
-      msgs.push(`★${d.songRank}の楽譜も落ちていた（楽譜の入手は今後実装）`);
+      const sc = addScore(ex, randomSong(d.songRank, rng, true));
+      msgs.push(`${scoreName(sc)}を見つけた`);
     }
   } else if (b.result === 'flee') {
     if (ev.kind !== 'wander') retreat(ex.ex);
@@ -223,60 +270,18 @@ export function climb(ex) {
   return [];
 }
 
-function toTown(ex) {
+export function toTown(ex) {
   returnToTown(ex.ex);
   ex.mode = 'town';
 }
 
 export function enterDungeon(ex) {
+  if (!ex.slots.some((s) => !DOWN.has(ex.cond[s.idol]))) return ['動けるメンバーがいない。酒場でパーティを組もう'];
   ex.mode = 'dungeon';
   const msgs = ['迷宮に入った'];
   ex.ex.seen[0] ||= {};
   ex.ex.seen[0][`${ex.ex.x},${ex.ex.y}`] = 1;
   return msgs;
-}
-
-// ── 街 ──
-export const INN_FEE = 10;
-export function inn(ex) {
-  if (ex.gold < INN_FEE) return ['お金が足りない'];
-  ex.gold -= INN_FEE;
-  for (const m of partyView(ex)) {
-    if (DOWN.has(ex.cond[m.id])) continue;
-    ex.hp[m.id] = m.maxHp; ex.cond[m.id] = 'ok';
-    // 呪文とライブスキルの回数も全快（エルミナージュ準拠）
-    for (const f of familiesOf(m)) ex.mp[m.id][f] = spellPool(f, m.level, m.base);
-    if (m.live && ex.live[m.id]) ex.live[m.id].left = m.live.uses;
-  }
-  return [`宿屋で休んだ（${INN_FEE}G）。HP・状態異常・呪文の回数が回復した`];
-}
-
-export function temple(ex, idolId, rng = Math.random) {
-  const m = partyView(ex).find((x) => x.id === idolId);
-  const st = ex.cond[idolId];
-  if (!m || (st !== 'dead' && st !== 'ash' && st !== 'paralyze' && st !== 'stone')) return ['治療の必要はない'];
-  const fee = (REVIVE_FEE[st] || 50) * m.level;
-  if (ex.gold < fee) return [`お金が足りない（${fee}G）`];
-  ex.gold -= fee;
-  if (st === 'paralyze' || st === 'stone') { ex.cond[idolId] = 'ok'; return [`${m.idol.name}の${CONDITIONS[st].name}が治った（${fee}G）`]; }
-  const r = tryRevive({ base: m.base }, st, rng);
-  if (r === 'ok') { ex.cond[idolId] = 'ok'; ex.hp[idolId] = 1; return [`${m.idol.name}は生き返った！（${fee}G）`]; }
-  ex.cond[idolId] = 'ash';
-  return [`蘇生に失敗した……${m.idol.name}は灰になった（${fee}G）`];
-}
-
-export function shopList(ex) {
-  const clears = Object.values(ex.ex.bossClears).reduce((a, b) => a + b, 0) + Object.values(ex.ex.trip).filter((t) => t === 'boss').length;
-  const stock = shopStock(clears, ex.bought);
-  return PROMOTE_ITEMS.map((it) => ({ ...it, stock: it.shop === 'perClear' ? stock[it.id] : Infinity }));
-}
-export function buy(ex, itemId) {
-  const it = shopList(ex).find((x) => x.id === itemId);
-  if (!it || it.stock <= 0) return ['在庫がない'];
-  if (ex.gold < it.price) return ['お金が足りない'];
-  ex.gold -= it.price; ex.items.push(it.id);
-  if (it.shop === 'perClear') ex.bought++;
-  return [`「${it.name}」を買った（${it.price}G）`];
 }
 
 export const keyLabel = (k) => KEY_NAMES[k] || k;

@@ -85,6 +85,7 @@ const ok = (c, m) => { if (!c) { fail++; console.log('NG:', m); } };
 ok(ex.mode === 'town', '街に戻った');
 ok(ex.ex.bossClears.b1 === 1, 'ボスを倒し、再戦の回数が増えた');
 ok(ex.items.length >= 1, 'ボスのドロップ（昇格アイテム）');
+ok(ex.scores.some((sc) => !sc.known), 'ボスのドロップ（未鑑定の楽譜）');
 ok(ex.ex.keys.includes('silverKey') && ex.ex.flags.f1gate, '鍵とスイッチ');
 ok(Object.keys(ex.ex.seen).length === 3, '3つの階をオートマップに記録');
 ok(!errors.length, 'ページのエラー: ' + errors.join(' / '));
