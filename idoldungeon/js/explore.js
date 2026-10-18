@@ -13,6 +13,7 @@ import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveRead
 import { expForLevel } from './engine/growth.js';
 import { drawView } from './ui/view3d.js';
 import { drawMap } from './ui/automap.js';
+import { chooseCard, cardView, finishCardBattle, returnHome, cardWipe } from './engine/cards.js';
 
 const KEY = 'idoldungeon.expedition';
 const $ = (id) => document.getElementById(id);
@@ -34,6 +35,8 @@ let battleEnd = null;
 let play = null, playTimer = 0;
 // 敵が現れる動きは、新しい戦闘のときだけ
 let foesShown = null;
+// カードモード：「街へ戻る」の確認中
+let homeAsk = false;
 
 function load() {
   try {
@@ -47,21 +50,23 @@ function say(msgs) { for (const m of msgs) log.push(m); while (log.length > 40) 
 
 // ── 描画 ──
 function render() {
-  const town = ex.mode === 'town', battle = !!(ex.battle || battleEnd);
+  const town = ex.mode === 'town', battle = !!(ex.battle || battleEnd), cards = ex.mode === 'card' && !!ex.card && !battle;
   const st = ex.ex;
   const fl = getFloor(st.dungeon, st.floor);
   const ch = fl.cellAt(st.x, st.y);
-  const dark = !town && isDark(ch);
+  const dark = !town && ex.mode !== 'card' && isDark(ch);
   // 右上の場所名（エルミナージュの細い下線つきの札）。座標は X/Y、ダークゾーンでは分からない
   $('where').textContent = town ? `劇中の街 ― ${townSpeech().place}` : `${DUNGEONS[st.dungeon].name}  ${fl.id}`;
-  $('pos').textContent = town || battle ? '' : dark ? 'X?? Y??' : `X${String(st.x).padStart(2, '0')}  Y${String(st.y).padStart(2, '0')}`;
-  $('zone').textContent = town ? '' : dark ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
+  $('pos').textContent = town || battle || cards ? '' : dark ? 'X?? Y??' : `X${String(st.x).padStart(2, '0')}  Y${String(st.y).padStart(2, '0')}`;
+  $('zone').textContent = town || ex.mode === 'card' ? '' : dark ? 'ダークゾーン' : isAntiMagic(ch) ? '呪文禁止' : '';
   $('gold').textContent = `${ex.gold} G`;
   // 画面の切り替え（スマホの並べ方は body の data-mode で決める）
-  $('screen').dataset.mode = document.body.dataset.mode = town ? 'town' : battle ? 'battle' : 'dungeon';
-  $('town').hidden = !town; $('battle').hidden = !battle; $('pad').hidden = town || battle;
-  $('hudmap').hidden = town || battle; $('compass').hidden = town || battle;
+  $('screen').dataset.mode = document.body.dataset.mode = town ? 'town' : battle ? 'battle' : cards ? 'card' : 'dungeon';
+  document.body.dataset.play = ex.mode === 'card' || ex.card ? 'card' : 'drpg';
+  $('town').hidden = !town; $('battle').hidden = !battle; $('cards').hidden = !cards; $('pad').hidden = town || battle || cards;
+  $('hudmap').hidden = town || battle || cards; $('compass').hidden = town || battle || cards;
   if (town) $('town').innerHTML = renderTown(ex);
+  else if (cards) renderCards();
   else {
     drawView($('view'), st, viewCells(st), { theme: fl.theme });
     if (battle) renderBattle();
@@ -84,6 +89,7 @@ function renderLog(town, battle) {
   if (battle && play) { const s = play.b.steps[play.idx]; lines = play.b.log.slice(s.from, s.to).slice(-5); }
   else if (battle) lines = (ex.battle || battleEnd.battle).log.slice(-5);
   else if (town) { const t = townSpeech(); speaker = t.speaker; lines = [`「${t.line}」`, ...log.slice(-2)]; }
+  else if (ex.mode === 'card') lines = log.slice(-3);
   else lines = log.slice(-4);
   $('log').innerHTML = (speaker ? `<div class="speaker">${esc(speaker)}</div>` : '') + lines.map((m) => `<div>${esc(m)}</div>`).join('');
 }
@@ -220,7 +226,12 @@ function commandMenu(b, m, groups) {
   const head = `<div class="who">${esc(m.name)}<small>${m.row === 'front' ? '前列' : '後列'}・射程${m.range}・素早さ${m.stats.spd}</small></div>`;
   const back = cmdIdx > nextActor(0) || sub ? '<button data-b="back" class="vbar minor">戻る</button>' : '';
   const auto = '<button data-b="auto" class="vbar minor">おまかせ</button>';
-  if (!sub) {
+  if (!sub && ex.card) return commandCard(b, m, groups, back, auto);
+  if (sub?.type === 'magic') {
+    const live = m.live ? `<button class="vbar" data-b="live" ${m.live.left > 0 ? '' : 'disabled'}>ライブ「${esc(m.live.name)}」×${m.live.left}</button>` : '';
+    return `${head}<div class="vmenu">${castable(b, m).map((s) => `<button class="vbar" data-sp="${s.id}" title="${esc(s.text)}">${esc(s.name)} <small>${m.mp[s.family]}回</small></button>`).join('')}${live}</div><div class="vmenu minor-row">${back}</div>`;
+  }
+  if (!sub || sub.type === 'more') {
     const reach = reachableGroups(b, m);
     const spells = castable(b, m);
     const btns = [
@@ -252,6 +263,27 @@ function commandMenu(b, m, groups) {
   return `${head}<div class="ask">${esc(sub.label)}：だれに？</div><div class="vmenu">${allies.map(([t, i]) => `<button class="vbar" data-ta="${i}">${esc(t.name)} <small>HP${t.hp}</small></button>`).join('')}</div><div class="vmenu minor-row">${back}</div>`;
 }
 
+// カードモードの戦闘：1人1枚のコマンドカード。右＝戦う（届くいちばん前のグループ）・左＝守る・上＝呪文とライブ・下＝その他
+function commandCard(b, m, groups, back, auto) {
+  const tg = reachableGroups(b, m)[0];
+  const magic = castable(b, m).length > 0 || (m.live && m.live.left > 0);
+  const actors = b.party.map((t, i) => i).filter((i) => canAct(b.party[i]));
+  return `<div class="cmd-card" data-swipe-root>
+      <article class="ccard small" data-card tabindex="0" aria-label="${esc(m.name)}のコマンド">
+        <div class="cc-tag">コマンド<span>${actors.indexOf(cmdIdx) + 1} / ${actors.length}人目</span></div>
+        <p class="cc-text"><b>${esc(m.name)}</b><br><small>HP ${m.hp}/${m.maxHp}・${m.row === 'front' ? '前列' : '後列'}・射程${m.range}・素早さ${m.stats.spd}</small></p>
+        <div class="cc-label"></div>
+      </article>
+      <div class="cmd4">
+        <button class="vbar" data-swipe="left" data-label="守る" data-b="defend">← 守る</button>
+        <button class="vbar" data-swipe="right" data-label="戦う" ${tg ? `data-tg="${groups.indexOf(tg)}"` : 'disabled'}>戦う${tg ? `：${esc(groupName(tg))}` : '（届かない）'} →</button>
+        <button class="vbar" data-swipe="up" data-label="呪文・ライブ" data-b="magic" ${magic ? '' : 'disabled'}>↑ 呪文・ライブ</button>
+        <button class="vbar" data-swipe="down" data-label="その他" data-b="more">↓ その他</button>
+      </div>
+    </div>
+    <div class="vmenu minor-row">${back}${auto}</div>`;
+}
+
 function setCommand(c) {
   cmds[cmdIdx] = c; sub = null;
   cmdIdx = nextActor(cmdIdx + 1);
@@ -263,7 +295,7 @@ function runBattleTurn() {
   const bt = ex.battle, pre = snapOf(bt);
   battleTurn(ex, cmds);
   if (bt.result) {
-    const r = finishBattle(ex);
+    const r = ex.card ? finishCardBattle(ex) : finishBattle(ex);
     battleEnd = { battle: bt, msgs: r.msgs, wiped: r.wiped };
   } else resetCommands();
   clearTimeout(playTimer);
@@ -317,6 +349,8 @@ function battleClick(b) {
     return;
   }
   if (d.b === 'attack') { sub = { type: 'attack' }; render(); return; }
+  if (d.b === 'magic') { sub = { type: 'magic' }; render(); return; }
+  if (d.b === 'more') { sub = { type: 'more' }; render(); return; }
   if (d.b === 'spell') { sub = { type: 'spell' }; render(); return; }
   if (d.b === 'defend') { setCommand({ type: 'defend' }); return; }
   if (d.b === 'flee') { setCommand({ type: 'flee' }); return; }
@@ -337,7 +371,7 @@ function battleClick(b) {
   }
   if (d.tg != null) {
     const g = Number(d.tg);
-    if (!sub || sub.type === 'attack') setCommand({ type: 'attack', group: g });
+    if (!sub || sub.type === 'attack' || sub.type === 'more') setCommand({ type: 'attack', group: g });
     else if (sub.type === 'spellTarget') setCommand({ type: 'spell', spell: sub.spell, target: g });
     else if (sub.type === 'live') setCommand({ type: 'live', target: g });
     return;
@@ -350,6 +384,94 @@ function battleClick(b) {
     else if (sub.type === 'live') setCommand({ type: 'live', target: a });
   }
 }
+
+// ── カードモード（docs/DESIGN.md 17.3）：テキストのカードを左右に振って進む ──
+function renderCards() {
+  const v = cardView(ex), c = v.card;
+  const zone = [v.dark && `ダークゾーン あと${v.dark}枚`, v.anti && `呪文禁止 あと${v.anti}枚`].filter(Boolean).join('・');
+  const l = v.loot, loot = [`${l.gold}G`, l.scores.length && `楽譜${l.scores.length}`, l.items.length && `アイテム${l.items.length}`].filter(Boolean).join('・');
+  const foot = homeAsk
+    ? `<span>拾った物（${loot}）の半分を失います。街へ戻りますか？</span><button data-c="homeYes">戻る</button><button data-c="homeNo">続ける</button>`
+    : `<span>拾った物：${loot}</span><button data-c="home">街へ戻る<small>拾った物の半分を失う</small></button>`;
+  $('cards').innerHTML = `<div class="cm" data-swipe-root>
+    <div class="cm-top">
+      <div class="cm-hp" title="パーティの残り HP"><span>HP</span><div class="cm-bar"><i style="width:${v.hp}%" class="${v.hp < 30 ? 'low' : ''}"></i><span class="cm-dot" id="cmdot" data-size="0"></span></div><b>${v.hp}%</b></div>
+      <div class="cm-where">${esc(DUNGEONS[ex.card.dungeon].name)}　${v.floor}<small>${c.kind === 'boss' ? '最深部' : `${v.step} / ${v.perFloor}`}</small>${zone ? `<em>${zone}</em>` : ''}</div>
+    </div>
+    <div class="cm-stage">
+      <article class="ccard kind-${c.kind}" data-card tabindex="0" aria-label="${esc(c.title)}">
+        <div class="cc-tag">${esc(c.tag)}<span>${esc(c.title)}</span></div>
+        <p class="cc-text">${esc(c.text)}</p>
+        <div class="cc-label"></div>
+      </article>
+    </div>
+    <div class="cm-choices">
+      <button data-c="left" data-swipe="left" data-hp="${c.left.hp}" data-label="${esc(c.left.label)}">← ${esc(c.left.label)}</button>
+      <button data-c="right" data-swipe="right" data-hp="${c.right.hp}" data-label="${esc(c.right.label)}">${esc(c.right.label)} →</button>
+    </div>
+    <div class="cm-foot">${foot}</div>
+  </div>`;
+}
+
+function cardClick(b) {
+  const d = b.dataset;
+  if (d.c === 'home') { homeAsk = true; render(); return; }
+  if (d.c === 'homeNo') { homeAsk = false; render(); return; }
+  if (d.c === 'homeYes') { homeAsk = false; say(returnHome(ex)); render(); return; }
+  if (d.c !== 'left' && d.c !== 'right') return;
+  homeAsk = false;
+  const r = chooseCard(ex, d.c);
+  say(r.msgs);
+  if (r.battle) resetCommands();
+  if (r.wiped) { pending = { type: 'wiped' }; render(); showPending(); return; }
+  render();
+}
+
+// カードを指（マウス）で振る：ドラッグして離すと、その向きのボタン（data-swipe）を押したことになる。傾けているあいだは答えを出す
+let drag = null;
+const swipeDir = (dx, dy, min, root) => {
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (ax >= ay && ax >= min) return dx > 0 ? 'right' : 'left';
+  if (ay > ax && ay >= min && root?.querySelector('[data-swipe="up"]')) return dy < 0 ? 'up' : 'down';
+  return null;
+};
+function showChoice(root, dir) {
+  const btn = dir ? root?.querySelector(`[data-swipe="${dir}"]`) : null;
+  const label = root?.querySelector('.cc-label');
+  if (label) { label.textContent = btn && !btn.disabled ? btn.dataset.label : ''; label.dataset.dir = dir || ''; }
+  root?.querySelectorAll('[data-swipe]').forEach((x) => x.classList.toggle('hot', x === btn));
+  preview(btn);
+}
+// 答えで HP が動くなら、ゲージの上に点を出す（大きさ＝動く量。増えるか減るかは出さない）
+function preview(btn) { const dot = $('cmdot'); if (dot) dot.dataset.size = btn?.dataset.hp || '0'; }
+document.addEventListener('pointerdown', (ev) => {
+  const card = ev.target.closest('[data-card]');
+  if (!card || play) return;
+  drag = { card, root: card.closest('[data-swipe-root]'), x: ev.clientX, y: ev.clientY, dx: 0, dy: 0 };
+  card.classList.add('dragging');
+});
+document.addEventListener('pointermove', (ev) => {
+  if (!drag) return;
+  drag.dx = ev.clientX - drag.x; drag.dy = ev.clientY - drag.y;
+  drag.card.style.transform = `translate(${drag.dx}px, ${drag.dy * 0.35}px) rotate(${drag.dx / 16}deg)`;
+  showChoice(drag.root, swipeDir(drag.dx, drag.dy, 24, drag.root));
+});
+function endDrag(ev) {
+  if (!drag) return;
+  const { card, root, dx, dy } = drag;
+  drag = null;
+  card.classList.remove('dragging');
+  card.style.transform = '';
+  showChoice(root, null);
+  const dir = ev.type === 'pointerup' ? swipeDir(dx, dy, 80, root) : null;
+  if (dir) root.querySelector(`[data-swipe="${dir}"]:not(:disabled)`)?.click();
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+document.addEventListener('pointerover', (ev) => { const b = ev.target.closest?.('#cards [data-swipe]'); if (b) preview(b); });
+document.addEventListener('pointerout', (ev) => { if (ev.target.closest?.('#cards [data-swipe]')) preview(null); });
+document.addEventListener('focusin', (ev) => { if (ev.target.closest?.('#cards [data-swipe]')) preview(ev.target); });
+const visibleSwipeRoot = () => [...document.querySelectorAll('[data-swipe-root]')].find((e) => e.offsetParent !== null);
 
 // ── 入力 ──
 function doAction(a) {
@@ -383,7 +505,7 @@ function closeModal() {
   const p = pending;
   pending = null;
   $('modal').hidden = true;
-  if (p.type === 'wiped') say(wipeOut(ex));
+  if (p.type === 'wiped') say(ex.card ? cardWipe(ex) : wipeOut(ex));
   render();
 }
 
@@ -394,6 +516,7 @@ document.addEventListener('click', (ev) => {
   if (!b || b.disabled) return;
   if (!$('bigmap').hidden && b.dataset.x !== 'mapclose') return;
   if (b.closest('#battle')) { battleClick(b); return; }
+  if (b.closest('#cards')) { cardClick(b); return; }
   if (b.id === 'hudmap' || b.dataset.x === 'map') { showBigMap(); return; }
   if (b.dataset.x === 'mapclose') { $('bigmap').hidden = true; return; }
   if (b.dataset.a) doAction(b.dataset.a);
@@ -419,6 +542,14 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'm' || ev.key === 'M' || (ev.key === 'Escape' && !$('bigmap').hidden)) {
     if (ev.target.closest('input, select, textarea')) return;
     if ($('bigmap').hidden) showBigMap(); else $('bigmap').hidden = true;
+    return;
+  }
+  // カード：矢印キーで振る
+  const swipe = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }[ev.key];
+  const root = swipe && !play && pending == null && visibleSwipeRoot();
+  if (root) {
+    const btn = root.querySelector(`[data-swipe="${swipe}"]:not(:disabled)`);
+    if (btn) { ev.preventDefault(); btn.click(); }
     return;
   }
   const a = KEYMAP[ev.key];

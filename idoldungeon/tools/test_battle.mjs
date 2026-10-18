@@ -2,7 +2,7 @@
 // node idoldungeon/tools/test_battle.mjs
 import { createBattle, runTurn, reachableGroups, aliveGroups, castable, unitLiveReady, autoCommands, canAct, groupName } from '../js/engine/battle.js';
 import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore,
-  dungeonBoss, cardUnlocked, CARD_MODE_READY, PLAY_MODES, DRPG_BONUS, syncParty } from '../js/engine/expedition.js';
+  dungeonBoss, cardUnlocked, PLAY_MODES, DRPG_BONUS, syncParty } from '../js/engine/expedition.js';
 import { equip } from '../js/engine/town.js';
 import { ENEMIES, ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { SPELL_LIST, KIND_TARGET } from '../js/data/spells.js';
@@ -219,7 +219,6 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ok(!cardUnlocked(ex, 'd1') && enterDungeon(ex, 'd1', 'card')[0].includes('DRPGモードで倒す') && ex.mode === 'town', 'カードモードはボスを倒すまで入れない');
   ex.ex.trip.b1 = 'boss';
   ok(cardUnlocked(ex, 'd1') && !cardUnlocked(ex, 'd2'), 'ボスを倒した迷宮だけカードモードが解放される');
-  if (!CARD_MODE_READY) ok(enterDungeon(ex, 'd1', 'card')[0].includes('準備中') && ex.mode === 'town', 'カードモードの中身ができるまでは入れない');
   ok(enterDungeon(ex, 'd1')[0].includes('入った') && ex.play === 'drpg', 'ふつうに入ると DRPGモード');
   const fight = (play) => {
     ex.play = play;

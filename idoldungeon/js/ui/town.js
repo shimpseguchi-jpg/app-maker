@@ -7,7 +7,9 @@ import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
-import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, CARD_MODE_READY, DRPG_BONUS } from '../engine/expedition.js';
+import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, DRPG_BONUS } from '../engine/expedition.js';
+import { enterCardMode } from '../engine/cards.js';
+import { CARD_DUNGEONS } from '../data/cards.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
   shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
   trainingInfo, doChangeClass, doPromote } from '../engine/town.js';
@@ -38,12 +40,13 @@ function depart(ex) {
   const can = ex.slots.length > 0;
   const list = openDungeons(ex).map((d) => {
     const open = cardUnlocked(ex, d.id);
-    const note = !open ? 'この迷宮のボスを DRPGモードで倒すと解放' : CARD_MODE_READY ? 'カードを左右に振って一気に進む' : '準備中';
+    const c = CARD_DUNGEONS[d.id];
+    const note = !open ? 'この迷宮のボスを DRPGモードで倒すと解放' : `カードを左右に振って進む。${c.floors}階×${c.perFloor}枚＋ボス`;
     return `<div class="depart">
       <h3>${esc(d.name)} <small class="sub">${d.floors.length}階</small></h3>
       <div class="depart-modes">
         <button data-t="enter" data-id="${d.id}" class="mode" ${can ? '' : 'disabled'}><b>DRPGモード</b><small>歩いて地図を埋める。経験値・お金・楽譜 ×${DRPG_BONUS}</small></button>
-        <button data-t="enterCard" data-id="${d.id}" class="mode" ${can && open && CARD_MODE_READY ? '' : 'disabled'}><b>カードモード${open ? '' : '（未解放）'}</b><small>${note}</small></button>
+        <button data-t="enterCard" data-id="${d.id}" class="mode" ${can && open ? '' : 'disabled'}><b>カードモード${open ? '' : '（未解放）'}</b><small>${note}</small></button>
       </div>
     </div>`;
   }).join('');
@@ -183,7 +186,7 @@ export function townAction(ex, el, rng = Math.random) {
   if (d.equip) return { msgs: equip(ex, d.equip, el.value ? Number(el.value) : null) };
   switch (d.t) {
     case 'enter': return { msgs: enterDungeon(ex, d.id) };
-    case 'enterCard': return { msgs: enterDungeon(ex, d.id, 'card') };
+    case 'enterCard': return { msgs: enterCardMode(ex, d.id, rng) };
     case 'appraiseAll': return { msgs: appraiseAll(ex) };
     case 'change': confirm = { kind: 'change', cls: d.cls }; return { msgs: [] };
     case 'promote': confirm = { kind: 'promote', cls: d.cls, item: d.item }; return { msgs: [] };

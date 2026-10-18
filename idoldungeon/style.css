@@ -54,12 +54,12 @@ button { font-family: inherit; }
 .row > button, .row > .btn { flex: 1; }
 
 /* ボタン（金の縁の黒い札） */
-.btn, .row button, .modal button, .pad button, .info button, .town-panel button, .town-panel .btn, .tv-row select, .town-panel textarea {
+.btn, .row button, .modal button, .pad button, .info button, .town-panel button, .town-panel .btn, .tv-row select, .town-panel textarea, .cm button {
   font: inherit; color: var(--ink); text-decoration: none; cursor: pointer; touch-action: manipulation;
   background: linear-gradient(180deg, #3a2618, #1e130b); border: 1px solid var(--gold-lo); border-radius: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 230, 180, .12); padding: 8px 10px; text-align: center; display: inline-block;
 }
-.btn:hover, .row button:hover, .modal button:hover, .pad button:hover, .town-panel button:not(:disabled):hover { border-color: var(--gold-hi); color: var(--gold-hi); }
+.btn:hover, .row button:hover, .modal button:hover, .pad button:hover, .town-panel button:not(:disabled):hover, .cm button:hover { border-color: var(--gold-hi); color: var(--gold-hi); }
 button:disabled { opacity: .4; cursor: default; }
 button small, .btn small { display: block; color: var(--sub); font-size: .72rem; }
 
@@ -266,6 +266,57 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 .mode:disabled b { color: var(--sub); }
 button { touch-action: manipulation; }
 
+/* ── カードモード（Reigns 型・テキストだけ）：上に HP のゲージ、まん中にカード、下に左右の答え ── */
+.cards-layer { position: absolute; inset: 0 0 30% 0; z-index: 2; }
+.screen[data-mode="card"] #view, .screen[data-mode="card"] .hud-loc { display: none; }
+body[data-play="card"] #view { visibility: hidden; }
+body[data-play="card"] .screen { background: radial-gradient(circle at 50% 38%, #2e1e12, #0d0907 72%); }
+.cm { height: 100%; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px; padding: 10px 14px 8px; }
+.cm-top { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; justify-content: space-between; }
+.cm-hp { display: flex; align-items: center; gap: 8px; font-family: var(--sans); }
+.cm-hp > span { color: var(--gold-hi); font-weight: 700; font-size: .85rem; }
+.cm-hp b { font: 800 1.15rem var(--sans); color: #fff; min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.cm-bar { position: relative; width: clamp(120px, 30vw, 220px); height: 12px; background: #000; border: 1px solid var(--gold-lo); }
+.cm-bar i { display: block; height: 100%; background: linear-gradient(180deg, #8ff7ec, var(--hp)); transition: width .3s; }
+.cm-bar i.low { background: linear-gradient(180deg, #ffb39a, var(--hp-low)); }
+.cm-dot { position: absolute; right: -2px; top: -16px; width: 0; height: 0; border-radius: 50%; background: #fff1c4; box-shadow: 0 0 8px rgba(255, 241, 196, .8); transition: width .12s, height .12s; transform: translate(50%, 0); }
+.cm-dot[data-size="1"] { width: 8px; height: 8px; top: -12px; }
+.cm-dot[data-size="2"] { width: 14px; height: 14px; top: -18px; }
+.cm-where { font-weight: 700; letter-spacing: .06em; text-shadow: 0 1px 3px #000; }
+.cm-where small { margin-left: 10px; font: 700 .85rem var(--sans); color: var(--gold-hi); }
+.cm-where em { display: block; font-style: normal; font-size: .78rem; color: var(--bad); text-align: right; }
+.cm-stage { display: grid; place-items: center; min-height: 0; }
+.ccard { position: relative; box-sizing: border-box; width: min(360px, 88%); min-height: min(240px, 100%); max-height: 100%; overflow: hidden; padding: 16px 20px 18px; display: grid; align-content: center; gap: 10px;
+  background: linear-gradient(180deg, #3a2716, #22160c); border: 3px solid var(--gold); border-radius: 14px; box-shadow: inset 0 0 0 1px #000, inset 0 0 24px rgba(0, 0, 0, .55), 0 14px 30px rgba(0, 0, 0, .7);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; transition: transform .2s ease-out; }
+.ccard.dragging { transition: none; cursor: grabbing; }
+.ccard:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+.cc-tag { display: flex; justify-content: space-between; gap: 8px; font: 700 .78rem var(--sans); color: var(--gold); letter-spacing: .1em; border-bottom: 1px solid var(--gold-lo); padding-bottom: 4px; }
+.cc-tag span { color: var(--gold-hi); font-family: var(--serif); font-size: .95rem; letter-spacing: .04em; }
+.cc-text { margin: 0; font-size: clamp(1.02rem, 2.6vw, 1.25rem); line-height: 1.75; text-align: center; text-shadow: 0 1px 2px #000; }
+.kind-enemy, .kind-guardian, .kind-boss { border-color: #c9604a; }
+.kind-boss .cc-text { font-weight: 700; }
+.cc-label { position: absolute; left: 0; right: 0; top: 0; padding: 10px 16px 22px; font: 800 1.2rem var(--serif); color: #fff1c4; background: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0)); pointer-events: none; opacity: 0; transition: opacity .1s; }
+.cc-label:not(:empty) { opacity: 1; }
+.cc-label[data-dir="right"] { text-align: right; }
+.cc-label[data-dir="up"], .cc-label[data-dir="down"] { text-align: center; }
+.cm-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cm-choices button { min-height: 52px; font-size: 1rem; padding: 6px 10px; }
+.cm-choices [data-swipe="left"] { text-align: left; }
+.cm-choices [data-swipe="right"] { text-align: right; }
+.cm-choices button.hot, .cmd4 button.hot { border-color: var(--gold-hi); color: var(--gold-hi); box-shadow: 0 0 10px rgba(242, 217, 142, .5); }
+.cm-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .85rem; color: var(--sub); }
+.cm-foot span { flex: 1 1 160px; }
+.cm-foot button { padding: 6px 12px; font-size: .85rem; }
+.cm-foot button small { display: block; font-size: .7rem; color: var(--sub); }
+/* 戦闘のコマンドカード */
+.cmd-card { display: grid; gap: 6px; }
+.ccard.small { width: 100%; min-height: 0; padding: 10px 12px; gap: 6px; }
+.ccard.small .cc-text { font-size: 1rem; line-height: 1.5; }
+.ccard.small .cc-text small { font: .75rem var(--sans); color: var(--sub); }
+.cmd4 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cmd4 .vbar { font-size: .88rem; }
+
 /* ── スマホ（DRPGモード）：エルミナージュ2 DS Remix の上下2画面を縦に積む「DS二画面型」（docs/DESIGN.md 17.2） ──
    画面の高さに合わせ、ページはスクロールさせない。部品はすべて .game の格子に並べ直す（.screen などは display: contents）
    上：迷宮の絵（場所・方角・メッセージを重ねる）／中：6人の帯／下：地図と持ち物、その下に操作ボタン（親指の届く範囲） */
@@ -324,6 +375,16 @@ button { touch-action: manipulation; }
     padding: 8px 8px 12px; background: #120c08; border-top: 2px solid var(--gold); }
   .town-menu .vbar { clip-path: none; text-align: center; padding: 12px 2px; min-height: 48px; border-radius: 4px; font-size: .9rem; }
   .tv-row select { flex: 1 1 140px; }
+
+  /* カードモード：上にメッセージと6人、残りをカード */
+  body[data-mode="card"] .game { grid-template-areas: "log log" "party party" "cards cards" "cards cards"; }
+  body[data-mode="card"] #view, body[data-mode="card"] .hud-loc, body[data-mode="card"] .info { display: none; }
+  body[data-mode="card"] #log { grid-area: log; align-self: stretch; margin: 8px 8px 0; min-height: 3.2em; }
+  body[data-mode="card"] #log > div:nth-last-child(n+3) { display: none; }
+  .cards-layer { grid-area: cards; position: relative; inset: auto; min-height: 0; }
+  .cm { padding: 8px 10px 12px; }
+  .ccard { width: 100%; }
+  .cm-choices button { min-height: 56px; }
 }
 
 /* ── パーティ編成の試し場（party.html） ── */
