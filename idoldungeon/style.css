@@ -54,12 +54,12 @@ button { font-family: inherit; }
 .row > button, .row > .btn { flex: 1; }
 
 /* ボタン（金の縁の黒い札） */
-.btn, .row button, .modal button, .pad button, .info button, .town-panel button, .town-panel .btn, .tv-row select, .town-panel textarea {
+.btn, .row button, .modal button, .pad button, .info button, .town-panel button, .town-panel .btn, .tv-row select, .town-panel textarea, .cm button {
   font: inherit; color: var(--ink); text-decoration: none; cursor: pointer; touch-action: manipulation;
   background: linear-gradient(180deg, #3a2618, #1e130b); border: 1px solid var(--gold-lo); border-radius: 4px;
   box-shadow: inset 0 1px 0 rgba(255, 230, 180, .12); padding: 8px 10px; text-align: center; display: inline-block;
 }
-.btn:hover, .row button:hover, .modal button:hover, .pad button:hover, .town-panel button:not(:disabled):hover { border-color: var(--gold-hi); color: var(--gold-hi); }
+.btn:hover, .row button:hover, .modal button:hover, .pad button:hover, .town-panel button:not(:disabled):hover, .cm button:hover { border-color: var(--gold-hi); color: var(--gold-hi); }
 button:disabled { opacity: .4; cursor: default; }
 button small, .btn small { display: block; color: var(--sub); font-size: .72rem; }
 
@@ -168,13 +168,36 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 /* ── 戦闘（敵は中央に大きく、右上に敵グループの小窓、左上にコマンド） ── */
 .battle-layer { position: absolute; inset: 0; z-index: 2; }
 .foes { position: absolute; left: 22%; right: 22%; top: 12%; bottom: 30%; display: flex; align-items: flex-end; justify-content: center; gap: 4%; }
-.foe { text-align: center; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .8)); animation: foe-in .35s ease-out; }
+.foe { position: relative; text-align: center; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .8)); }
+.foes.first .foe { animation: foe-in .35s ease-out; }
 .foe-art { display: flex; justify-content: center; font-size: clamp(2.2rem, 8vw, 5rem); line-height: 1; }
 .foe-art span:nth-child(2) { transform: translateY(-10%) scale(.9); }
 .foe-art span:nth-child(3) { transform: translateY(-18%) scale(.82); }
 .foe.boss .foe-art { font-size: clamp(3.4rem, 13vw, 8rem); }
 .foe-name { margin-top: 4px; font-size: clamp(.7rem, 1.8vw, .95rem); text-shadow: 0 0 4px #000, 0 1px 2px #000; }
 .foe-name em { font-style: normal; color: var(--bad); font-size: .85em; }
+/* ターンの再生：行動している敵は赤く光って前へ、当たった敵は揺れる、倒れたグループは消えていく */
+.foe.acting .foe-art { filter: drop-shadow(0 0 12px rgba(255, 90, 60, .95)); animation: foe-lunge .45s ease-out; }
+.foe.hit .foe-art { animation: foe-hit .35s linear; }
+.foe.dying { animation: foe-out .8s ease-in forwards; }
+@keyframes foe-lunge { 40% { transform: translateY(6%) scale(1.12); } }
+@keyframes foe-hit { 20% { transform: translateX(-6%); filter: brightness(2.2); } 50% { transform: translateX(5%); } 80% { transform: translateX(-2%); } }
+@keyframes foe-out { to { opacity: 0; transform: scale(.85); filter: grayscale(1); } }
+.pop { position: absolute; left: 50%; top: 22%; z-index: 4; pointer-events: none; white-space: nowrap; transform: translateX(-50%);
+  font: 800 clamp(1.1rem, 3.8vw, 2.1rem)/1 var(--sans); color: #fff; text-shadow: 0 0 4px #000, 0 2px 0 #8a1c10, 0 0 10px rgba(255, 80, 40, .8); animation: pop .9s ease-out both; }
+.pop.heal { color: #b6ffd0; text-shadow: 0 0 4px #000, 0 2px 0 #0d5a30, 0 0 10px rgba(60, 220, 120, .7); }
+.pop.miss { color: #e8e0d0; font-size: clamp(.8rem, 2.4vw, 1.15rem); text-shadow: 0 0 4px #000, 0 1px 2px #000; }
+.foe .pop { top: 10%; font-size: clamp(1.4rem, 5vw, 2.8rem); }
+@keyframes pop { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.7); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.2); } 100% { opacity: 1; transform: translate(-50%, -12px) scale(1); } }
+.pt.acting { box-shadow: 0 0 0 2px #fff6d8, 0 0 16px rgba(255, 246, 216, .75); transform: translateY(-5px); transition: transform .15s; z-index: 1; }
+.pt.hit .pt-face { animation: pt-hit .35s linear; }
+@keyframes pt-hit { 20% { transform: translateX(-4px); filter: brightness(1.8) sepia(1) hue-rotate(-40deg); } 50% { transform: translateX(3px); } }
+.cmdwin .order { display: flex; flex-wrap: wrap; gap: 3px; padding: 2px 0 4px; }
+.oc { padding: 1px 6px; font-size: clamp(.68rem, 1.6vw, .85rem); line-height: 1.5; background: rgba(12, 8, 6, .85); border: 1px solid var(--gold-lo); border-left: 3px solid var(--c, #c43a2a); text-shadow: 0 1px 2px #000; }
+.oc.e { padding: 0 4px; }
+.oc.done { opacity: .35; }
+.oc.now { background: var(--gold-hi); color: #1a0f08; font-weight: 700; text-shadow: none; box-shadow: 0 0 8px rgba(242, 217, 142, .7); }
+@media (prefers-reduced-motion: reduce) { .foe.acting .foe-art, .foe.hit .foe-art, .pt.hit .pt-face, .pop { animation: none; } }
 @keyframes foe-in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
 .groupbox { position: absolute; top: 44px; right: 10px; min-width: 24%; padding: 4px 8px; font-size: clamp(.65rem, 1.6vw, .85rem);
   background: rgba(12, 8, 6, .82); border: 1px solid var(--gold); box-shadow: 0 0 0 1px #000; }
@@ -234,24 +257,134 @@ button small, .btn small { display: block; color: var(--sub); font-size: .72rem;
 .map-box canvas { width: 100%; height: auto; aspect-ratio: 1; display: block; border: 1px solid var(--gold-lo); }
 .map-box .coord { margin: 6px 0; font-family: var(--sans); color: var(--gold-hi); }
 
-/* スマホなど狭い画面：重ねていた部品を絵の下に並べる */
+/* 出発：迷宮とモードを選ぶ */
+.depart { margin-bottom: 10px; }
+.depart-modes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.town-panel .mode { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 8px 12px; text-align: left; }
+.mode b { font-family: var(--serif); font-size: 1.05rem; color: var(--gold-hi); }
+.mode small { color: var(--sub); font-size: .78rem; }
+.mode:disabled b { color: var(--sub); }
+button { touch-action: manipulation; }
+
+/* ── カードモード（Reigns 型・テキストだけ）：上に HP のゲージ、まん中にカード、下に左右の答え ── */
+.cards-layer { position: absolute; inset: 0 0 30% 0; z-index: 2; }
+.screen[data-mode="card"] #view, .screen[data-mode="card"] .hud-loc { display: none; }
+body[data-play="card"] #view { visibility: hidden; }
+body[data-play="card"] .screen { background: radial-gradient(circle at 50% 38%, #2e1e12, #0d0907 72%); }
+.cm { height: 100%; box-sizing: border-box; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 8px; padding: 10px 14px 8px; }
+.cm-top { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; justify-content: space-between; }
+.cm-hp { display: flex; align-items: center; gap: 8px; font-family: var(--sans); }
+.cm-hp > span { color: var(--gold-hi); font-weight: 700; font-size: .85rem; }
+.cm-hp b { font: 800 1.15rem var(--sans); color: #fff; min-width: 3.2em; font-variant-numeric: tabular-nums; }
+.cm-bar { position: relative; width: clamp(120px, 30vw, 220px); height: 12px; background: #000; border: 1px solid var(--gold-lo); }
+.cm-bar i { display: block; height: 100%; background: linear-gradient(180deg, #8ff7ec, var(--hp)); transition: width .3s; }
+.cm-bar i.low { background: linear-gradient(180deg, #ffb39a, var(--hp-low)); }
+.cm-dot { position: absolute; right: -2px; top: -16px; width: 0; height: 0; border-radius: 50%; background: #fff1c4; box-shadow: 0 0 8px rgba(255, 241, 196, .8); transition: width .12s, height .12s; transform: translate(50%, 0); }
+.cm-dot[data-size="1"] { width: 8px; height: 8px; top: -12px; }
+.cm-dot[data-size="2"] { width: 14px; height: 14px; top: -18px; }
+.cm-where { font-weight: 700; letter-spacing: .06em; text-shadow: 0 1px 3px #000; }
+.cm-where small { margin-left: 10px; font: 700 .85rem var(--sans); color: var(--gold-hi); }
+.cm-where em { display: block; font-style: normal; font-size: .78rem; color: var(--bad); text-align: right; }
+.cm-stage { display: grid; place-items: center; min-height: 0; }
+.ccard { position: relative; box-sizing: border-box; width: min(360px, 88%); min-height: min(240px, 100%); max-height: 100%; overflow: hidden; padding: 16px 20px 18px; display: grid; align-content: center; gap: 10px;
+  background: linear-gradient(180deg, #3a2716, #22160c); border: 3px solid var(--gold); border-radius: 14px; box-shadow: inset 0 0 0 1px #000, inset 0 0 24px rgba(0, 0, 0, .55), 0 14px 30px rgba(0, 0, 0, .7);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; transition: transform .2s ease-out; }
+.ccard.dragging { transition: none; cursor: grabbing; }
+.ccard:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+.cc-tag { display: flex; justify-content: space-between; gap: 8px; font: 700 .78rem var(--sans); color: var(--gold); letter-spacing: .1em; border-bottom: 1px solid var(--gold-lo); padding-bottom: 4px; }
+.cc-tag span { color: var(--gold-hi); font-family: var(--serif); font-size: .95rem; letter-spacing: .04em; }
+.cc-text { margin: 0; font-size: clamp(1.02rem, 2.6vw, 1.25rem); line-height: 1.75; text-align: center; text-shadow: 0 1px 2px #000; }
+.kind-enemy, .kind-guardian, .kind-boss { border-color: #c9604a; }
+.kind-boss .cc-text { font-weight: 700; }
+.cc-label { position: absolute; left: 0; right: 0; top: 0; padding: 10px 16px 22px; font: 800 1.2rem var(--serif); color: #fff1c4; background: linear-gradient(180deg, rgba(0, 0, 0, .9), rgba(0, 0, 0, 0)); pointer-events: none; opacity: 0; transition: opacity .1s; }
+.cc-label:not(:empty) { opacity: 1; }
+.cc-label[data-dir="right"] { text-align: right; }
+.cc-label[data-dir="up"], .cc-label[data-dir="down"] { text-align: center; }
+.cm-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cm-choices button { min-height: 52px; font-size: 1rem; padding: 6px 10px; }
+.cm-choices [data-swipe="left"] { text-align: left; }
+.cm-choices [data-swipe="right"] { text-align: right; }
+.cm-choices button.hot, .cmd4 button.hot { border-color: var(--gold-hi); color: var(--gold-hi); box-shadow: 0 0 10px rgba(242, 217, 142, .5); }
+.cm-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .85rem; color: var(--sub); }
+.cm-foot span { flex: 1 1 160px; }
+.cm-foot button { padding: 6px 12px; font-size: .85rem; }
+.cm-foot button small { display: block; font-size: .7rem; color: var(--sub); }
+/* 戦闘のコマンドカード */
+.cmd-card { display: grid; gap: 6px; }
+.ccard.small { width: 100%; min-height: 0; padding: 10px 12px; gap: 6px; }
+.ccard.small .cc-text { font-size: 1rem; line-height: 1.5; }
+.ccard.small .cc-text small { font: .75rem var(--sans); color: var(--sub); }
+.cmd4 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cmd4 .vbar { font-size: .88rem; }
+
+/* ── スマホ（DRPGモード）：エルミナージュ2 DS Remix の上下2画面を縦に積む「DS二画面型」（docs/DESIGN.md 17.2） ──
+   画面の高さに合わせ、ページはスクロールさせない。部品はすべて .game の格子に並べ直す（.screen などは display: contents）
+   上：迷宮の絵（場所・方角・メッセージを重ねる）／中：6人の帯／下：地図と持ち物、その下に操作ボタン（親指の届く範囲） */
 @media (max-width: 700px) {
-  .screen { aspect-ratio: auto; overflow: visible; border: 0; box-shadow: none; background: none; display: grid; gap: 8px; }
-  #view { position: relative; aspect-ratio: 16 / 9; height: auto; border: 2px solid var(--gold); }
-  .screen[data-mode="town"] .town-layer, .screen[data-mode="battle"] .battle-layer { position: relative; }
-  .partybar { position: relative; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0; }
-  .pt { aspect-ratio: 1.5 / 1; }
-  .hud-loc { top: 6px; right: 8px; }
-  .hud-map { width: 28%; }
-  .hud-compass { left: calc(28% + 14px); }
-  .battle-layer { display: grid; gap: 6px; }
-  .battle-layer .foes { position: relative; inset: auto; min-height: 120px; padding: 10px; background: linear-gradient(180deg, #1a120c, #0a0604); border: 2px solid var(--gold); }
-  .groupbox, .cmdwin { position: relative; inset: auto; width: auto; max-height: none; top: auto; right: auto; left: auto; }
-  .town-layer { display: grid; gap: 8px; }
-  .town-layer .scene { position: relative; height: 150px; border: 2px solid var(--gold); }
-  .town-menu { position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
-  .town-menu .vmenu-sep { grid-column: 1 / -1; }
-  .town-panel { position: relative; inset: auto; width: auto; max-height: none; }
+  body.explore { overflow: hidden; }
+  .game {
+    height: 100dvh; max-width: none; margin: 0; gap: 0; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "view view" "party party" "map info" "pad pad";
+  }
+  body[data-mode="battle"] .game { grid-template-areas: "view view" "party party" "cmd cmd" "cmd cmd"; }
+  body[data-mode="town"] .game { grid-template-areas: "view view" "panel panel" "panel panel" "menu menu"; }
+  .screen, .under, .battle-layer, .town-layer { display: contents; }
+
+  /* 上：迷宮の絵と、その上に重ねるもの */
+  #view { grid-area: view; position: relative; width: 100%; height: clamp(180px, 31dvh, 290px); border-bottom: 2px solid var(--gold); }
+  body[data-mode="battle"] #view { height: clamp(220px, 36dvh, 330px); }
+  .town-layer .scene { grid-area: view; position: relative; height: clamp(150px, 25dvh, 230px); border-bottom: 2px solid var(--gold); }
+  .hud-loc { grid-area: view; position: relative; top: auto; right: auto; align-self: start; justify-self: end; margin: 8px 10px 0 0; }
+  .hud-compass { grid-area: view; position: relative; top: auto; left: auto; align-self: start; justify-self: start; margin: 8px 0 0 8px; }
+  #log { grid-area: view; align-self: end; z-index: 3; min-height: 0; margin: 0 8px 8px; padding: 6px 10px; font-size: .9rem; line-height: 1.5;
+    background: rgba(14, 9, 6, .88); border-width: 1px; box-shadow: none; }
+  body[data-mode="dungeon"] #log > div:nth-last-child(n+3) { display: none; }
+  body[data-mode="battle"] #log > div:nth-last-child(n+4) { display: none; }
+  body[data-mode="town"] #log > div:nth-child(n+4) { display: none; }
+  body[data-mode="town"] #log { margin-top: 26px; }
+
+  /* 中：6人の帯 */
+  .partybar { grid-area: party; position: relative; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; padding: 6px; background: #140e0a; border-bottom: 1px solid var(--gold-lo); }
+  body[data-mode="town"] .partybar { display: none; }
+  .pt { aspect-ratio: 1 / 1.22; }
+  .pt-name { font-size: .68rem; }
+  .pt-hp { font-size: 1.05rem; }
+
+  /* 下：地図と持ち物、操作ボタン */
+  .hud-map { grid-area: map; position: relative; top: auto; left: auto; width: auto; height: calc(100% - 16px); max-width: 54vw; aspect-ratio: 1; margin: 8px; align-self: center; justify-self: start; }
+  .info { grid-area: info; margin: 8px 8px 8px 0; padding: 8px 10px; overflow-y: auto; align-content: start; min-height: 0; }
+  .info .row { display: grid; gap: 6px; }
+  body[data-mode="battle"] .info, body[data-mode="town"] .info { display: none; }
+  .pad { grid-area: pad; max-width: none; gap: 6px; padding: 8px 8px 12px; background: linear-gradient(180deg, #24170d, #140e0a); border-top: 1px solid var(--gold-lo); }
+  .pad button { min-height: 50px; padding: 6px; }
+  .pad .wide { grid-column: span 3; }
+
+  /* 戦闘：敵とグループの一覧は絵の上、コマンドは下に2列の大きなボタン */
+  .battle-layer .foes { grid-area: view; position: relative; inset: auto; align-self: center; z-index: 2; padding: 0 8px 40px; }
+  .groupbox { grid-area: view; position: relative; top: auto; right: auto; align-self: start; justify-self: end; z-index: 3; margin: 40px 8px 0 0; }
+  .cmdwin { grid-area: cmd; position: relative; top: auto; left: auto; width: auto; max-height: none; min-height: 0; overflow-y: auto;
+    padding: 10px 10px 14px; gap: 8px; align-content: end; background: linear-gradient(180deg, #2a1c12, #170f0a); }
+  .cmdwin .vmenu:not(.minor-row) { grid-template-columns: 1fr 1fr; }
+  .cmdwin .vbar { min-height: 50px; font-size: 1rem; }
+  .cmdwin .order { grid-column: 1 / -1; }
+
+  /* 街：施設の中身だけスクロール、施設のボタンは下に固定 */
+  .town-panel { grid-area: panel; position: relative; inset: auto; width: auto; max-height: none; min-height: 0; margin: 8px; }
+  .town-menu { grid-area: menu; position: relative; top: auto; left: auto; width: auto; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px;
+    padding: 8px 8px 12px; background: #120c08; border-top: 2px solid var(--gold); }
+  .town-menu .vbar { clip-path: none; text-align: center; padding: 12px 2px; min-height: 48px; border-radius: 4px; font-size: .9rem; }
+  .tv-row select { flex: 1 1 140px; }
+
+  /* カードモード：上にメッセージと6人、残りをカード */
+  body[data-mode="card"] .game { grid-template-areas: "log log" "party party" "cards cards" "cards cards"; }
+  body[data-mode="card"] #view, body[data-mode="card"] .hud-loc, body[data-mode="card"] .info { display: none; }
+  body[data-mode="card"] #log { grid-area: log; align-self: stretch; margin: 8px 8px 0; min-height: 3.2em; }
+  body[data-mode="card"] #log > div:nth-last-child(n+3) { display: none; }
+  .cards-layer { grid-area: cards; position: relative; inset: auto; min-height: 0; }
+  .cm { padding: 8px 10px 12px; }
+  .ccard { width: 100%; }
+  .cm-choices button { min-height: 56px; }
 }
 
 /* ── パーティ編成の試し場（party.html） ── */

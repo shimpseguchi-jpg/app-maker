@@ -13,6 +13,7 @@ import { spellPool } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { SONGS } from '../data/songs.js';
 import { DOWN, isWiped } from './revive.js';
+import { CARD_PROMO_RATE } from '../data/cards.js';
 
 // 最初に持っている楽譜（鑑定済み）
 export const STARTER_SONGS = ['ready', 'ohayo'];
@@ -27,12 +28,22 @@ export function newExpedition(slots, dungeonId = 'd1') {
 // 古いセーブにも新しい項目をそろえる
 export function normalize(ex) {
   for (const [k, v] of Object.entries({ units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {}, items: [], bought: 0,
-    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0 })) {
+    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0, play: 'drpg', card: null })) {
     if (ex[k] == null) ex[k] = structuredClone(v);
   }
   ex.slots = ex.slots.map((s) => ({ idol: s.idol }));
   return ex;
 }
+
+// ── 2つのモード（docs/DESIGN.md 17章）。DRPGモード＝歩いて地図を埋める、カードモード＝Reigns 型 ──
+// 報酬は DRPGモードがカードモードの 1.5倍。調整済みの今の数値を DRPG の値とし、カードモードは 2/3 にする
+export const PLAY_MODES = { drpg: { name: 'DRPGモード', reward: 1 }, card: { name: 'カードモード', reward: 2 / 3 } };
+export const DRPG_BONUS = 1.5;
+export const rewardRate = (ex) => PLAY_MODES[ex.play]?.reward ?? 1;
+export const dungeonBoss = (dungeonId) => DUNGEONS[dungeonId].floors.flatMap((f) => f.specials || []).find((sp) => sp.type === 'boss')?.boss;
+const bossBeaten = (ex, bossId) => (ex.ex.bossClears[bossId] || 0) > 0 || ex.ex.trip[bossId] === 'boss';
+// カードモードは迷宮ごとに、その迷宮のボスを DRPGモードで倒すと解放
+export const cardUnlocked = (ex, dungeonId) => bossBeaten(ex, dungeonBoss(dungeonId));
 
 // ── 楽譜（楽曲の装備品）。未鑑定のうちは曲名が分からず、装備できない ──
 export function addScore(ex, songId, known = false) {
@@ -124,13 +135,13 @@ export function move(ex, action, rng = Math.random) {
   return { msgs, pending };
 }
 
-function damage(ex, m, dmg, msgs) {
+export function damage(ex, m, dmg, msgs) {
   ex.hp[m.id] = Math.max(0, ex.hp[m.id] - dmg);
   msgs.push(`${m.idol.name}に${dmg}のダメージ`);
   if (ex.hp[m.id] === 0) { ex.cond[m.id] = 'dead'; msgs.push(`${m.idol.name}は倒れた……`); }
 }
 
-function checkWipe(ex, msgs) {
+export function checkWipe(ex, msgs) {
   const ids = ex.slots.map((s) => s.idol);
   if (!ids.length || !isWiped(ids.map((id) => ex.cond[id]))) return false;
   msgs.push('パーティは全滅した……');
@@ -192,14 +203,16 @@ export function bossGroups(id, clears) {
   return groups;
 }
 
-function rollGroups(spec, rng) {
+export function rollGroups(spec, rng) {
   return spec.map(([enemy, min, max]) => ({ enemy, count: min + Math.floor(rng() * (max - min + 1)) }));
 }
 
-export function startBattle(ex, ev, rng = Math.random) {
+// ev.groups：あらかじめ決めた敵（カードモードの敵カード）。zone：ダークゾーン・呪文禁止（省略時は今いるマスで決める）
+export function startBattle(ex, ev, rng = Math.random, zone = null) {
   const st = ex.ex, fl = getFloor(st.dungeon, st.floor), ch = fl.cellAt(st.x, st.y);
   let groups;
-  if (ev.kind === 'boss') {
+  if (ev.groups) groups = ev.groups;
+  else if (ev.kind === 'boss') {
     const clears = st.bossClears[ev.id] || 0;
     groups = bossGroups(ev.id, clears);
   } else if (ev.kind === 'wander') {
@@ -208,7 +221,7 @@ export function startBattle(ex, ev, rng = Math.random) {
   } else groups = rollGroups(FIXED_GROUPS[ev.id], rng);
   ex.battleEv = ev;
   ex.battle = createBattle(battleParty(ex), groups, {
-    kind: ev.kind, canFlee: ev.kind !== 'boss', zone: { dark: isDark(ch), anti: isAntiMagic(ch) }, rng });
+    kind: ev.kind, canFlee: ev.kind !== 'boss', zone: zone || { dark: isDark(ch), anti: isAntiMagic(ch) }, rng });
   return ex.battle;
 }
 
@@ -239,17 +252,22 @@ export function finishBattle(ex, rng = Math.random) {
   }
   if (b.result === 'win') {
     // 経験値はためておき、宿屋に泊まったときにレベルが上がる（エルミナージュ準拠）
+    // モードで報酬が変わる。DRPGモードではボーナスの内訳を出す
+    const rate = rewardRate(ex);
     const earners = b.party.filter((m) => !m.fled && !DOWN.has(m.cond));
-    const share = earners.length ? Math.floor(b.exp / earners.length) : 0;
-    msgs.push(`経験値 ${share} ずつ、${b.gold}G を手に入れた`);
-    ex.gold += b.gold;
+    const share = earners.length ? Math.floor((b.exp * rate) / earners.length) : 0;
+    const gold = Math.floor(b.gold * rate);
+    const bonus = (n) => n - Math.round(n / DRPG_BONUS);
+    msgs.push(`経験値 ${share} ずつ、${gold}G を手に入れた`);
+    if (ex.play === 'drpg' && share + gold > 0) msgs.push(`（DRPGボーナス：経験値 ＋${bonus(share)}・＋${bonus(gold)}G）`);
+    ex.gold += gold;
     for (const m of earners) unitOf(ex, m.id).exp += share;
     if (ev.kind === 'guardian') {
       ex.ex.trip[ev.id] = 'guardian';
-      const g = 80 + Math.floor(rng() * 40);
+      const g = Math.floor((80 + Math.floor(rng() * 40)) * rate);
       ex.gold += g;
       msgs.push(`宝箱を開けた。${g}G が入っていた`);
-      if (rng() < 0.6) {
+      if (rng() < 0.6 * rate) {
         const sc = addScore(ex, randomSong(Math.min(5, ex.ex.floor + 2), rng));
         msgs.push(`${scoreName(sc)}を見つけた`);
       }
@@ -257,6 +275,9 @@ export function finishBattle(ex, rng = Math.random) {
       const clears = ex.ex.bossClears[ev.id] || 0;
       const d = rollDrops(ev.id, clears, rng);
       ex.ex.trip[ev.id] = 'boss';
+      d.gold = Math.floor(d.gold * rate);
+      // カードモードのボスは、昇格アイテムを落とす確率が低い
+      if (ex.play === 'card') d.items = d.items.filter(() => rng() < CARD_PROMO_RATE);
       ex.gold += d.gold; ex.items.push(...d.items);
       msgs.push(`${BOSSES[ev.id].name}を倒した！ ${d.gold}G を手に入れた`);
       for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
@@ -288,11 +309,15 @@ export function openDungeons(ex) {
   return Object.values(DUNGEONS).filter((d) => !d.unlock || (ex.ex.bossClears[d.unlock] || 0) > 0 || ex.ex.trip[d.unlock] === 'boss');
 }
 
-export function enterDungeon(ex, dungeonId = ex.ex.dungeon) {
+export function enterDungeon(ex, dungeonId = ex.ex.dungeon, play = 'drpg') {
   if (!ex.slots.some((s) => !DOWN.has(ex.cond[s.idol]))) return ['動けるメンバーがいない。酒場でパーティを組もう'];
   if (!openDungeons(ex).some((d) => d.id === dungeonId)) return ['まだその迷宮には行けない'];
+  if (play === 'card' && !cardUnlocked(ex, dungeonId)) return ['カードモードは、この迷宮のボスを DRPGモードで倒すと遊べる'];
   switchDungeon(ex.ex, dungeonId);
-  ex.mode = 'dungeon';
+  // カードモードの札の束は engine/cards.js の enterCardMode が作る
+  ex.mode = play === 'card' ? 'card' : 'dungeon';
+  ex.play = play;
+  if (play === 'card') return [`${DUNGEONS[dungeonId].name}に入った（カードモード）`];
   ex.ex.seen[0] ||= {};
   ex.ex.seen[0][`${ex.ex.x},${ex.ex.y}`] = 1;
   return [`${DUNGEONS[dungeonId].name}に入った`];

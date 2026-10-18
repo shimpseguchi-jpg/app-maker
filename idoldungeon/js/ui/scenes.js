@@ -86,6 +86,16 @@ const SCENES = {
       ${shelf(60, 120, 200, ['#7a2a2a', '#2a3a6a', '#3a6a3a', '#7a5a2a', '#5a3a7a'])}${shelf(540, 120, 200, ['#2a3a6a', '#7a2a2a', '#7a5a2a', '#3a6a3a'])}
       <rect width="800" height="450" fill="url(#glow)"/>`,
   },
+  depart: {
+    name: '舞台袖', speaker: '舞台監督', line: '出番だよ。じっくり歩くか、カードで駆け抜けるか。今日はどっちの舞台にする？',
+    svg: () => `${bg('#2a0a10', '#0a0204')}
+      ${[0, 1, 2, 3].map((i) => `<path d="M${i * 60} 0 q30 30 60 0 v380 q-30 -16 -60 0 Z" fill="${i % 2 ? '#6a1020' : '#5a0c1a'}"/>`).join('')}
+      ${[0, 1, 2, 3].map((i) => `<path d="M${560 + i * 60} 0 q30 30 60 0 v380 q-30 -16 -60 0 Z" fill="${i % 2 ? '#6a1020' : '#5a0c1a'}"/>`).join('')}
+      <path d="M0 0 h800 v46 q-400 30 -800 0 Z" fill="#7a1424"/><path d="M0 40 q400 30 800 0" stroke="#c9a24a" stroke-width="4" fill="none"/>
+      <path d="M330 0 L250 380 h300 L470 0 Z" fill="#fff3c8" opacity=".08"/><ellipse cx="400" cy="380" rx="150" ry="22" fill="#fff3c8" opacity=".14"/>
+      <rect y="380" width="800" height="70" fill="#2a1a10"/><path d="M0 380 h800" stroke="#5a3a1a" stroke-width="4"/>
+      <rect width="800" height="450" fill="url(#glow)"/>${person(660, '#3a2a1a', '<path d="M-38 214 h76 v-10 h-76 Z M-20 204 v-14 h40 v14" fill="#1a1410"/>')}`,
+  },
 };
 
 export function sceneSvg(tab) {

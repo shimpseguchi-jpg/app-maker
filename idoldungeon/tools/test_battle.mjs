@@ -1,7 +1,8 @@
 // 戦闘ルールのテスト
 // node idoldungeon/tools/test_battle.mjs
 import { createBattle, runTurn, reachableGroups, aliveGroups, castable, unitLiveReady, autoCommands, canAct, groupName } from '../js/engine/battle.js';
-import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore } from '../js/engine/expedition.js';
+import { newExpedition, battleParty, startBattle, battleTurn, finishBattle, unitOf, enterDungeon, bossEnemy, bossGroups, addScore,
+  dungeonBoss, cardUnlocked, PLAY_MODES, DRPG_BONUS, syncParty } from '../js/engine/expedition.js';
 import { equip } from '../js/engine/town.js';
 import { ENEMIES, ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { SPELL_LIST, KIND_TARGET } from '../js/data/spells.js';
@@ -141,6 +142,45 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ok(bossGroups('b1', 3).length === 3 && bossEnemy('b1', 1).traits.some((t) => t.id === 'twoActions'), '再戦で取り巻き・連続行動');
 }
 
+// ── 行動順（素早さ＋0〜10 の乱数。毎ターン決め直す）と、1人ずつの記録 ──
+{
+  const firstSide = (spd, seed) => {
+    const rng = seeded(seed);
+    const b = noSurprise(createBattle(partyOf('makoto'), [{ enemy: dummy({ spd, hit: 0 }), count: 1 }], { rng }));
+    runTurn(b, [{ type: 'attack', group: 0 }], rng);
+    return b.order[0].side;
+  };
+  const spd = partyOf('makoto')[0].stats.spd;
+  const seeds = Array.from({ length: 40 }, (_, i) => i + 1);
+  ok(seeds.every((s) => firstSide(spd - 11, s) === 'p'), '素早さが10以上高ければ必ず先に動く');
+  ok(seeds.every((s) => firstSide(spd + 11, s) === 'e'), '素早さが10以上低ければ必ずあとに動く');
+  const mixed = seeds.map((s) => firstSide(spd, s));
+  ok(mixed.includes('p') && mixed.includes('e'), '素早さが同じなら運で入れ替わる');
+
+  const rng = seeded(5);
+  const b = noSurprise(createBattle(partyOf('makoto', 'hibiki'), [{ enemy: dummy({ hp: 1, eva: 0 }), count: 2 }], { rng }));
+  runTurn(b, [{ type: 'attack', group: 0 }, { type: 'defend' }], rng);
+  ok(b.order.length === 3 && b.order.filter((o) => o.side === 'p').length === 1, '行動順：守る人は並ばない（ターンの最初から効く）');
+  const st = b.steps.find((x) => b.order[x.k]?.side === 'p');
+  ok(st && st.hits.some((h) => h.side === 'e' && h.dmg > 0) && st.foes[0].some((hp) => hp === 0), '1人ずつの記録：当たったダメージと、その時点の敵の HP');
+  const lines = b.log.slice(st.from, st.to);
+  const atk = lines.findIndex((l) => l.includes('の攻撃！')), kill = lines.findIndex((l) => l.includes('倒した'));
+  ok(atk >= 0 && kill > atk, '「倒した」は攻撃の結果のあとに出る');
+  ok(!('hits' in b), '途中の作業用の値は残さない');
+
+  // 先制・不意打ち：パーティが速いほど先制しやすい
+  const rate = (espd) => {
+    let party = 0, enemy = 0;
+    for (let i = 0; i < 400; i++) {
+      const s = createBattle(partyOf('makoto'), [{ enemy: dummy({ spd: espd }), count: 1 }], { rng: seeded(100 + i) }).surprise;
+      party += s === 'party'; enemy += s === 'enemy';
+    }
+    return { party, enemy };
+  };
+  const slow = rate(1), fast = rate(99);
+  ok(slow.party > fast.party && slow.enemy < fast.enemy, '素早さの差で先制・不意打ちの起こりやすさが変わる');
+}
+
 // ── 経験値とレベルアップ ──
 {
   const u = { level: 1, exp: 0, base: { pow: 10, vo: 10, men: 10, sta: 10, dan: 10, vis: 10 } };
@@ -170,6 +210,32 @@ for (const s of Object.values(SONGS)) if (s.live) ok(KIND_TARGET[s.live.kind], `
   ex.battle.result = 'flee';
   finishBattle(ex);
   ok(ex.ex.x === 4 && !ex.ex.trip.g1a, 'ルームガーダーから逃げると部屋の外へ戻る');
+}
+
+// ── 2つのモード：カードモードの解放と、DRPGボーナス（報酬はカードモードの1.5倍） ──
+{
+  const ex = newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }]);
+  ok(dungeonBoss('d1') === 'b1' && dungeonBoss('d2') === 'b2', '迷宮のボス');
+  ok(!cardUnlocked(ex, 'd1') && enterDungeon(ex, 'd1', 'card')[0].includes('DRPGモードで倒す') && ex.mode === 'town', 'カードモードはボスを倒すまで入れない');
+  ex.ex.trip.b1 = 'boss';
+  ok(cardUnlocked(ex, 'd1') && !cardUnlocked(ex, 'd2'), 'ボスを倒した迷宮だけカードモードが解放される');
+  ok(enterDungeon(ex, 'd1')[0].includes('入った') && ex.play === 'drpg', 'ふつうに入ると DRPGモード');
+  const fight = (play) => {
+    ex.play = play;
+    ex.hp = {}; ex.cond = {}; syncParty(ex); // 全員元気な状態で比べる
+    startBattle(ex, { kind: 'wander' }, seeded(21));
+    const rng = seeded(22);
+    while (!ex.battle.result) battleTurn(ex, autoCommands(ex.battle), rng);
+    const { exp, gold } = ex.battle;
+    const before = { exp: unitOf(ex, 'makoto').exp, gold: ex.gold };
+    const r = finishBattle(ex, seeded(23));
+    return { exp, gold, got: unitOf(ex, 'makoto').exp - before.exp, money: ex.gold - before.gold, msgs: r.msgs };
+  };
+  const d = fight('drpg');
+  ok(d.money === d.gold && d.got === Math.floor(d.exp / 3) && d.msgs.some((m) => m.includes('DRPGボーナス')), `DRPGモードは今までどおりの報酬で、ボーナスの内訳が出る（${d.msgs.join(' / ')}）`);
+  const c = fight('card');
+  ok(c.money === Math.floor(c.gold * 2 / 3) && c.got === Math.floor((c.exp * 2 / 3) / 3) && !c.msgs.some((m) => m.includes('ボーナス')), 'カードモードの報酬は DRPGモードの 2/3');
+  ok(Math.abs(PLAY_MODES.drpg.reward / PLAY_MODES.card.reward - DRPG_BONUS) < 1e-9, 'DRPGボーナスは1.5倍');
 }
 
 // ── 同じ乱数なら同じ結果 ──

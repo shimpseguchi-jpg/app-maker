@@ -36,5 +36,7 @@ node idoldungeon/tools/test_battle.mjs    # 戦闘ルール（射程・逃げる
 node idoldungeon/tools/test_town.mjs      # 街（酒場・宿屋・商店・寺院・訓練所・城・記録）と全滅・死体回収
 node idoldungeon/tools/sim_battle.mjs     # 自動対戦で全滅率を測る（バランス調整用）
 node idoldungeon/tools/sim_play.mjs       # Lv1 から最後のボスまで自動で遊び、かかった戦闘・全滅・レベルを出す
-node idoldungeon/tools/e2e_explore.mjs    # ブラウザで2つの迷宮をボスまで通しで遊ぶ（Playwright と http-server が必要）
+node idoldungeon/tools/test_cards.mjs     # カードモード（札の束・各カード・帰還・全滅と死体カード・ボス）
+node idoldungeon/tools/sim_cards.mjs      # カードモードを自動で遊んで踏破率を測る
+node idoldungeon/tools/e2e_explore.mjs    # ブラウザで2つの迷宮をボスまで通しで遊び、カードモードも1回通す（Playwright と http-server が必要）
 ```
