@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const PREFS = ['栃木', '千葉', '茨城', '群馬'];
+  const PREFS = ['栃木', '千葉', '茨城', '群馬', '埼玉'];
   const COLOR = { todo: '#d64545', plan: '#2f6fd6', done: '#2e9e5b' };
   const BY_ID = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
@@ -126,7 +126,7 @@
   const listEl = document.getElementById('list');
   const qEl = document.getElementById('q');
   const filterEl = document.getElementById('filter');
-  const openState = { 栃木: true, 千葉: true, 茨城: true, 群馬: true };
+  const openState = Object.fromEntries(PREFS.map((p) => [p, true]));
 
   function renderList() {
     const q = qEl.value.trim();
