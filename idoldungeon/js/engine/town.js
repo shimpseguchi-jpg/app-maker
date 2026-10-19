@@ -12,11 +12,13 @@ import { CLASSES, PROMOTE_LEVEL } from '../data/classes.js';
 import { itemFits } from '../data/items.js';
 import { canChangeClass, changeClass, canPromote, promote } from './classes.js';
 import { buildMembers, computeParty, BASE_STATS, STAT_NAME } from './party.js';
+import { GEAR, GEAR_SLOTS } from '../data/gear.js';
+import { addGear, gearName, gearPrice, gearSellPrice, gearAppraiseFee, wornUids, removeGear, dropUnfit, canWear, isCursed, wornGear, wear, unwear, autoEquipAll, uncurse } from './gear.js';
 
 export const PARTY_MAX = 6;
 const name = (id) => IDOLS[id].name;
 
-// ── 酒場：パーティの結成と、楽譜の装備。司教（ビショップ）がいればまとめて鑑定 ──
+// ── 酒場：パーティの結成。司教（ビショップ）がいれば楽譜・装備をまとめて鑑定。装備（4部位）は街の「装備」で着せかえる ──
 // 戻り値は 13人の状態（パーティにいる／迷宮に取り残されている／待機）
 export function roster(ex) {
   return IDOL_LIST.map((id) => {
@@ -56,13 +58,26 @@ export function equip(ex, id, uid) {
   syncParty(ex);
   return [`${name(id)}が「${SONGS[sc.song].title}」を装備した`];
 }
+// 小道具・衣装・アクセサリを着せかえる（uid=null で外す）。おまかせは着られる物が少ない子から順に
+export function dressUp(ex, id, slot, uid) {
+  const msgs = uid == null ? unwear(ex, id, slot) : wear(ex, id, uid);
+  syncParty(ex);
+  return msgs;
+}
+export function dressAuto(ex, ids) {
+  const msgs = autoEquipAll(ex, ids);
+  syncParty(ex);
+  return msgs.length ? msgs : ['これ以上よい装備は持っていない'];
+}
 export const hasAppraiser = (ex) => partyView(ex).some((m) => !DOWN.has(m.cond) && m.abilities.some((a) => a.id === 'identify'));
+export const unknownCount = (ex) => ex.scores.filter((sc) => !sc.known).length + ex.gear.filter((g) => !g.known).length;
 export function appraiseAll(ex) {
   if (!hasAppraiser(ex)) return ['鑑定できる仲間（ビショップ）がいない'];
-  const list = ex.scores.filter((sc) => !sc.known);
-  if (!list.length) return ['未鑑定の楽譜はない'];
+  const list = ex.scores.filter((sc) => !sc.known), gear = ex.gear.filter((g) => !g.known);
+  if (!list.length && !gear.length) return ['未鑑定の楽譜・装備はない'];
   list.forEach((sc) => { sc.known = true; });
-  return list.map((sc) => `鑑定した：「${SONGS[sc.song].title}」`);
+  gear.forEach((g) => { g.known = true; });
+  return [...list.map((sc) => `鑑定した：「${SONGS[sc.song].title}」`), ...gear.map((g) => `鑑定した：${gearName(g)}`)];
 }
 
 // ── 宿屋：部屋で回復の量が違う。経験値が足りていれば泊まったときにレベルが上がる ──
@@ -97,10 +112,14 @@ export function stay(ex, roomId, rng = Math.random) {
 }
 export const expToNext = (u) => Math.max(0, expForLevel(u.level + 1) - u.exp);
 
-// ── 商店：昇格アイテムと楽譜の売買、有料の鑑定 ──
+// ── 商店：昇格アイテム・楽譜・装備の売買、有料の鑑定 ──
 export const songPrice = (id) => SONGS[id].rank * 400;
 export const appraiseFee = (id) => SONGS[id].rank * 100;
 const totalClears = (ex) => Object.values(ex.ex.bossClears).reduce((a, b) => a + b, 0) + Object.values(ex.ex.trip).filter((t) => t === 'boss').length;
+// 倒したことのあるボスの数（迷宮ごと）。装備の品ぞろえは、これに 1 を足したランクまで
+const bossesBeaten = (ex) => new Set([...Object.keys(ex.ex.bossClears).filter((id) => ex.ex.bossClears[id] > 0),
+  ...Object.keys(ex.ex.trip).filter((id) => ex.ex.trip[id] === 'boss')]).size;
+export const gearShopRank = (ex) => 1 + bossesBeaten(ex);
 export function shopList(ex) {
   const stock = shopStock(totalClears(ex), ex.bought);
   const items = PROMOTE_ITEMS.map((it) => ({ kind: 'item', ...it, stock: it.shop === 'perClear' ? stock[it.id] : Infinity }));
@@ -108,7 +127,10 @@ export function shopList(ex) {
   const maxRank = totalClears(ex) ? 2 : 1;
   const songs = Object.values(SONGS).filter((s) => s.rank <= maxRank)
     .map((s) => ({ kind: 'song', id: s.id, name: `楽譜「${s.title}」`, price: songPrice(s.id), stock: Infinity }));
-  return [...items, ...songs];
+  // 装備：ランク1はいつでも。迷宮のボスを倒すたびに1つ上のランクが並ぶ。衣装セットと呪いの装備は店にない
+  const gear = Object.values(GEAR).filter((g) => g.shop && g.rank <= gearShopRank(ex))
+    .map((g) => ({ kind: 'gear', id: g.id, name: g.name, price: gearPrice(g.id), stock: Infinity }));
+  return [...items, ...songs, ...gear];
 }
 export function buy(ex, id) {
   const it = shopList(ex).find((x) => x.id === id);
@@ -116,26 +138,42 @@ export function buy(ex, id) {
   if (ex.gold < it.price) return ['お金が足りない'];
   ex.gold -= it.price;
   if (it.kind === 'song') addScore(ex, id, true);
+  else if (it.kind === 'gear') addGear(ex, id, { known: true });
   else { ex.items.push(id); if (it.shop === 'perClear') ex.bought++; }
   return [`${it.name}を買った（${it.price}G）`];
 }
-// 売れるもの：昇格アイテムと、装備していない楽譜（売値は半額。未鑑定は安い）
+// 売れるもの：昇格アイテムと、装備していない楽譜・装備（売値は半額。未鑑定と呪いの装備は安い）
 export function sellList(ex) {
   const items = [...new Set(ex.items)].map((id) => ({ kind: 'item', ref: id, name: ITEMS[id].name, price: Math.floor(ITEMS[id].price / 2) }));
   const worn = new Set(Object.values(ex.equip));
   const scores = ex.scores.filter((sc) => !worn.has(sc.uid))
     .map((sc) => ({ kind: 'score', ref: sc.uid, name: scoreName(sc), price: Math.floor(songPrice(sc.song) / (sc.known ? 2 : 4)) }));
-  return [...items, ...scores];
+  const wornG = wornUids(ex);
+  const gear = ex.gear.filter((g) => !wornG.has(g.uid)).map((g) => ({ kind: 'gear', ref: g.uid, name: gearName(g), price: gearSellPrice(g) }));
+  return [...items, ...scores, ...gear];
 }
 export function sell(ex, kind, ref) {
   const it = sellList(ex).find((x) => x.kind === kind && x.ref === ref);
   if (!it) return [];
   if (kind === 'item') ex.items.splice(ex.items.indexOf(ref), 1);
+  else if (kind === 'gear') removeGear(ex, [ref]);
   else ex.scores = ex.scores.filter((sc) => sc.uid !== ref);
   ex.gold += it.price;
   return [`${it.name}を売った（${it.price}G）`];
 }
+// 未鑑定の楽譜・装備（uid は楽譜と装備で共通の通し番号）
+export const unknownList = (ex) => [
+  ...ex.scores.filter((sc) => !sc.known).map((sc) => ({ uid: sc.uid, name: scoreName(sc), fee: appraiseFee(sc.song) })),
+  ...ex.gear.filter((g) => !g.known).map((g) => ({ uid: g.uid, name: gearName(g), fee: gearAppraiseFee(g) })),
+];
 export function appraise(ex, uid) {
+  const g = ex.gear.find((x) => x.uid === uid && !x.known);
+  if (g) {
+    const fee = gearAppraiseFee(g);
+    if (ex.gold < fee) return [`お金が足りない（${fee}G）`];
+    ex.gold -= fee; g.known = true;
+    return [`鑑定してもらった（${fee}G）：${gearName(g)}`];
+  }
   const sc = ex.scores.find((x) => x.uid === uid && !x.known);
   if (!sc) return [];
   const fee = appraiseFee(sc.song);
@@ -144,7 +182,7 @@ export function appraise(ex, uid) {
   return [`鑑定してもらった（${fee}G）：「${SONGS[sc.song].title}」`];
 }
 
-// ── 寺院：治療・蘇生（料金はレベルに応じる）、死体の回収、寄付（寄付額と同じ経験値） ──
+// ── 寺院：治療・蘇生（料金はレベルに応じる）、呪いの装備の解呪、死体の回収、寄付（寄付額と同じ経験値） ──
 const TREAT = new Set(['dead', 'ash', 'paralyze', 'stone', 'poison']);
 export const treatFee = (ex, id) => (REVIVE_FEE[ex.cond[id]] || 20) * unitOf(ex, id).level;
 export function treat(ex, id, rng = Math.random) {
@@ -162,6 +200,12 @@ export function treat(ex, id, rng = Math.random) {
   if (r === 'ok') { ex.cond[id] = 'ok'; ex.hp[id] = 1; return [`${name(id)}は生き返った！（${fee}G）`]; }
   ex.cond[id] = 'ash';
   return [`蘇生に失敗した……${name(id)}は灰になった（${fee}G）`];
+}
+// 解呪：呪いを解くと、その装備は崩れてなくなる（js/engine/gear.js）
+export function removeCurse(ex, id, slot) {
+  const msgs = uncurse(ex, id, slot);
+  syncParty(ex);
+  return msgs;
 }
 export const retrieveFee = (ex, id) => 50 + 30 * unitOf(ex, id).level;
 export function retrieve(ex, id) {
@@ -208,14 +252,16 @@ export function trainingInfo(ex, id) {
   return { unit: u, cls: cur, blocked, changes, promotions };
 }
 
-// 転職・昇格の後：HP は新しい最大値、呪文の回数は新しいレベルで数え直す
+// 転職・昇格の後：装備できなくなった物を外し、HP は新しい最大値、呪文の回数は新しいレベルで数え直す。戻り値は外した装備の知らせ
 function afterTraining(ex, id) {
+  const msgs = dropUnfit(ex, id);
   const solo = computeParty(buildMembers([{ idol: id, ...unitOf(ex, id) }])).members[0];
   ex.hp[id] = solo.stats.hp;
   delete ex.mp[id];
   const inParty = partyView(ex).find((m) => m.id === id); // パーティにいればシナジー込みの最大値で全快
   if (inParty) ex.hp[id] = inParty.maxHp;
   syncParty(ex);
+  return msgs;
 }
 
 export function doChangeClass(ex, id, clsId) {
@@ -225,8 +271,8 @@ export function doChangeClass(ex, id, clsId) {
   if (!canChangeClass(u, clsId)) return ['能力が条件に届いていない'];
   const from = CLASSES[u.cls].name;
   ex.units[id] = changeClass(u, clsId, IDOLS[id]);
-  afterTraining(ex, id);
-  return [`${name(id)}は${from}から${CLASSES[clsId].name}に転職した（Lv1 から。覚えた魔法はそのまま）`];
+  const off = afterTraining(ex, id);
+  return [`${name(id)}は${from}から${CLASSES[clsId].name}に転職した（Lv1 から。覚えた魔法はそのまま）`, ...off];
 }
 
 export function doPromote(ex, id, clsId, itemId) {
@@ -238,9 +284,9 @@ export function doPromote(ex, id, clsId, itemId) {
   const bonus = CLASSES[clsId].bonus || {};
   ex.units[id] = promote(u, clsId, itemId);
   ex.items.splice(ex.items.indexOf(itemId), 1);
-  afterTraining(ex, id);
+  const off = afterTraining(ex, id);
   const up = BASE_STATS.filter((k) => bonus[k]).map((k) => `${STAT_NAME[k]}+${bonus[k]}`).join(' ');
-  return [`${name(id)}は「${ITEMS[itemId].name}」を使い、${from}から${CLASSES[clsId].name}に昇格した！`, `昇格ボーナス：${up}`];
+  return [`${name(id)}は「${ITEMS[itemId].name}」を使い、${from}から${CLASSES[clsId].name}に昇格した！`, `昇格ボーナス：${up}`, ...off];
 }
 
 // ── 出発前のチェック（街の「迷宮へ」に出す）。ok=false の項目に、行くとよい施設（tab）をつける ──
@@ -263,12 +309,17 @@ export function prepCheck(ex) {
   add(!tired.length, tired.length ? `呪文・ライブの回数が減っている：${names(tired)}` : '呪文・ライブの回数は全快', 'inn');
   const ready = up.filter((m) => expToNext(unitOf(ex, m.id)) === 0);
   if (ready.length) add(false, `泊まればレベルアップ：${names(ready)}`, 'inn');
+  // 小道具・衣装・アクセサリ：空いている部位に、着られる鑑定済みの装備が余っていれば知らせる
+  const taken = wornUids(ex);
+  const spareFor = (m, slot) => ex.gear.some((g) => g.known && !isCursed(g) && !taken.has(g.uid) && GEAR[g.item].slot === slot && canWear(m.cls, g.item));
+  const undressed = party.filter((m) => { const w = wornGear(ex, m.id); return GEAR_SLOTS.some((slot) => !w[slot] && spareFor(m, slot)); });
+  add(!undressed.length, undressed.length ? `空いている部位に着られる装備がある：${names(undressed)}（「おまかせ」でまとめて着せられる）` : '着られる装備は全部着ている（新しい装備は商店で買える）', 'equip');
   const worn = new Set(Object.values(ex.equip));
   const spare = ex.scores.filter((sc) => sc.known && !worn.has(sc.uid));
   const bare = party.filter((m) => !ex.equip[m.id]);
-  add(!bare.length || !spare.length, bare.length && spare.length ? `楽譜を装備していない仲間がいる：${names(bare)}（使える楽譜 ${spare.length}枚）` : bare.length ? '楽譜は全部装備ずみ（新しい楽譜は商店で買える）' : '全員が楽譜を装備している', 'tavern');
-  const unknown = ex.scores.filter((sc) => !sc.known).length;
-  if (unknown) add(false, `未鑑定の楽譜が${unknown}枚（鑑定するまで装備できない）`, hasAppraiser(ex) ? 'tavern' : 'shop');
+  add(!bare.length || !spare.length, bare.length && spare.length ? `楽譜を装備していない仲間がいる：${names(bare)}（使える楽譜 ${spare.length}枚）` : bare.length ? '楽譜は全部装備ずみ（新しい楽譜は商店で買える）' : '全員が楽譜を装備している', 'equip');
+  const unknownS = ex.scores.filter((sc) => !sc.known).length, unknownG = ex.gear.filter((g) => !g.known).length;
+  if (unknownS + unknownG) add(false, `未鑑定の${[unknownS && `楽譜が${unknownS}枚`, unknownG && `装備が${unknownG}個`].filter(Boolean).join('・')}（楽譜は鑑定するまで装備できない。装備は呪われているかもしれない）`, hasAppraiser(ex) ? 'tavern' : 'shop');
   const promo = party.filter((m) => trainingInfo(ex, m.id).promotions.some((p) => p.ok));
   if (promo.length) add(false, `昇格できる：${names(promo)}`, 'training');
   const lost = Object.keys(ex.lost).map((id) => IDOLS[id].name);

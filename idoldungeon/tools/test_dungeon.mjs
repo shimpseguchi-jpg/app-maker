@@ -3,7 +3,7 @@
 import { DUNGEONS } from '../js/data/floors.js';
 import { BOSSES } from '../js/data/bosses.js';
 import { getFloor, newExplore, act, edgeInfo, useStairs, returnToTown, switchDungeon, isSolid, DX, DY, viewCells, KEY_NAMES } from '../js/engine/dungeon.js';
-import { newExpedition, move, finishBattle, enterDungeon, climb, partyView, openDungeons } from '../js/engine/expedition.js';
+import { newExpedition, move, finishBattle, enterDungeon, climb, partyView, openDungeons, fightGuardian, leaveGuardian } from '../js/engine/expedition.js';
 import { stay, treat, buy, shopList } from '../js/engine/town.js';
 
 let fail = 0, pass = 0;
@@ -241,6 +241,21 @@ const walk = (st, seq, ctx = { rng: rng0 }) => seq.split(' ').map((a) => act(st,
   ok(ex.cond.ami === 'ash', '灰の蘇生に失敗しても灰のまま（ロストなし）');
   buy(ex, 'masterSeal');
   ok(shopList(ex).find((i) => i.id === 'masterSeal').stock === 0, 'マスタープルフの在庫が減る');
+}
+
+// ── ルームガーダー：部屋に入ったら、挑むか引き返すかを選ぶ ──
+{
+  const ex = newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }]);
+  enterDungeon(ex, 'd1');
+  Object.assign(ex.ex, { floor: 0, x: 3, y: 2, dir: 3, prev: null });
+  let r = move(ex, 'forward', () => 0.99);
+  ok(r.pending?.type === 'guardian' && r.pending.id === 'g1a' && r.pending.hint === 2 && !ex.battle && r.msgs.some((m) => m.includes('目安 Lv2')), '番人の部屋に入ると、戦う前に聞かれる（目安のレベルつき）');
+  leaveGuardian(ex);
+  ok(ex.ex.x === 3 && ex.ex.y === 2 && !ex.battle, '引き返すと部屋の外へ');
+  r = move(ex, 'forward', () => 0.99);
+  fightGuardian(ex, r.pending, () => 0.5);
+  ok(ex.battle && ex.battleEv.kind === 'guardian' && ex.battleEv.id === 'g1a', '挑むと番人と戦闘');
+  ok(DUNGEONS.d1.floors.flatMap((f) => f.specials).concat(DUNGEONS.d2.floors.flatMap((f) => f.specials)).filter((sp) => sp.type === 'guardian').every((sp) => sp.hint > 0), 'どの番人にも目安のレベルがある');
 }
 
 console.log(`${pass} ok / ${fail} ng`);

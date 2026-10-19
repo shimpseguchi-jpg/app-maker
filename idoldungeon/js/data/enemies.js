@@ -34,7 +34,7 @@ def({ id: 'stagehand', name: '荒くれ大道具', uname: '大柄な人影', ico
   hp: 188, atk: 30, mat: 0, def: 8, res: 3, spd: 12, hit: 75, eva: 6, exp: 360, gold: 90 });
 // ルームガーダー・固定敵
 def({ id: 'gatekeeper', name: '楽屋の番人', uname: '鎧を着た人影', icon: '🛡️', level: 3,
-  hp: 224, atk: 32, mat: 0, def: 6, res: 4, spd: 14, hit: 75, eva: 6, exp: 240, gold: 80, resist: ['sleep'] });
+  hp: 224, atk: 26, mat: 0, def: 6, res: 4, spd: 14, hit: 75, eva: 6, exp: 240, gold: 80, resist: ['sleep'] });
 def({ id: 'watcher', name: '奈落の見張り', uname: '目の多い何か', icon: '👁️', level: 5,
   hp: 266, atk: 36, mat: 29, def: 6, res: 8, spd: 18, hit: 78, eva: 10, exp: 440, gold: 120,
   acts: [{ kind: 'attack', w: 2 }, { kind: 'sleepGroup', w: 1, name: 'にらみ' }] });
@@ -103,7 +103,7 @@ export const ENCOUNTERS = {
 };
 // ルームガーダー・固定敵の編成（floors.js の special.id）
 export const FIXED_GROUPS = {
-  g1a: [['gatekeeper', 1, 1], ['prop', 2, 3]],
+  g1a: [['gatekeeper', 1, 1], ['prop', 1, 2]],
   g1b: [['watcher', 1, 1], ['rat', 2, 4]],
   abi: [['abi', 1, 1]],
   g2a: [['headUsher', 1, 1], ['usher', 2, 2]],

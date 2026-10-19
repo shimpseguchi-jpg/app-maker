@@ -11,6 +11,7 @@ import { enterDungeon, partyView, startBattle, finishBattle, rollGroups, damage,
   rewardRate, toTown } from './expedition.js';
 import { SEARCHERS } from './dungeon.js';
 import { bossStage } from './boss.js';
+import { findGear, gearName, depthOf, removeGear } from './gear.js';
 import { DOWN } from './revive.js';
 
 const pick = (list, rng) => list[Math.floor(rng() * list.length)];
@@ -23,7 +24,7 @@ export function enterCardMode(ex, dungeonId, rng = Math.random) {
   const msgs = enterDungeon(ex, dungeonId, 'card');
   if (ex.mode !== 'card') return msgs;
   ex.card = { dungeon: dungeonId, floor: 0, step: 0, perFloor: CARD_DUNGEONS[dungeonId].perFloor, cur: null, hint: null,
-    dark: 0, anti: 0, loot: { gold: 0, scores: [], items: [] }, corpse: {}, guardian: {}, prev: null };
+    dark: 0, anti: 0, loot: { gold: 0, scores: [], items: [], gear: [] }, corpse: {}, guardian: {}, prev: null };
   ex.ex.floor = 0;
   ex.card.cur = draw(ex, rng);
   return msgs;
@@ -287,7 +288,8 @@ function healAll(ex, pct, msgs) {
   msgs.push(`パーティの HP が回復した（${partyHp(ex)}%）`);
 }
 
-// 拾ったお金と楽譜（カードモードの報酬は DRPG の 2/3）。この挑戦の拾った物として記録する
+// 拾ったお金・楽譜・装備（カードモードの報酬は DRPG の 2/3）。この挑戦の拾った物として記録する
+// 装備は楽譜と同じ確率で、楽譜とは別に見つかる
 function loot(ex, mult, scoreChance, rng, msgs) {
   const c = ex.card, cfg = CARD_DUNGEONS[c.dungeon];
   const gold = Math.max(1, Math.floor((15 + 12 * c.floor) * cfg.loot * mult * rewardRate(ex) * (0.8 + rng() * 0.4)));
@@ -298,17 +300,23 @@ function loot(ex, mult, scoreChance, rng, msgs) {
     c.loot.scores.push(sc.uid);
     msgs.push(`${scoreName(sc)}を見つけた`);
   }
+  if (rng() < scoreChance * rewardRate(ex)) {
+    const g = findGear(ex, depthOf(c.dungeon, c.floor), rng);
+    c.loot.gear.push(g.uid);
+    msgs.push(`${gearName(g)}を見つけた`);
+  }
 }
 
 // ── 戦闘のあと ──
 // 拾った物を記録し、カードを進める。ボスに勝てば街へ（全部持ち帰る）
 export function finishCardBattle(ex, rng = Math.random) {
   const c = ex.card, ev = ex.battleEv || {}, result = ex.battle.result;
-  const g0 = ex.gold, s0 = ex.scores.length, i0 = ex.items.length;
+  const g0 = ex.gold, s0 = ex.scores.length, i0 = ex.items.length, e0 = ex.gear.length;
   const r = finishBattle(ex, rng);
   c.loot.gold += Math.max(0, ex.gold - g0);
   c.loot.scores.push(...ex.scores.slice(s0).map((sc) => sc.uid));
   c.loot.items.push(...ex.items.slice(i0));
+  (c.loot.gear ||= []).push(...ex.gear.slice(e0).map((g) => g.uid));
   if (r.wiped) return r;
   if (ev.kind === 'boss' && result === 'win') { r.msgs.push(...clearRun(ex)); r.town = true; return r; }
   advance(ex, rng);
@@ -316,7 +324,7 @@ export function finishCardBattle(ex, rng = Math.random) {
 }
 
 function lootText(l) {
-  return [`${l.gold}G`, l.scores.length && `楽譜${l.scores.length}`, l.items.length && `アイテム${l.items.length}`].filter(Boolean).join('・');
+  return [`${l.gold}G`, l.scores.length && `楽譜${l.scores.length}`, l.gear?.length && `装備${l.gear.length}`, l.items.length && `アイテム${l.items.length}`].filter(Boolean).join('・');
 }
 
 // ボスを倒した：拾った物は全部持ち帰る
@@ -329,7 +337,8 @@ function clearRun(ex) {
 // 途中で街に戻る：この挑戦で拾った物の半分を失う
 export function returnHome(ex) {
   const l = ex.card.loot;
-  const lost = { gold: Math.min(ex.gold, Math.ceil(l.gold / 2)), scores: l.scores.slice(Math.floor(l.scores.length / 2)), items: l.items.slice(Math.floor(l.items.length / 2)) };
+  const half = (xs = []) => xs.slice(Math.floor(xs.length / 2));
+  const lost = { gold: Math.min(ex.gold, Math.ceil(l.gold / 2)), scores: half(l.scores), items: half(l.items), gear: half(l.gear) };
   drop(ex, lost);
   const msgs = [`街に戻った。拾った物の半分を失った（${lootText(lost)}）`];
   endRun(ex);
@@ -339,7 +348,7 @@ export function returnHome(ex) {
 // 全滅：死体はカードモードのこの迷宮・この階に残る。拾った物はすべて失う
 export function cardWipe(ex) {
   const c = ex.card;
-  drop(ex, { gold: Math.min(ex.gold, c.loot.gold), scores: c.loot.scores, items: c.loot.items });
+  drop(ex, { gold: Math.min(ex.gold, c.loot.gold), scores: c.loot.scores, items: c.loot.items, gear: c.loot.gear || [] });
   for (const s of ex.slots) ex.lost[s.idol] = { dungeon: c.dungeon, floor: c.floor, card: true };
   const names = ex.slots.map((s) => IDOLS[s.idol].name).join('・');
   ex.slots = [];
@@ -354,6 +363,7 @@ function drop(ex, lost) {
   for (const [id, uid] of Object.entries(ex.equip)) if (gone.has(uid)) delete ex.equip[id];
   ex.scores = ex.scores.filter((sc) => !gone.has(sc.uid));
   for (const it of lost.items) { const i = ex.items.lastIndexOf(it); if (i >= 0) ex.items.splice(i, 1); }
+  removeGear(ex, lost.gear || []);
 }
 
 function endRun(ex) {

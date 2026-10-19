@@ -84,5 +84,26 @@ const RANGE_M = ['knight', 'cavalier', 'pegasus', 'wyvern', 'general', 'greatkni
 const RANGE_L = ['archer', 'warrior', 'sniper', 'ranger'];
 for (const c of Object.values(CLASSES)) c.range = RANGE_L.includes(c.id) ? 'L' : RANGE_M.includes(c.id) ? 'M' : 'S';
 
+// 装備できる小道具（武器）の種類と、衣装の重さ（js/data/gear.js。docs/DESIGN.md「18. 装備」）
+//   聖魔の光石の武器の種類をもとに、魔法職は杖、盗賊の系統は短剣。アクセサリはだれでも使える
+//   衣装：heavy は重い衣装まで（軽い衣装・ローブも着られる）、light は軽い衣装まで、robe はローブだけ
+const WEAPONS = {
+  fighter: ['sword', 'axe'], mercenary: ['sword'], myrmidon: ['sword'], knight: ['lance'], cavalier: ['sword', 'lance'],
+  pegasus: ['lance'], wyvern: ['lance'], archer: ['bow'], thief: ['dagger'], mage: ['staff', 'dagger'], shaman: ['staff', 'dagger'],
+  priest: ['staff'], troubadour: ['staff'], alchemist: ['staff', 'dagger'], dancer: ['dagger'],
+  warrior: ['axe', 'bow'], hero: ['sword', 'axe'], swordmaster: ['sword'], assassin: ['sword', 'dagger'], general: ['lance', 'axe'],
+  greatknight: ['sword', 'lance', 'axe'], paladin: ['sword', 'lance', 'axe'], falcoknight: ['sword', 'lance'], wyvernknight: ['lance'],
+  wyvernlord: ['sword', 'lance'], sniper: ['bow'], ranger: ['sword', 'bow'], rogue: ['dagger'], sage: ['staff', 'dagger'],
+  mageknight: ['sword', 'staff'], druid: ['staff', 'dagger'], summoner: ['staff', 'dagger'], bishop: ['staff'], valkyrie: ['staff'],
+  samurai: ['sword'], ninja: ['dagger'], lord: ['sword', 'lance'],
+};
+const ARMOR_HEAVY = ['fighter', 'mercenary', 'knight', 'cavalier', 'wyvern', 'warrior', 'hero', 'general', 'greatknight', 'paladin',
+  'wyvernknight', 'wyvernlord', 'samurai', 'lord'];
+const ARMOR_ROBE = ['mage', 'shaman', 'alchemist', 'sage', 'druid', 'summoner'];
+for (const c of Object.values(CLASSES)) {
+  c.weapons = WEAPONS[c.id] || [];
+  c.armor = ARMOR_HEAVY.includes(c.id) ? 'heavy' : ARMOR_ROBE.includes(c.id) ? 'robe' : 'light';
+}
+
 export const CLASS_LIST = Object.keys(CLASSES);
 export const PROMOTE_LEVEL = 10; // 昇格できるレベル（聖魔の光石と同じく Lv10 から）

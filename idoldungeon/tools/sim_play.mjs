@@ -1,17 +1,21 @@
 // 自動プレイ：Lv1 から最後のボスまで、ゲームのルールどおりに遊び続けてバランスを測る
 // node idoldungeon/tools/sim_play.mjs [回数=5] [種=1]
-//   街：寺院で治療・回収 → 宿屋 → 昇格できる人は昇格
+//   街：寺院で治療・回収 → 宿屋 → 昇格できる人は昇格 → 装備（お金に余裕があれば鑑定・買い足し、おまかせで着せる。GEAR=0 で、はじめの装備のまま）
 //   迷宮：レベルに見合う階まで潜って戦い、HP が減ったり倒れた人が出たら引き返す
 //   鍵・スイッチは道すがら取り、ボスを倒したら次の迷宮へ
 import { DUNGEONS } from '../js/data/floors.js';
-import { newExpedition, move, battleTurn, finishBattle, wipeOut, climb, enterDungeon, partyView, unitOf } from '../js/engine/expedition.js';
+import { newExpedition, move, battleTurn, finishBattle, wipeOut, climb, enterDungeon, partyView, unitOf, fightGuardian } from '../js/engine/expedition.js';
 import { act, useStairs, getFloor, isSolid } from '../js/engine/dungeon.js';
 import { autoCommands } from '../js/engine/battle.js';
-import { stay, treat, retrieve, trainingInfo, doPromote, ROOMS, roomFee } from '../js/engine/town.js';
+import { stay, treat, retrieve, trainingInfo, doPromote, ROOMS, roomFee, unknownList, appraise, dressAuto, shopList, buy } from '../js/engine/town.js';
+import { GEAR } from '../js/data/gear.js';
+import { wornGear, canWear } from '../js/engine/gear.js';
 import { DOWN } from '../js/engine/revive.js';
 import { seeded } from '../js/engine/rng.js';
 
 const RUNS = Number(process.argv[2] || 5), SEED = Number(process.argv[3] || 1);
+// 装備を鑑定・購入して着せかえるか（GEAR=0 で、はじめの装備のまま）
+const GEAR_ON = process.env.GEAR !== '0';
 const PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'ami' }, { idol: 'yukiho' }];
 // 階ごとの目安のレベル（この平均レベルに届いたらその階まで潜る）。最後の要素はボス
 export const REC = { d1: [1, 4, 7, 8], d2: [10, 12, 13, 15, 17, 21] };
@@ -45,7 +49,7 @@ function route(st0, goal, limit = 40000) {
 function runOnce(seed) {
   const rng = seeded(seed);
   const ex = newExpedition(PARTY);
-  const log = { wipes: 0, deaths: 0, trips: 0, battles: 0, promotions: 0, rescues: 0, cleared: {}, per: {} };
+  const log = { wipes: 0, deaths: 0, trips: 0, battles: 0, promotions: 0, rescues: 0, bought: 0, cleared: {}, per: {} };
   const per = (d) => (log.per[d] ||= { battles: 0, wipes: 0, bossTries: 0, bossWins: 0, firstTryLv: null });
   const avgLevel = () => { const p = ex.slots.map((s) => unitOf(ex, s.idol)); return p.length ? p.reduce((a, u) => a + u.level + Math.min(u.carry || 0, 20), 0) / p.length : 0; };
 
@@ -82,7 +86,8 @@ function runOnce(seed) {
       if (a === 'stairs') { const r = climb(ex); if (ex.mode === 'town') return 'town'; continue; }
       const before = `${ex.ex.floor}:${ex.ex.x},${ex.ex.y},${ex.ex.dir}`;
       const r = move(ex, a, rng);
-      if (r.pending?.type === 'battle') { if (fight() === 'wiped') return 'wiped'; }
+      if (r.pending?.type === 'guardian') fightGuardian(ex, r.pending, rng); // ルームガーダーにはいつも挑む
+      if (r.pending?.type === 'battle' || r.pending?.type === 'guardian') { if (fight() === 'wiped') return 'wiped'; }
       if (r.pending?.type === 'wiped') { wipeOut(ex); log.wipes++; return 'wiped'; }
       if (stopOnRest && needRest()) return 'rest';
       // 回転床・ワープ・逃走で予定とずれたら、道順を引き直す
@@ -155,6 +160,21 @@ function runOnce(seed) {
       const p = info.promotions.find((x) => x.ok);
       if (p) { doPromote(ex, s.idol, p.cls.id, p.items[0]); log.promotions++; stay(ex, 'stable', rng); }
     }
+    if (GEAR_ON) shopping();
+  };
+  // 装備：お金に余裕があれば未鑑定の装備を鑑定し、空いている小道具・衣装を店で買い、おまかせで着せる
+  const RESERVE_G = 600;
+  const shopping = () => {
+    for (const x of unknownList(ex)) if (ex.gold >= x.fee + RESERVE_G) appraise(ex, x.uid);
+    dressAuto(ex, ex.slots.map((s) => s.idol));
+    const shop = shopList(ex).filter((it) => it.kind === 'gear');
+    for (const s of ex.slots) for (const slot of ['weapon', 'armor']) {
+      const cls = unitOf(ex, s.idol).cls, cur = wornGear(ex, s.idol)[slot];
+      const best = shop.filter((it) => GEAR[it.id].slot === slot && canWear(cls, it.id) && ex.gold >= it.price + RESERVE_G && (!cur || GEAR[it.id].rank > GEAR[cur.item].rank))
+        .sort((a, b) => b.price - a.price)[0];
+      if (best) { buy(ex, best.id); log.bought++; }
+    }
+    dressAuto(ex, ex.slots.map((s) => s.idol));
   };
 
   for (const d of ['d1', 'd2']) {
@@ -212,7 +232,7 @@ for (let i = 0; i < RUNS; i++) {
     const p = r.per[d] || {};
     return r.cleared[b] ? `${r.cleared[b].trips}回目の探索で撃破（戦闘${p.battles}・全滅${p.wipes}・ボス${p.bossWins}/${p.bossTries}勝・初挑戦Lv${p.firstTryLv}・撃破時Lv${r.cleared[b].lv}）` : '未';
   };
-  console.log(`#${i + 1} 劇場地下迷宮：${c('b1', 'd1')}\n   奈落の大劇場：${c('b2', 'd2')}\n   救助 ${r.rescues} 回・昇格 ${r.promotions} 人（${((Date.now() - t0) / 1000).toFixed(1)}秒）`);
+  console.log(`#${i + 1} 劇場地下迷宮：${c('b1', 'd1')}\n   奈落の大劇場：${c('b2', 'd2')}\n   救助 ${r.rescues} 回・昇格 ${r.promotions} 人・装備を買った ${r.bought} 回（${((Date.now() - t0) / 1000).toFixed(1)}秒）`);
 }
 const ok = results.filter((r) => r.cleared.b2).length;
 console.log(`奈落の怪人まで倒せたのは ${ok}/${RUNS} 回`);

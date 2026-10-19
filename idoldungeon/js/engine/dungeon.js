@@ -203,7 +203,7 @@ function enterCell(st, ctx, out, rng, walked) {
         enterCell(st, ctx, out, rng, false);
         return;
       case 'guardian':
-        if (!st.trip[sp.id]) out.events.push({ type: 'battle', kind: 'guardian', id: sp.id, name: sp.name });
+        if (!st.trip[sp.id]) out.events.push({ type: 'battle', kind: 'guardian', id: sp.id, name: sp.name, hint: sp.hint });
         return;
       case 'fixed':
         out.events.push({ type: 'battle', kind: 'fixed', id: sp.id, name: sp.name });

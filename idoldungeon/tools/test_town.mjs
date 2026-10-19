@@ -7,6 +7,7 @@ import { IDOLS } from '../js/data/idols.js';
 import { exportText, importText, summary } from '../js/save.js';
 import { expForLevel } from '../js/engine/growth.js';
 import { SONGS } from '../js/data/songs.js';
+import { autoEquip } from '../js/engine/gear.js';
 
 let fail = 0, pass = 0;
 const ok = (cond, msg) => { if (cond) pass++; else { fail++; console.log('NG:', msg); } };
@@ -200,6 +201,9 @@ const fresh = () => newExpedition([{ idol: 'makoto' }, { idol: 'hibiki' }, { ido
   for (const id of ['haruka', 'ritsuko', 'ami', 'yukiho']) joinParty(ex, id);
   const known = ex.scores.filter((sc) => sc.known);
   equip(ex, 'makoto', known[0].uid); equip(ex, 'hibiki', known[1].uid);
+  c = prepCheck(ex);
+  ok(todo(c).includes('equip') && c.some((x) => !x.ok && x.text.includes('着られる装備')), '後から入った仲間に、余っている装備を着せるよう知らせる');
+  for (const s of ex.slots) autoEquip(ex, s.idol);
   c = prepCheck(ex);
   ok(todo(c).length === 0, `準備が整えば全部 ✓（${c.filter((x) => !x.ok).map((x) => x.text).join(' / ')}）`);
   ex.hp.makoto = 1;

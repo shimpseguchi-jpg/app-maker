@@ -1,4 +1,4 @@
-// パーティの最終能力値（基本能力 → シナジー・楽曲の補正 → 派生ステータス）
+// パーティの最終能力値（基本能力 → シナジー・クラス・装備・楽曲の補正 → 派生ステータス）
 import { IDOLS } from '../data/idols.js';
 import { SONGS } from '../data/songs.js';
 import { CLASSES } from '../data/classes.js';
@@ -29,8 +29,9 @@ export function derive(b, level = 1) {
   };
 }
 
-// slots: [{ idol: 'haruka', song: 'ready' | null, cls?, level?, carry?, base?, learned? }, ...] 先頭 FRONT_SIZE 人が前列
+// slots: [{ idol: 'haruka', song: 'ready' | null, cls?, level?, carry?, base?, learned?, gear? }, ...] 先頭 FRONT_SIZE 人が前列
 // cls・level・carry・base・learned は育成状態（js/engine/classes.js の unit）。省略時はアイドルの初期値
+// gear：小道具・衣装・アクセサリと衣装セットの効果 [{ source, effects }]（js/engine/gear.js の gearEffectsOf）
 // power：派生ステータスに使う「実質のレベル」。今のクラスのレベル＋これまでのクラスで積んだレベル（carry、上限20）
 //   昇格・転職で Lv1 に戻っても、HP や攻撃力が下がりすぎないようにする（聖魔の光石の昇格で強さが残るのと同じ考え）
 export const CARRY_MAX = 20;
@@ -39,7 +40,7 @@ export function buildMembers(slots) {
     const idol = IDOLS[s.idol];
     return { id: idol.id, idol, tags: idol.tags, row: i < FRONT_SIZE ? 'front' : 'back', song: s.song || null,
       cls: s.cls || idol.cls, level: s.level || 1, power: (s.level || 1) + Math.min(s.carry || 0, CARRY_MAX),
-      base: s.base || idol.base, learned: s.learned || [] };
+      base: s.base || idol.base, learned: s.learned || [], gear: s.gear || [] };
   });
 }
 
@@ -78,6 +79,7 @@ export function computeParty(members) {
       const e = Object.values(CLASSES).flatMap((c) => c.effects).find((x) => x.id === id);
       if (e) apply(e, [i], '習得済み');
     }
+    for (const g of mem.gear || []) for (const e of g.effects) apply(e, [i], g.source);
     const song = mem.song && SONGS[mem.song];
     if (!song) return;
     for (const e of song.effects) apply(e, targets(e.to || 'self', members, [i], i), song.title);

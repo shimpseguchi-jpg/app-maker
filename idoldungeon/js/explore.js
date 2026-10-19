@@ -6,7 +6,7 @@ import { CLASSES } from './data/classes.js';
 import { SPELLS_BY_ID, KIND_TARGET } from './data/spells.js';
 import { CONDITIONS } from './engine/revive.js';
 import { getFloor, viewCells, DIR_NAME, isDark, isAntiMagic } from './engine/dungeon.js';
-import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf, FIRST_PARTY } from './engine/expedition.js';
+import { newExpedition, normalize, move, battleTurn, finishBattle, wipeOut, climb, partyView, syncParty, keyLabel, unitOf, FIRST_PARTY, fightGuardian, leaveGuardian } from './engine/expedition.js';
 import { renderTown, townAction, townSpeech, openTab } from './ui/town.js';
 import { portrait, shortName } from './ui/portrait.js';
 import { aliveGroups, groupName, reachableGroups, castable, canAct, unitLiveReady, autoCommands } from './engine/battle.js';
@@ -48,7 +48,8 @@ function say(msgs) { for (const m of msgs) log.push(m); while (log.length > 40) 
 
 // ── 描画 ──
 function render() {
-  const town = ex.mode === 'town', battle = !!(ex.battle || battleEnd), cards = ex.mode === 'card' && !!ex.card && !battle;
+  // カードモードでボスに勝つと、データの上ではもう街にいる。戦闘の再生と結果を見せ終わるまでは戦闘の画面のまま
+  const battle = !!(ex.battle || battleEnd), town = ex.mode === 'town' && !battle, cards = ex.mode === 'card' && !!ex.card && !battle;
   const st = ex.ex;
   const fl = getFloor(st.dungeon, st.floor);
   const ch = fl.cellAt(st.x, st.y);
@@ -180,7 +181,7 @@ function renderBattle() {
   else if (battleEnd) {
     ctl = `<div class="who">${{ win: '勝利！', flee: '逃げ切った', lose: '全滅……' }[b.result]}</div>
       <div class="bres">${battleEnd.msgs.map((m) => `<div>${esc(m)}</div>`).join('')}</div>
-      <div class="vmenu"><button data-b="end" class="vbar on">探索に戻る</button></div>`;
+      <div class="vmenu"><button data-b="end" class="vbar on">${ex.mode === 'town' ? '街に戻る' : '探索に戻る'}</button></div>`;
   } else if (b.turn === 0 && b.surprise === 'enemy') {
     ctl = '<div class="who">不意を突かれた！</div><div class="vmenu"><button data-b="go" class="vbar on">次へ</button></div>';
   } else if (cmdIdx >= b.party.length) {
@@ -493,16 +494,26 @@ function askStairs() {
 }
 
 function showPending() {
+  if (pending.type === 'guardian') {
+    const g = pending;
+    $('modal-box').innerHTML = `<h2>${esc(g.name)}</h2><p>部屋の奥から、強い気配がする。${g.hint ? `<br>目安は Lv${g.hint} くらい。` : ''}<br>勝てば宝箱が手に入る。</p><div class="row"><button data-m="fight">挑む</button><button data-m="back">引き返す</button></div>`;
+    $('modal').hidden = false;
+    return;
+  }
   if (pending.type === 'wiped') {
     $('modal-box').innerHTML = '<h2>全滅</h2><p>パーティは迷宮で倒れた……<br>死体はその場に残る。寺院で回収してもらうか、別のパーティで探しに行こう。</p><div class="row"><button data-m="rescue">街へ</button></div>';
     $('modal').hidden = false;
   }
 }
 
-function closeModal() {
+function closeModal(choice) {
   const p = pending;
   pending = null;
   $('modal').hidden = true;
+  if (p.type === 'guardian') {
+    if (choice === 'fight') { say(fightGuardian(ex, p)); resetCommands(); }
+    else say(leaveGuardian(ex));
+  }
   if (p.type === 'wiped') say(ex.card ? cardWipe(ex) : wipeOut(ex));
   render();
 }
@@ -518,7 +529,7 @@ document.addEventListener('click', (ev) => {
   if (b.id === 'hudmap' || b.dataset.x === 'map') { showBigMap(); return; }
   if (b.dataset.x === 'mapclose') { $('bigmap').hidden = true; return; }
   if (b.dataset.a) doAction(b.dataset.a);
-  else if (b.dataset.m) closeModal();
+  else if (b.dataset.m) closeModal(b.dataset.m);
   else if (b.closest('#town')) townDo(b);
 });
 document.addEventListener('change', (ev) => {
