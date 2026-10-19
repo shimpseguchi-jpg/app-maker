@@ -14,6 +14,8 @@ import { ITEMS } from '../data/items.js';
 import { SONGS } from '../data/songs.js';
 import { DOWN, isWiped } from './revive.js';
 import { CARD_PROMO_RATE } from '../data/cards.js';
+import { STARTER_GEAR } from '../data/gear.js';
+import { addGear, autoEquipAll, gearEffectsOf, gearName, findGear, depthOf } from './gear.js';
 
 // 最初に持っている楽譜（鑑定済み）
 export const STARTER_SONGS = ['ready', 'ohayo'];
@@ -28,12 +30,18 @@ export function newExpedition(slots, dungeonId = 'd1') {
 }
 
 // 古いセーブにも新しい項目をそろえる
+// 装備（小道具・衣装・アクセサリ）のなかった記録には、はじめの装備を渡して、パーティにおまかせで着せる（新しい冒険も同じ）
 export function normalize(ex) {
+  const noGear = ex.gear == null;
   for (const [k, v] of Object.entries({ units: {}, hp: {}, cond: {}, mp: {}, live: {}, usedRevive: {}, items: [], bought: 0,
-    battle: null, battleEv: null, scores: [], equip: {}, lost: {}, book: {}, seq: 1, days: 0, play: 'drpg', card: null })) {
+    battle: null, battleEv: null, scores: [], equip: {}, gear: [], wear: {}, lost: {}, book: {}, seq: 1, days: 0, play: 'drpg', card: null })) {
     if (ex[k] == null) ex[k] = structuredClone(v);
   }
   ex.slots = ex.slots.map((s) => ({ idol: s.idol }));
+  if (noGear) {
+    for (const id of STARTER_GEAR) addGear(ex, id, { known: true });
+    autoEquipAll(ex, ex.slots.map((s) => s.idol));
+  }
   return ex;
 }
 
@@ -41,6 +49,8 @@ export function normalize(ex) {
 // 報酬は DRPGモードがカードモードの 1.5倍。調整済みの今の数値を DRPG の値とし、カードモードは 2/3 にする
 export const PLAY_MODES = { drpg: { name: 'DRPGモード', reward: 1 }, card: { name: 'カードモード', reward: 2 / 3 } };
 export const DRPG_BONUS = 1.5;
+// うろつく敵が装備を落とす確率（DRPGモード。カードモードは報酬の倍率がかかる）
+export const GEAR_DROP = 0.15;
 export const rewardRate = (ex) => PLAY_MODES[ex.play]?.reward ?? 1;
 export const dungeonBoss = (dungeonId) => DUNGEONS[dungeonId].floors.flatMap((f) => f.specials || []).find((sp) => sp.type === 'boss')?.boss;
 const bossBeaten = (ex, bossId) => (ex.ex.bossClears[bossId] || 0) > 0 || ex.ex.trip[bossId] === 'boss';
@@ -68,7 +78,7 @@ export function unitOf(ex, idolId) {
   const idol = IDOLS[idolId];
   return (ex.units[idolId] ||= { cls: idol.cls, level: 1, exp: 0, base: { ...idol.base }, learned: [] });
 }
-const slotsOf = (ex) => ex.slots.map((s) => ({ idol: s.idol, song: equippedScore(ex, s.idol)?.song || null, ...unitOf(ex, s.idol) }));
+const slotsOf = (ex) => ex.slots.map((s) => ({ idol: s.idol, song: equippedScore(ex, s.idol)?.song || null, gear: gearEffectsOf(ex, s.idol), ...unitOf(ex, s.idol) }));
 export const familiesOf = (m) => SPELL_FAMILIES.filter((f) => m.abilities.some((a) => a.id === f || (f === 'dark' && a.id === 'sleepStaff')));
 
 // パーティ編成が変わったとき・レベルが上がったときに、HP・呪文の回数・ライブスキルの回数をそろえる
@@ -288,11 +298,14 @@ export function finishBattle(ex, rng = Math.random) {
     if (ex.play === 'drpg' && share + gold > 0) msgs.push(`（DRPGボーナス：経験値 ＋${bonus(share)}・＋${bonus(gold)}G）`);
     ex.gold += gold;
     for (const m of earners) unitOf(ex, m.id).exp += share;
+    const depth = depthOf(ex.ex.dungeon, ex.card ? ex.card.floor : ex.ex.floor); // カードモードはカードの階
+    // 装備は未鑑定で見つかる。うろつく敵はときどき、ルームガーダーとボスは必ず落とす
+    if (ev.kind === 'wander' && rng() < GEAR_DROP * rate) msgs.push(`敵が何か落としていった。${gearName(findGear(ex, depth, rng))}を拾った`);
     if (ev.kind === 'guardian') {
       ex.ex.trip[ev.id] = 'guardian';
       const g = Math.floor((80 + Math.floor(rng() * 40)) * rate);
       ex.gold += g;
-      msgs.push(`宝箱を開けた。${g}G が入っていた`);
+      msgs.push(`宝箱を開けた。${g}G と${gearName(findGear(ex, depth, rng))}が入っていた`);
       if (rng() < 0.6 * rate) {
         const sc = addScore(ex, randomSong(Math.min(5, ex.ex.floor + 2), rng));
         msgs.push(`${scoreName(sc)}を見つけた`);
@@ -307,6 +320,7 @@ export function finishBattle(ex, rng = Math.random) {
       ex.gold += d.gold; ex.items.push(...d.items);
       msgs.push(`${BOSSES[ev.id].name}を倒した！ ${d.gold}G を手に入れた`);
       for (const it of d.items) msgs.push(`「${ITEMS[it].name}」を手に入れた`);
+      msgs.push(`${gearName(findGear(ex, depth, rng, 1))}を見つけた`);
       const sc = addScore(ex, randomSong(d.songRank, rng, true));
       msgs.push(`${scoreName(sc)}を見つけた`);
     }

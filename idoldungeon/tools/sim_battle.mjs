@@ -1,19 +1,28 @@
 // 自動対戦でバランスを測る（おまかせ作戦で戦い続ける）
 // node idoldungeon/tools/sim_battle.mjs [回数]
+//   RANK=n：はじめの装備の代わりに、ランク n までの店の装備（いちばん強い物）を全員に着せて測る
 // 1F・B1F・B2F の徘徊する敵、ルームガーダー、ボスについて、パーティのレベルごとの勝率と残り HP を出す
 import { createBattle, runTurn, autoCommands } from '../js/engine/battle.js';
 import { newExpedition, battleParty, bossGroups, unitOf, syncParty } from '../js/engine/expedition.js';
 import { ENCOUNTERS, FIXED_GROUPS } from '../js/data/enemies.js';
 import { gainExp, expForLevel } from '../js/engine/growth.js';
 import { seeded } from '../js/engine/rng.js';
+import { GEAR } from '../js/data/gear.js';
+import { addGear, autoEquip } from '../js/engine/gear.js';
 
 const N = Number(process.argv[2] || 300);
+const RANK = Number(process.env.RANK || 0);
 const PARTY = [{ idol: 'makoto' }, { idol: 'hibiki' }, { idol: 'haruka' }, { idol: 'ritsuko' }, { idol: 'chihaya' }, { idol: 'yukiho' }];
 
 function partyAt(level, seed) {
   const ex = newExpedition(PARTY);
   const rng = seeded(seed);
   for (const s of PARTY) { const u = unitOf(ex, s.idol); gainExp(u, expForLevel(level), '', rng); }
+  if (RANK) {
+    ex.gear = []; ex.wear = {};
+    for (const g of Object.values(GEAR)) if (g.shop && g.rank <= RANK) for (let i = 0; i < PARTY.length; i++) addGear(ex, g.id, { known: true });
+    for (const s of PARTY) autoEquip(ex, s.idol);
+  }
   ex.hp = {}; ex.mp = {};
   syncParty(ex);
   return battleParty(ex);

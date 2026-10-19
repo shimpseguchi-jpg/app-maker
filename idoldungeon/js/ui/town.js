@@ -7,30 +7,34 @@ import { SPELL_LIST } from '../data/spells.js';
 import { ITEMS } from '../data/items.js';
 import { CONDITIONS } from '../engine/revive.js';
 import { getFloor } from '../engine/dungeon.js';
-import { partyView, scoreName, unitOf, enterDungeon, openDungeons, cardUnlocked, DRPG_BONUS, newExpedition, FIRST_PARTY } from '../engine/expedition.js';
+import { partyView, unitOf, enterDungeon, openDungeons, cardUnlocked, DRPG_BONUS, newExpedition, FIRST_PARTY } from '../engine/expedition.js';
 import { enterCardMode } from '../engine/cards.js';
 import { CARD_DUNGEONS } from '../data/cards.js';
 import { roster, joinParty, leaveParty, moveMember, equip, appraiseAll, hasAppraiser, ROOMS, roomFee, stay, expToNext,
-  shopList, buy, sellList, sell, appraise, appraiseFee, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
-  trainingInfo, doChangeClass, doPromote, prepCheck } from '../engine/town.js';
+  shopList, buy, sellList, sell, appraise, unknownList, unknownCount, treat, treatFee, retrieve, retrieveFee, donate, bestiary,
+  trainingInfo, doChangeClass, doPromote, prepCheck, dressUp, dressAuto, removeCurse, gearShopRank } from '../engine/town.js';
+import { GEAR, GEAR_SLOTS, SLOT_NAME, TYPE_NAME, SETS } from '../data/gear.js';
+import { gearName, gearStats, statText, kindText, canWear, isCursed, wornGear, wornUids, wearerOf, setsOf, cursedWorn } from '../engine/gear.js';
 import { SLOTS, saveSlot, readSlot, clearSlot, exportText, importText } from '../save.js';
 import { BOSSES } from '../data/bosses.js';
 import { bossStage, untilNextStage } from '../engine/boss.js';
 import { sceneSvg, sceneInfo } from './scenes.js';
+import { shortName } from './portrait.js';
 
-export const TABS = [['tavern', '酒場'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['help', '遊び方'], ['depart', '迷宮へ']];
+export const TABS = [['tavern', '酒場'], ['equip', '装備'], ['inn', '宿屋'], ['shop', '商店'], ['temple', '寺院'], ['training', '訓練所'], ['castle', '城'], ['record', '記録'], ['help', '遊び方'], ['depart', '迷宮へ']];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let tab = 'tavern';
 let shopMode = 'buy';
 let ioText = '';
 let trainee = null;   // 訓練所で選んでいるアイドル
+let dresser = null;   // 装備で選んでいるアイドル
 let confirm = null;   // 転職・昇格の確認待ち { kind, cls, item }
 let wipeAsk = null;   // 記録：消す前の確認 'reset'（今の冒険を最初から）| 記録枠の番号
 
 // エルミナージュの施設画面：背景画の上に、左上の縦メニュー（施設）と、こげ茶の板（中身）。施設の人のひとことは下の窓
 export function renderTown(ex) {
   const tabs = TABS.map(([id, nm]) => `<button data-tab="${id}" class="vbar ${id === tab ? 'on' : ''} ${id === 'depart' ? 'go' : ''}">${nm}</button>`).join('');
-  const body = (HOWTO[tab] ? `<p class="howto">${HOWTO[tab]}</p>` : '') + { tavern, inn, shop, temple, training, castle, record, help, depart }[tab](ex);
+  const body = (HOWTO[tab] ? `<p class="howto">${HOWTO[tab]}</p>` : '') + { tavern, equip: dress, inn, shop, temple, training, castle, record, help, depart }[tab](ex);
   return `${sceneSvg(tab)}
     <nav class="vmenu town-menu" aria-label="施設">${tabs}</nav>
     <section class="panel town-panel"><h2 class="plate">${esc(sceneInfo(tab).name)}</h2>${body}</section>`;
@@ -39,10 +43,11 @@ export function renderTown(ex) {
 export const openTab = (id) => { if (TABS.some(([t]) => t === id)) tab = id; };
 // 各施設でできること（いちばん上に1行で出す）
 const HOWTO = {
-  tavern: 'パーティを組み（6人まで。先頭3人が前列）、<b>楽譜を装備</b>するところ。楽譜は1人1枚、名前の横の欄から選ぶ。',
+  tavern: 'パーティを組むところ（6人まで。先頭3人が前列）。名前の横の「装備」で、その子の装備を着せかえられる。',
+  equip: '<b>小道具（武器）・衣装（防具）・アクセサリ・楽譜</b>の4つを着せかえる。使える種類はクラスで決まる。迷ったら「おまかせ」。',
   inn: '泊まると<b>呪文とライブの回数が全快</b>し、<b>ためた経験値でレベルが上がる</b>。HP の回復は部屋しだい。',
-  shop: '楽譜と昇格アイテムを買う・売る。迷宮で拾った<b>未鑑定の楽譜</b>はここで鑑定すると装備できる。',
-  temple: '倒れた仲間の<b>治療・蘇生</b>と、迷宮に取り残された仲間の<b>回収</b>。寄付すると経験値になる。',
+  shop: '装備・楽譜・昇格アイテムを買う・売る。迷宮で拾った<b>未鑑定</b>の楽譜・装備はここで鑑定できる。',
+  temple: '倒れた仲間の<b>治療・蘇生</b>、呪いの装備の<b>解呪</b>、迷宮に取り残された仲間の<b>回収</b>。寄付すると経験値になる。',
   training: '<b>転職</b>（能力が条件を満たせば Lv1 から別のクラスへ）と<b>昇格</b>（Lv10 以上で昇格アイテムを使い上位職へ）。',
   castle: '出会った魔物の記録と、持っている昇格アイテムを見られる。',
 };
@@ -74,27 +79,86 @@ function depart(ex) {
 function tavern(ex) {
   const party = partyView(ex);
   const list = roster(ex);
-  const worn = new Set(Object.values(ex.equip));
-  const known = ex.scores.filter((sc) => sc.known);
-  const songOpts = (id) => `<option value="">（楽譜なし）</option>` + known.map((sc) =>
-    `<option value="${sc.uid}" ${ex.equip[id] === sc.uid ? 'selected' : ''} ${worn.has(sc.uid) && ex.equip[id] !== sc.uid ? 'disabled' : ''}>★${SONGS[sc.song].rank} ${esc(SONGS[sc.song].title)}</option>`).join('');
+  // 装備の早見：小道具・衣装・アクセサリ・楽譜のうち、つけている数
+  const filled = (m) => Object.values(wornGear(ex, m.id)).filter(Boolean).length + (ex.equip[m.id] ? 1 : 0);
   const rows = party.map((m, i) => `${i === 0 ? '<div class="row-label">前列</div>' : i === 3 ? '<div class="row-label">後列</div>' : ''}
     <div class="tv-row" style="--c:${m.idol.color}">
       <b>${esc(m.idol.name)}</b> <small class="sub">${esc(CLASSES[m.cls].name)} Lv${m.level}</small>
       ${m.cond !== 'ok' ? `<span class="cond ${m.cond}">${CONDITIONS[m.cond].name}</span>` : ''}
-      <select data-equip="${m.id}" aria-label="楽譜">${songOpts(m.id)}</select>
+      <button data-dress="${m.id}" class="dress-btn">装備 ${filled(m)}/4</button>
       <span class="moves"><button data-up="${m.id}" aria-label="前へ">▲</button><button data-down="${m.id}" aria-label="後ろへ">▼</button><button data-leave="${m.id}">外す</button></span>
     </div>`).join('');
   const waiting = list.filter((r) => !r.inParty).map((r) => `<button data-join="${r.id}" ${r.lost ? 'disabled' : ''} style="--c:${r.idol.color}" class="wait">
     ${esc(r.idol.name)} <small>${esc(CLASSES[r.cls].name)} Lv${r.level}${r.lost ? '・迷宮に取り残されている' : r.cond !== 'ok' ? '・' + CONDITIONS[r.cond].name : ''}</small></button>`).join('');
-  const unknown = ex.scores.filter((sc) => !sc.known).length;
   return `<h3>パーティ <small class="sub">${party.length}/6人。先頭3人が前列</small></h3>
     <div class="tv-party">${rows || '<p class="sub">だれもいない。下から選んで加えよう</p>'}</div>
     <h3>待機中のアイドル</h3><div class="wait-grid">${waiting}</div>
-    <h3>楽譜</h3>
-    <p class="sub">鑑定済み ${known.length}・未鑑定 ${unknown}${unknown ? (hasAppraiser(ex) ? '' : '（ビショップがいれば、ここでまとめて鑑定できる。商店でも有料で鑑定できる）') : ''}</p>
-    ${unknown && hasAppraiser(ex) ? '<button data-t="appraiseAll">まとめて鑑定</button>' : ''}
+    <h3>鑑定</h3>${appraiseNote(ex)}
     <p class="sub">パーティ編成画面（party.html）はシナジーを試すための場所です。冒険のパーティはこの酒場で組みます。</p>`;
+}
+
+// 未鑑定の楽譜・装備と、ビショップのまとめて鑑定（酒場と装備で出す）
+function appraiseNote(ex) {
+  const n = unknownCount(ex);
+  if (!n) return '<p class="sub">未鑑定の楽譜・装備はない</p>';
+  return `<p class="sub">未鑑定の楽譜・装備が ${n} つ${hasAppraiser(ex) ? '' : '（ビショップがいれば、ここでまとめて鑑定できる。商店でも有料で鑑定できる）'}</p>
+    ${hasAppraiser(ex) ? '<button data-t="appraiseAll">まとめて鑑定</button>' : ''}`;
+}
+
+// 装備：小道具・衣装・アクセサリ・楽譜の4部位（docs/DESIGN.md 18章）
+const setTag = (g) => (g.known && GEAR[g.item].set ? `［${SETS[GEAR[g.item].set].name}］` : '');
+const SHOW_STATS = ['hp', 'atk', 'mat', 'def', 'res', 'hit', 'eva', 'spd', 'crit'];
+function dress(ex) {
+  const party = partyView(ex);
+  if (!party.length) return '<p class="sub">パーティがいない。酒場で組もう</p>';
+  if (!party.some((m) => m.id === dresser)) dresser = party[0].id;
+  const pick = party.map((m) => `<button data-dresser="${m.id}" class="chip ${m.id === dresser ? 'on' : ''}" style="--c:${m.idol.color}">${esc(shortName(m.id))}</button>`).join('');
+  const m = party.find((x) => x.id === dresser), c = CLASSES[m.cls];
+  const worn = wornGear(ex, m.id), list = Object.values(worn).filter(Boolean);
+  const gearRow = (slot) => {
+    const cur = worn[slot], locked = cur && isCursed(cur);
+    const opts = ex.gear.filter((g) => GEAR[g.item].slot === slot && canWear(m.cls, g.item)).map((g) => {
+      const who = wearerOf(ex, g.uid), other = who && who !== m.id;
+      return `<option value="${g.uid}" ${cur?.uid === g.uid ? 'selected' : ''} ${other && isCursed(g) ? 'disabled' : ''}>${esc(gearName(g))}${setTag(g)}${g.known ? '　' + esc(statText(gearStats(g))) : ''}${other ? `（${esc(IDOLS[who].name)}）` : ''}</option>`;
+    }).join('');
+    return `<label class="eq-row"><span>${SLOT_NAME[slot]}</span><select data-wear="${slot}" ${locked ? 'disabled' : ''} aria-label="${SLOT_NAME[slot]}"><option value="">（なし）</option>${opts}</select></label>
+      ${locked ? '<small class="cond eq-note">呪われていて外せない（寺院で解呪できる）</small>' : ''}`;
+  };
+  const songWorn = new Set(Object.values(ex.equip));
+  const songOpts = ex.scores.filter((sc) => sc.known).map((sc) => { const other = songWorn.has(sc.uid) && ex.equip[m.id] !== sc.uid;
+    return `<option value="${sc.uid}" ${ex.equip[m.id] === sc.uid ? 'selected' : ''} ${other ? 'disabled' : ''}>★${SONGS[sc.song].rank} ${esc(SONGS[sc.song].title)}${other ? '（装備中）' : ''}</option>`; }).join('');
+  const song = ex.equip[m.id] && ex.scores.find((sc) => sc.uid === ex.equip[m.id]);
+  // 装備で増えている値（強化値・衣装セット込み）
+  const plus = {};
+  for (const g of list) for (const [k, v] of Object.entries(gearStats(g))) plus[k] = (plus[k] || 0) + v;
+  const sets = setsOf(list);
+  for (const st of sets) for (const e of st.effects) if (e.type === 'stat' && e.add) plus[e.stat] = (plus[e.stat] || 0) + e.add;
+  const stats = SHOW_STATS.map((k) => `<span>${STAT_NAME[k]}<b>${k === 'hp' ? m.maxHp : m.stats[k]}${plus[k] ? `<small class="${plus[k] > 0 ? 'up' : 'down'}">${plus[k] > 0 ? '+' : ''}${plus[k]}</small>` : ''}</b></span>`).join('');
+  const setLine = sets.length ? sets.map((st) => `<b>${esc(st.name)}セット ${st.count}/${st.of}</b>：${esc(st.effects.map((e) => e.type === 'stat' ? `${STAT_NAME[e.stat]}${e.pct ? `+${e.pct}%` : `+${e.add}`}` : e.name).join(' '))}`).join('<br>') : '';
+  const can = `小道具：${c.weapons.map((t) => TYPE_NAME[t]).join('・') || 'なし'}　衣装：${{ heavy: '重い衣装まで', light: '軽い衣装まで', robe: 'ローブだけ' }[c.armor]}　アクセサリ：だれでも`;
+  // 持ち物の装備（だれが着ているか・パーティのだれが着られるか）
+  const taken = wornUids(ex);
+  const bag = ex.gear.slice().sort((a, b) => GEAR_SLOTS.indexOf(GEAR[a.item].slot) - GEAR_SLOTS.indexOf(GEAR[b.item].slot) || GEAR[b.item].rank - GEAR[a.item].rank).map((g) => {
+    const who = wearerOf(ex, g.uid);
+    const fit = party.filter((p) => canWear(p.cls, g.item)).map((p) => shortName(p.id));
+    return `<li><b>${esc(gearName(g))}</b>${setTag(g)} <small class="sub">${esc(kindText(g.item))}${g.known ? '・' + esc(statText(gearStats(g))) : ''}・${who ? `${esc(IDOLS[who].name)}が装備中` : fit.length ? `着られる：${esc(fit.join('・'))}` : 'パーティのだれも着られない'}</small></li>`;
+  }).join('');
+  return `<div class="chips" role="group" aria-label="だれの装備">${pick}</div>
+    <div class="tr-head" style="--c:${m.idol.color}"><b>${esc(m.idol.name)}</b>
+      <span>${esc(c.name)} Lv${m.level}・${m.row === 'front' ? '前列' : '後列'}・射程${c.range}</span>
+      <small class="sub">${esc(can)}</small>
+      <div class="stats">${stats}</div>
+      ${setLine ? `<small class="sub">${setLine}</small>` : ''}</div>
+    <div class="eq">
+      ${GEAR_SLOTS.map(gearRow).join('')}
+      <label class="eq-row"><span>楽譜</span><select data-equip="${m.id}" aria-label="楽譜"><option value="">（なし）</option>${songOpts}</select></label>
+      ${song ? `<small class="sub eq-note">${esc(songNote(song.song))}</small>` : ''}
+    </div>
+    <div class="row"><button data-t="dressAuto">おまかせ（${esc(m.idol.name)}）</button><button data-t="dressAll">全員おまかせ</button></div>
+    <p class="sub">おまかせは、鑑定済みで呪われていない装備から選ぶ（楽譜は自分で選ぶ）。未鑑定の装備も着られるが、呪われていると外せなくなる。</p>
+    <h3>持ち物の装備 <small class="sub">${ex.gear.length}個・装備中 ${taken.size}</small></h3>
+    ${bag ? `<ul class="plain bag">${bag}</ul>` : '<p class="sub">装備を持っていない。商店で買うか、迷宮で見つけよう</p>'}
+    <h3>鑑定</h3>${appraiseNote(ex)}`;
 }
 
 function inn(ex) {
@@ -109,13 +173,20 @@ function shop(ex) {
   const modes = [['buy', '買う'], ['sell', '売る'], ['appraise', '鑑定']].map(([id, nm]) => `<button data-shop="${id}" class="${id === shopMode ? 'on' : ''}">${nm}</button>`).join('');
   let body;
   if (shopMode === 'buy') {
-    body = `<div class="shop">${shopList(ex).map((it) => `<button data-t="buy" data-id="${it.id}" ${it.stock <= 0 || ex.gold < it.price ? 'disabled' : ''}>${esc(it.name)} <small>${it.price}G${it.stock === Infinity ? '' : ` 残り${it.stock}`}${it.kind === 'song' ? '・' + esc(songNote(it.id)) : ''}</small></button>`).join('')}</div>`;
+    const party = partyView(ex);
+    const note = (it) => it.kind === 'song' ? '・' + esc(songNote(it.id))
+      : it.kind === 'gear' ? `・${esc(kindText(it.id))}・${esc(statText(GEAR[it.id].stats))}・${(() => { const fit = party.filter((p) => canWear(p.cls, it.id)).map((p) => shortName(p.id)); return fit.length ? `着られる：${esc(fit.join('・'))}` : 'パーティのだれも着られない'; })()}` : '';
+    const btn = (it) => `<button data-t="buy" data-id="${it.id}" ${it.stock <= 0 || ex.gold < it.price ? 'disabled' : ''}>${esc(it.name)} <small>${it.price}G${it.stock === Infinity ? '' : ` 残り${it.stock}`}${note(it)}</small></button>`;
+    const all = shopList(ex), gear = all.filter((it) => it.kind === 'gear');
+    body = `<h3>装備 <small class="sub">ランク${gearShopRank(ex)}まで（迷宮のボスを倒すと品ぞろえが増える）</small></h3>
+      <div class="shop">${gear.map(btn).join('')}</div>
+      <h3>楽譜・昇格アイテム</h3><div class="shop">${all.filter((it) => it.kind !== 'gear').map(btn).join('')}</div>`;
   } else if (shopMode === 'sell') {
     const list = sellList(ex);
-    body = list.length ? `<div class="shop">${list.map((it) => `<button data-t="sell" data-kind="${it.kind}" data-id="${it.ref}">${esc(it.name)} <small>${it.price}G で売る</small></button>`).join('')}</div>` : '<p class="sub">売れるものがない（装備中の楽譜は売れない）</p>';
+    body = list.length ? `<div class="shop">${list.map((it) => `<button data-t="sell" data-kind="${it.kind}" data-id="${it.ref}">${esc(it.name)} <small>${it.price}G で売る</small></button>`).join('')}</div>` : '<p class="sub">売れるものがない（装備中の楽譜・装備は売れない）</p>';
   } else {
-    const list = ex.scores.filter((sc) => !sc.known);
-    body = list.length ? `<div class="shop">${list.map((sc) => `<button data-t="appraise" data-id="${sc.uid}" ${ex.gold < appraiseFee(sc.song) ? 'disabled' : ''}>${esc(scoreName(sc))} <small>${appraiseFee(sc.song)}G</small></button>`).join('')}</div>` : '<p class="sub">未鑑定の楽譜はない</p>';
+    const list = unknownList(ex);
+    body = list.length ? `<div class="shop">${list.map((x) => `<button data-t="appraise" data-id="${x.uid}" ${ex.gold < x.fee ? 'disabled' : ''}>${esc(x.name)} <small>${x.fee}G</small></button>`).join('')}</div>` : '<p class="sub">未鑑定の楽譜・装備はない</p>';
   }
   return `<div class="tabs sub-tabs">${modes}</div>${body}`;
 }
@@ -125,8 +196,11 @@ function temple(ex) {
   const list = roster(ex);
   const sick = list.filter((r) => ['dead', 'ash', 'paralyze', 'stone', 'poison'].includes(r.cond) && !r.lost);
   const lost = list.filter((r) => r.lost);
+  const cursed = cursedWorn(ex);
   return `<h3>治療・蘇生 <small class="sub">料金はレベルに応じる。灰の蘇生に失敗しても灰のまま</small></h3>
     ${sick.length ? `<div class="town-grid">${sick.map((r) => `<button data-t="treat" data-id="${r.id}">${esc(r.idol.name)} <small>${CONDITIONS[r.cond].name}・${treatFee(ex, r.id)}G</small></button>`).join('')}</div>` : '<p class="sub">治療が必要な仲間はいない</p>'}
+    <h3>解呪 <small class="sub">呪いを解くと、その装備は崩れてなくなる</small></h3>
+    ${cursed.length ? `<div class="town-grid">${cursed.map((x) => `<button data-t="uncurse" data-id="${x.id}" data-slot="${x.slot}" ${ex.gold < x.fee ? 'disabled' : ''}>${esc(IDOLS[x.id].name)}の${esc(gearName(x.g))} <small>${x.fee}G</small></button>`).join('')}</div>` : '<p class="sub">呪われた装備をつけている仲間はいない</p>'}
     <h3>死体の回収</h3>
     ${lost.length ? `<div class="town-grid">${lost.map((r) => { const at = ex.lost[r.id]; return `<button data-t="retrieve" data-id="${r.id}">${esc(r.idol.name)} <small>${retrieveFee(ex, r.id)}G・${getFloor(at.dungeon || 'd1', at.floor).name}${at.card ? '（カードモード）' : ` X${at.x} Y${at.y}`}</small></button>`; }).join('')}</div>
       <p class="sub">自分たちで探しに行けば無料（DRPGモードはそのマスに行く、カードモードはその階の「仲間の死体」カードで連れて帰る。パーティに空きが必要）</p>` : '<p class="sub">迷宮に取り残された仲間はいない</p>'}
@@ -187,19 +261,22 @@ function castle(ex) {
 function help() {
   return `<h3>冒険の流れ</h3>
     <ol class="plain">
-      <li><b>酒場</b>でパーティを組み、<b>楽譜を装備</b>する</li>
+      <li><b>酒場</b>でパーティを組み、<b>装備</b>で小道具・衣装・アクセサリ・楽譜を着せる</li>
       <li><b>迷宮へ</b>から出発。「出発前のチェック」で準備の抜けを確かめられる</li>
-      <li>迷宮で戦って経験値・お金・楽譜を集め、階段で街に戻る</li>
+      <li>迷宮で戦って経験値・お金・装備・楽譜を集め、階段で街に戻る</li>
       <li><b>宿屋</b>に泊まる（ここでレベルが上がる）。倒れた仲間は<b>寺院</b>へ</li>
       <li>ボスを倒すと次の迷宮と、その迷宮のカードモードが開く。倒したボスは街に戻ると復活し、<b>5回倒すごとに1段階強くなる</b>（城で段階を確かめられる）</li>
     </ol>
-    <h3>装備：楽譜</h3>
+    <h3>装備（4つの部位）</h3>
     <ul class="plain">
-      <li>このゲームの装備品は<b>楽譜</b>（アイドルの曲）。1人1枚まで</li>
-      <li>酒場のパーティ欄で、名前の横の「楽譜」の欄から選ぶ。外すときは「（楽譜なし）」</li>
-      <li>能力が上がったり、戦闘で使える<b>ライブスキル</b>（曲ごとの必殺技。泊まると回数が戻る）が使えるようになる</li>
-      <li>迷宮で拾った楽譜は「？？？の楽譜」（<b>未鑑定</b>）。商店の「鑑定」か、ビショップがいれば酒場の「まとめて鑑定」で使えるようになる</li>
-      <li>新しい楽譜は商店でも買える（ボスを倒すと品ぞろえが増える）</li>
+      <li>部位は<b>小道具</b>（武器）・<b>衣装</b>（防具）・<b>アクセサリ</b>・<b>楽譜</b>の4つ。街の「<b>装備</b>」（酒場の名前の横の「装備」からも行ける）で、1人ずつ着せかえる</li>
+      <li>使える種類は<b>クラスで決まる</b>。小道具は剣・槍・斧・弓・短剣・杖、衣装は重い衣装・軽い衣装・ローブ（魔法職はローブだけ）。アクセサリはだれでも使える。転職・昇格で使えなくなった物は外れる</li>
+      <li>迷ったら「<b>おまかせ</b>」。持っている装備から、そのクラスにいちばん合う物を着せる</li>
+      <li>名前の後ろの <b>+1〜+3</b> は強化値で、数字のぶん強い。深い階ほど出やすい</li>
+      <li>迷宮で拾った装備は「？？？の剣」のような<b>未鑑定</b>。そのまま着られるが、<b>呪われていると外せなくなる</b>（−1・−2 や「（呪）」の付いた物）。寺院で<b>解呪</b>すると外れるが、その装備は崩れてなくなる。商店かビショップに鑑定してもらうと安心</li>
+      <li><b>衣装セット</b>：同じシリーズ（騎士団・怪盗・星空・狩人）の小道具・衣装・アクセサリを<b>2つそろえると効果</b>が出て、<b>3つで大きな効果</b>。セットの装備は店になく、迷宮で見つかる</li>
+      <li><b>楽譜</b>（アイドルの曲）は1人1枚。能力が上がったり、戦闘で使える<b>ライブスキル</b>（曲ごとの必殺技。泊まると回数が戻る）が使えるようになる。楽譜だけは鑑定するまで装備できない</li>
+      <li>装備・楽譜は商店でも買える（迷宮のボスを倒すと品ぞろえが増える）</li>
     </ul>
     <h3>昇格アイテム</h3>
     <ul class="plain">
@@ -254,6 +331,9 @@ export function townAction(ex, el, rng = Math.random) {
   if (d.tab) { tab = d.tab; wipeAsk = null; return { msgs: [] }; }
   if (d.shop) { shopMode = d.shop; return { msgs: [] }; }
   if (d.trainee) { trainee = d.trainee; confirm = null; return { msgs: [] }; }
+  if (d.dresser) { dresser = d.dresser; return { msgs: [] }; }
+  if (d.dress) { dresser = d.dress; tab = 'equip'; return { msgs: [] }; }
+  if (d.wear) return { msgs: dressUp(ex, dresser, d.wear, el.value ? Number(el.value) : null) };
   if (d.join) return { msgs: joinParty(ex, d.join) };
   if (d.leave) return { msgs: leaveParty(ex, d.leave) };
   if (d.up) return { msgs: moveMember(ex, d.up, -1) };
@@ -263,6 +343,9 @@ export function townAction(ex, el, rng = Math.random) {
     case 'enter': return { msgs: enterDungeon(ex, d.id) };
     case 'enterCard': return { msgs: enterCardMode(ex, d.id, rng) };
     case 'appraiseAll': return { msgs: appraiseAll(ex) };
+    case 'dressAuto': return { msgs: dressAuto(ex, [dresser]) };
+    case 'dressAll': return { msgs: dressAuto(ex, ex.slots.map((s) => s.idol)) };
+    case 'uncurse': return { msgs: removeCurse(ex, d.id, d.slot) };
     case 'change': confirm = { kind: 'change', cls: d.cls }; return { msgs: [] };
     case 'promote': confirm = { kind: 'promote', cls: d.cls, item: d.item }; return { msgs: [] };
     case 'trainNo': confirm = null; return { msgs: [] };
@@ -272,7 +355,7 @@ export function townAction(ex, el, rng = Math.random) {
     }
     case 'stay': return { msgs: stay(ex, d.id, rng) };
     case 'buy': return { msgs: buy(ex, d.id) };
-    case 'sell': return { msgs: sell(ex, d.kind, d.kind === 'score' ? Number(d.id) : d.id) };
+    case 'sell': return { msgs: sell(ex, d.kind, d.kind === 'item' ? d.id : Number(d.id)) };
     case 'appraise': return { msgs: appraise(ex, Number(d.id)) };
     case 'treat': return { msgs: treat(ex, d.id, rng) };
     case 'retrieve': return { msgs: retrieve(ex, d.id) };

@@ -48,7 +48,8 @@ function say(msgs) { for (const m of msgs) log.push(m); while (log.length > 40) 
 
 // ── 描画 ──
 function render() {
-  const town = ex.mode === 'town', battle = !!(ex.battle || battleEnd), cards = ex.mode === 'card' && !!ex.card && !battle;
+  // カードモードでボスに勝つと、データの上ではもう街にいる。戦闘の再生と結果を見せ終わるまでは戦闘の画面のまま
+  const battle = !!(ex.battle || battleEnd), town = ex.mode === 'town' && !battle, cards = ex.mode === 'card' && !!ex.card && !battle;
   const st = ex.ex;
   const fl = getFloor(st.dungeon, st.floor);
   const ch = fl.cellAt(st.x, st.y);
@@ -180,7 +181,7 @@ function renderBattle() {
   else if (battleEnd) {
     ctl = `<div class="who">${{ win: '勝利！', flee: '逃げ切った', lose: '全滅……' }[b.result]}</div>
       <div class="bres">${battleEnd.msgs.map((m) => `<div>${esc(m)}</div>`).join('')}</div>
-      <div class="vmenu"><button data-b="end" class="vbar on">探索に戻る</button></div>`;
+      <div class="vmenu"><button data-b="end" class="vbar on">${ex.mode === 'town' ? '街に戻る' : '探索に戻る'}</button></div>`;
   } else if (b.turn === 0 && b.surprise === 'enemy') {
     ctl = '<div class="who">不意を突かれた！</div><div class="vmenu"><button data-b="go" class="vbar on">次へ</button></div>';
   } else if (cmdIdx >= b.party.length) {

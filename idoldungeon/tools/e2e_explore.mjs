@@ -10,6 +10,7 @@ import { newExpedition, unitOf, syncParty } from '../js/engine/expedition.js';
 import { gainExp, expForLevel } from '../js/engine/growth.js';
 import { seeded } from '../js/engine/rng.js';
 import { DUNGEONS } from '../js/data/floors.js';
+import { STARTER_GEAR } from '../js/data/gear.js';
 
 const url = process.env.URL || 'http://localhost:8123/idoldungeon/explore.html';
 const KEYS = { forward: 'ArrowUp', turnL: 'ArrowLeft', turnR: 'ArrowRight', search: ' ', stairs: 'Enter' };
@@ -107,6 +108,25 @@ for (let guard = 0; guard < 400; guard++) {
   const ex = await state();
   results.card = { town: ex.mode === 'town' && !ex.card, clears: ex.ex.bossClears.b1, cards: cardsSeen };
 }
+// 装備：酒場の「装備」から衣装部屋へ。拾った装備を商店で鑑定して、全員おまかせで着せる
+{
+  const before = await state();
+  // ボス戦の再生と結果を閉じる
+  for (let i = 0; i < 20 && await page.isVisible('#battle'); i++) {
+    for (const sel of ['[data-b=skip]', '[data-b=end]']) if (await page.isVisible(sel)) { await page.click(sel); break; }
+  }
+  await page.click('[data-tab=tavern]');
+  await page.click('[data-dress=ami]');
+  const tab = await page.isVisible('select[data-wear=weapon]') && await page.isVisible('select[data-wear=armor]') && await page.isVisible('select[data-equip=ami]');
+  await page.click('[data-tab=shop]');
+  await page.click('[data-shop=appraise]');
+  for (let i = 0; i < 40 && await page.isVisible('[data-t=appraise]:not([disabled])'); i++) await page.click('[data-t=appraise]:not([disabled])');
+  await page.click('[data-tab=equip]');
+  await page.click('[data-t=dressAll]');
+  const after = await state();
+  const unknown = (e) => e.gear.filter((g) => !g.known).length;
+  results.equip = { unknownScore: before.scores.some((sc) => !sc.known), tab, found: before.gear.length - STARTER_GEAR.length, appraised: unknown(before) - unknown(after), worn: Object.values(after.wear).flatMap((w) => Object.values(w)).length };
+}
 const ex = await state();
 const shot = (process.env.OUT || (await import('os')).tmpdir()) + '/e2e_explore_town.png';
 await page.screenshot({ path: shot });
@@ -118,10 +138,11 @@ ok(results.d1.town && results.d1.boss, '劇場地下迷宮：ボスを倒して�
 ok(results.d2.town && results.d2.boss, '奈落の大劇場：ボスを倒して街に戻った');
 ok(results.d2.floors === 5, '奈落の大劇場の5つの階をオートマップに記録');
 ok(ex.items.length >= 2, 'ボスのドロップ（昇格アイテム）');
-ok(ex.scores.some((sc) => !sc.known), 'ボスのドロップ（未鑑定の楽譜）');
+ok(results.equip.unknownScore, 'ボスのドロップ（未鑑定の楽譜。最後に商店で鑑定する前）');
 const per = (d, k) => (ex.ex.dungeon === d ? ex.ex[k] : ex.ex.maps[d][k]); // 鍵・スイッチは迷宮ごとに記録（いまいる迷宮のぶんは ex.ex に出ている）
 ok(per('d2', 'keys').includes('propKey') && per('d2', 'flags').d2gate && per('d1', 'keys').includes('silverKey'), '両方の迷宮の鍵とスイッチ（迷宮ごとに記録）');
 ok(results.card.town && results.card.clears === 2 && results.card.cards >= 21, `カードモード：劇場地下迷宮をボスまで進んで街に戻った（${results.card.cards}枚）`);
+ok(results.equip.tab && results.equip.found > 0 && results.equip.appraised > 0 && results.equip.worn >= 12, `装備：拾った装備を鑑定して着せる（拾った ${results.equip.found}・鑑定 ${results.equip.appraised}・着ている ${results.equip.worn}）`);
 ok(guardians > 0, `ルームガーダーの部屋では挑むか聞かれる（${guardians}回）`);
 ok(plays > 0, '戦闘のターンを1人ずつ再生する（行動順の表示と「とばす」）');
 ok(!errors.length, 'ページのエラー: ' + errors.join(' / '));

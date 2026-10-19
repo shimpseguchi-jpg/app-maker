@@ -28,6 +28,17 @@ const SCENES = {
       <rect x="0" y="330" width="800" height="22" fill="#5a3418"/><rect x="0" y="352" width="800" height="98" fill="#3a2010"/>
       <rect width="800" height="450" fill="url(#glow)"/>${person(400, '#5a2030')}`,
   },
+  equip: {
+    name: '衣装部屋', speaker: '衣装係', line: '小道具も衣装も、役に合ったものを選んでね。呪われたものには気をつけて。',
+    svg: () => `${bg('#3a1e2a', '#120810')}
+      <path d="M40 80 h330 M430 80 h330" stroke="#8a6a3a" stroke-width="6"/>
+      ${[70, 130, 190, 250, 310].map((x, i) => `<path d="M${x} 80 v14 l-34 40 l10 150 h48 l10 -150 l-34 -40" fill="${['#7a2a3a', '#2a4a7a', '#c9a24a', '#3a6a4a', '#6a3a7a'][i]}" opacity=".85"/>`).join('')}
+      ${[460, 520, 580].map((x, i) => `<path d="M${x} 80 v14 l-26 34 v160 h52 v-160 l-26 -34" fill="${['#5a5a6a', '#8a2a2a', '#2a3a5a'][i]}" opacity=".85"/>`).join('')}
+      <rect x="630" y="100" width="110" height="200" rx="50" fill="#1a1420" stroke="#c9a24a" stroke-width="6"/>
+      ${[0, 1, 2, 3, 4, 5].map((i) => `<circle cx="${640 + (i % 2) * 90}" cy="${120 + Math.floor(i / 2) * 80}" r="6" fill="#ffe7a0"/>`).join('')}
+      <rect y="320" width="800" height="130" fill="#2a1418"/><rect x="0" y="320" width="800" height="10" fill="#4a2a2a"/>
+      <rect width="800" height="450" fill="url(#glow)"/>${person(400, '#6a2a4a', '<path d="M-30 196 h60 l-6 -10 h-48 Z" fill="#c9a24a"/>')}`,
+  },
   inn: {
     name: '宿屋', speaker: '宿屋の女将', line: 'お疲れさま。ゆっくり休めば、次の舞台もきっとうまくいくわ。',
     svg: () => `${bg('#16182e', '#0b0a14')}
