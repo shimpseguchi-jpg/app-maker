@@ -3,7 +3,7 @@
 > 姉妹作：本格デッキ構築ゲーム **[アルカナンバー](arcanumber/)**（`arcanumber/` フォルダ）もあります。
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
-> 要件定義中：算数のデジタルTCG・デッキ構築型ローグライク **さんすうTCG（仮）**（[`mathtcg/docs/REQUIREMENTS.md`](mathtcg/docs/REQUIREMENTS.md)）。
+> 要件定義中：算数のデジタルTCG・デッキ構築型ローグライク **マスマティック・ザ・ギャザリング**（[`mathtcg/docs/REQUIREMENTS.md`](mathtcg/docs/REQUIREMENTS.md)）。
 
 小学1〜3年生むけの **ローグライク × デッキ構築** ゲームです。
 カードを「じゅもんの わく」に並べると、**数が 0 から左→右の順に計算**され、できた数で敵を攻撃します。
