@@ -2,6 +2,7 @@
 
 > 姉妹作：本格デッキ構築ゲーム **[アルカナンバー](arcanumber/)**（`arcanumber/` フォルダ）もあります。
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
+> Android アプリ：撮ってすぐ Google ドライブへ送る **[撮ってDrive](photodrive/)**（`photodrive/` フォルダ）。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
 
 小学1〜3年生むけの **ローグライク × デッキ構築** ゲームです。
