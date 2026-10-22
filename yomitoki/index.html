@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="よみとき">
+<meta name="theme-color" content="#2f8f86">
+<meta name="description" content="小学1年生むけ。文章題を読んで式をつくる力と、計算の力をきたえる学習ゲーム。">
+<title>よみとき でんしゃ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="boot" style="position:fixed;left:16px;right:16px;top:44%;z-index:999;text-align:center;color:#5a6b68;font:700 18px/1.6 sans-serif">よみこみちゅう…</div>
+<script>
+// iPad には コンソールが ないので、よみこみに しっぱいしたら りゆうを がめんに だす
+(function () {
+  function show(msg) {
+    var b = document.getElementById('boot');
+    if (!b || window.__bootDone) return;
+    b.style.color = '#d0453a';
+    b.textContent = 'うまく よみこめませんでした：' + msg;
+  }
+  window.addEventListener('error', function (e) { show((e.message || 'error') + (e.lineno ? '（' + e.lineno + ':' + e.colno + '）' : '')); });
+  window.addEventListener('unhandledrejection', function (e) { show(String(e.reason && (e.reason.message || e.reason))); });
+})();
+</script>
+<div id="stage"></div>
+<div class="rotate-hint"><div class="ph">📱</div><p>iPadを よこむきに してね</p><button data-portrait>このまま あそぶ</button></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

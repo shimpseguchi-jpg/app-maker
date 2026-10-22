@@ -1,11 +1,12 @@
 // アルカナンバー を Google Apps Script の ウェブアプリとして ひらく
 // ・ふつうに ひらく → アルカナンバー
 // ・URL の さいごに ?game=kazumaho を つける → かずまほ（kazumaho.html を いれた ときだけ）
+// ・URL の さいごに ?game=yomitoki を つける → よみとき でんしゃ（yomitoki.html を いれた ときだけ）
 // ・「きょうの ちょうせん」の ランキングを この スクリプトに ほぞんする（スクリプト プロパティ）
 function doGet(e) {
   var want = (e && e.parameter && e.parameter.game) || 'arcanumber';
-  var game = want === 'kazumaho' ? 'kazumaho' : 'arcanumber';
-  var titles = { arcanumber: 'アルカナンバー', kazumaho: 'かずまほ' };
+  var game = want === 'kazumaho' || want === 'yomitoki' ? want : 'arcanumber';
+  var titles = { arcanumber: 'アルカナンバー', kazumaho: 'かずまほ', yomitoki: 'よみとき でんしゃ' };
   var out;
   try {
     out = HtmlService.createHtmlOutputFromFile(game);
