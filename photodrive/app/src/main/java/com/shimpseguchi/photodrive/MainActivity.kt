@@ -241,7 +241,8 @@ class MainActivity : AppCompatActivity() {
             if (videoMode) {
                 val recorder = Recorder.Builder()
                     .setQualitySelector(
-                        QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.HD))
+                        // フルHDを優先し、使えない機種では近い画質にする
+                        QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.FHD))
                     )
                     .build()
                 val vc = VideoCapture.withOutput(recorder).also { it.targetRotation = rotation }
