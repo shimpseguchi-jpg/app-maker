@@ -15,7 +15,7 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import kotlin.random.Random
 
-/** GAS と Drive の再開可能アップロードを真似たサーバーで、送信の手順を確かめる。 */
+/** Drive API と再開可能アップロードを真似たサーバーで、送信の手順を確かめる。 */
 class DriveUploaderTest {
     private val server = MockWebServer()
     private val base get() = server.url("/").toString().trimEnd('/')
@@ -23,36 +23,39 @@ class DriveUploaderTest {
     private val received = ByteArrayOutputStream()
     /** 1回目の PUT では、受け取った量より少なく「ここまで受け取った」と返す（途中切れの再現）。 */
     private var shortAckOnce = true
+    private var lastStart: RecordedRequest? = null
     private var lastStartBody: JSONObject? = null
-    private var resultJson = ""
 
     @Before
     fun setUp() {
         server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/exec" -> gas(request)
-                "/echo" -> MockResponse().setHeader("Content-Type", "application/json").setBody(resultJson)
-                "/session" -> session(request)
-                else -> MockResponse().setResponseCode(404)
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                return when {
+                    path == "/session" -> session(request)
+                    request.getHeader("Authorization") != "Bearer good" ->
+                        MockResponse().setResponseCode(401).setBody("""{"error":{"message":"Invalid Credentials"}}""")
+                    path.startsWith("/drive/v3/files/folder1?") -> json("""{"name":"現場写真","mimeType":"application/vnd.google-apps.folder"}""")
+                    path.startsWith("/drive/v3/files/file1?") -> json("""{"name":"a.jpg","mimeType":"image/jpeg"}""")
+                    path.startsWith("/drive/v3/files/") ->
+                        MockResponse().setResponseCode(404).setBody("""{"error":{"message":"File not found"}}""")
+                    path.startsWith("/upload/drive/v3/files?uploadType=resumable") -> {
+                        lastStart = request
+                        lastStartBody = JSONObject(request.body.readUtf8())
+                        MockResponse().setHeader("Location", "$base/session")
+                    }
+                    else -> MockResponse().setResponseCode(500)
+                }
             }
         }
         server.start()
+        DriveUploader.apiBase = base
     }
+
+    private fun json(body: String) = MockResponse().setHeader("Content-Type", "application/json").setBody(body)
 
     @After
     fun tearDown() = server.shutdown()
-
-    // GAS: POST を受けたら別 URL へ 302 で転送し、転送先（GET）で結果を返す
-    private fun gas(request: RecordedRequest): MockResponse {
-        val body = JSONObject(request.body.readUtf8())
-        lastStartBody = body
-        resultJson = when {
-            body.getString("token") != "secret" -> JSONObject().put("ok", false).put("error", "合言葉が違います")
-            body.getString("action") == "ping" -> JSONObject().put("ok", true).put("folder", "現場写真")
-            else -> JSONObject().put("ok", true).put("uploadUrl", "$base/session")
-        }.toString()
-        return MockResponse().setResponseCode(302).setHeader("Location", "$base/echo")
-    }
 
     private fun session(request: RecordedRequest): MockResponse {
         val range = request.getHeader("Content-Range")!!
@@ -81,21 +84,40 @@ class DriveUploaderTest {
         { off, n -> data.copyOfRange(off.toInt(), off.toInt() + n) }
 
     @Test
-    fun pingFollowsGasRedirect() {
-        assertEquals("現場写真", DriveUploader.ping(AppSettings("$base/exec", "secret")))
+    fun folderNameWithToken() {
+        assertEquals("現場写真", DriveUploader.folderName("good", "folder1"))
+    }
+
+    @Test(expected = DriveUploader.AuthException::class)
+    fun expiredTokenIsAuthError() {
+        DriveUploader.folderName("expired", "folder1")
+    }
+
+    @Test
+    fun missingFolderIsReadable() {
+        val e = runCatching { DriveUploader.folderName("good", "nope") }.exceptionOrNull()
+        assertTrue(e is DriveUploader.ServerException)
+        assertTrue(e!!.message!!.contains("見つかりません"))
     }
 
     @Test(expected = DriveUploader.ServerException::class)
-    fun wrongTokenIsError() {
-        DriveUploader.ping(AppSettings("$base/exec", "wrong"))
+    fun fileIsNotFolder() {
+        DriveUploader.folderName("good", "file1")
     }
 
     @Test
     fun startSendsFileInfo() {
-        val url = DriveUploader.startSession(AppSettings("$base/exec", "secret"), "a.mp4", "video/mp4", 123)
+        val url = DriveUploader.startSession("good", "folder1", "a.mp4", "video/mp4", 123)
         assertEquals("$base/session", url)
         assertEquals("a.mp4", lastStartBody!!.getString("name"))
-        assertEquals(123, lastStartBody!!.getLong("size"))
+        assertEquals("folder1", lastStartBody!!.getJSONArray("parents").getString(0))
+        assertEquals("video/mp4", lastStart!!.getHeader("X-Upload-Content-Type"))
+        assertEquals("123", lastStart!!.getHeader("X-Upload-Content-Length"))
+    }
+
+    @Test(expected = DriveUploader.AuthException::class)
+    fun startWithExpiredToken() {
+        DriveUploader.startSession("expired", "folder1", "a.jpg", "image/jpeg", 1)
     }
 
     @Test

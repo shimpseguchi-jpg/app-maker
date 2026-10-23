@@ -22,13 +22,35 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val ctx = applicationContext
-        // 設定がないときは待つだけ（設定を保存したときにもう一度呼ばれる）
+        // 未設定のときは待つだけ（設定を保存したときにもう一度呼ばれる）
         val settings = AppSettings.load(ctx) ?: return@withContext Result.success()
+        if (PhotoQueue.items(ctx).isEmpty()) return@withContext Result.success()
+        if (!Network.isWifi(ctx)) return@withContext Result.retry()
+
+        var token = try {
+            DriveAuth.tokenOrNull(ctx, settings.account)
+        } catch (e: Exception) {
+            return@withContext Result.retry()
+        }
+        if (token == null) {
+            // 許可が取り消された等。画面でログインし直すまで待つ（ログインすると呼び直される）
+            AppSettings.setNeedsLogin(ctx, true)
+            return@withContext Result.success()
+        }
+
+        var refreshed = false
         while (true) {
             val item = PhotoQueue.items(ctx).firstOrNull() ?: break
             if (!Network.isWifi(ctx) || isStopped) return@withContext Result.retry()
             try {
-                if (uploadOne(ctx, settings, item)) item.delete() else return@withContext Result.retry()
+                if (uploadOne(ctx, settings, token!!, item)) item.delete() else return@withContext Result.retry()
+            } catch (e: DriveUploader.AuthException) {
+                // トークンの期限切れ：1回だけ新しいものをもらって続ける
+                if (refreshed) return@withContext Result.retry()
+                refreshed = true
+                DriveAuth.clearToken(ctx, token!!)
+                token = runCatching { DriveAuth.tokenOrNull(ctx, settings.account) }.getOrNull()
+                    ?: return@withContext Result.retry()
             } catch (e: GeneralSecurityException) {
                 // 壊れた・鍵が失われた（アプリのデータ消去など）ファイルは送れないので捨てる
                 item.delete()
@@ -39,11 +61,11 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         Result.success()
     }
 
-    private fun uploadOne(ctx: Context, settings: AppSettings, item: PhotoQueue.Item): Boolean {
+    private fun uploadOne(ctx: Context, settings: AppSettings, token: String, item: PhotoQueue.Item): Boolean {
         SecureStore.Reader(item.file).use { reader ->
             repeat(2) {
                 val session = item.sessionFile.takeIf { it.exists() }?.readText()
-                    ?: DriveUploader.startSession(settings, item.name, item.mimeType, reader.length)
+                    ?: DriveUploader.startSession(token, settings.folderId, item.name, item.mimeType, reader.length)
                         .also { item.sessionFile.writeText(it) }
                 try {
                     return DriveUploader.upload(session, reader) { Network.isWifi(ctx) && !isStopped }

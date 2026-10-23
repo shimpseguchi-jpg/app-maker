@@ -1,65 +1,90 @@
 package com.shimpseguchi.photodrive
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /**
  * アップロードの流れ：
- *  1. GAS ウェブアプリに「この名前・大きさで送りたい」と頼むと、Google Drive の
- *     再開可能アップロード用 URL が返ってくる（GAS が持ち主の権限で受付を作る）
- *  2. その URL へ 8MB ずつ直接 PUT する。途中で切れても続きから送れる
+ *  1. ログインした Google アカウントのトークンで、Drive に「この名前・大きさのファイルを
+ *     このフォルダへ置きたい」と頼むと、再開可能アップロード用の受付 URL が返ってくる
+ *  2. その URL へ 8MB ずつ PUT する。途中で切れても続きから送れる
  */
 object DriveUploader {
     /** 8MB（Drive の決まりで 256KB の倍数にする）。 */
     private const val PART = 32 * 256 * 1024
 
+    /** テストでにせのサーバーに向けるため差し替えられるようにしておく。 */
+    internal var apiBase = "https://www.googleapis.com"
+
     class ServerException(message: String) : IOException(message)
+    /** トークンの期限切れ・取り消し。新しいトークンでやり直せばよい。 */
+    class AuthException : IOException("認証が切れました")
     /** 受付 URL の期限切れなど。最初からやり直せばよい。 */
     class SessionGone : IOException("upload session expired")
 
-    private fun postJson(url: String, body: JSONObject): JSONObject {
-        val conn = URL(url).openConnection() as HttpURLConnection
-        try {
-            conn.connectTimeout = 30_000
-            conn.readTimeout = 60_000
-            conn.instanceFollowRedirects = true // GAS は script.googleusercontent.com へ転送して結果を返す
-            conn.requestMethod = "POST"
-            conn.doOutput = true
-            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            conn.outputStream.use { it.write(body.toString().toByteArray()) }
-            val code = conn.responseCode
-            val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
-                ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) throw ServerException("HTTP $code")
-            val json = try {
-                JSONObject(text)
-            } catch (e: Exception) {
-                throw ServerException("GAS の応答が読めません（URL・公開設定を確認）")
+    private fun open(url: String, token: String, method: String): HttpURLConnection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 30_000
+            readTimeout = 60_000
+            requestMethod = method
+            setRequestProperty("Authorization", "Bearer $token")
+        }
+
+    /** エラー応答を、画面に出せる短い説明にする。 */
+    private fun fail(conn: HttpURLConnection, code: Int): Nothing {
+        if (code == 401) throw AuthException()
+        val text = conn.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        val message = runCatching { JSONObject(text).getJSONObject("error").getString("message") }.getOrNull()
+        throw ServerException(
+            when (code) {
+                404 -> "フォルダが見つかりません（ID とアクセス権を確認）"
+                403 -> "権限がありません：${message ?: "HTTP 403"}"
+                else -> message ?: "HTTP $code"
             }
-            if (!json.optBoolean("ok")) throw ServerException(json.optString("error", "不明なエラー"))
-            return json
+        )
+    }
+
+    /** 接続テスト。フォルダの名前を返す（フォルダでなければエラー）。 */
+    fun folderName(token: String, folderId: String): String {
+        val conn = open(
+            "$apiBase/drive/v3/files/${URLEncoder.encode(folderId, "UTF-8")}" +
+                "?fields=name,mimeType&supportsAllDrives=true",
+            token, "GET"
+        )
+        try {
+            val code = conn.responseCode
+            if (code != 200) fail(conn, code)
+            val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+            if (json.optString("mimeType") != "application/vnd.google-apps.folder") {
+                throw ServerException("フォルダではありません")
+            }
+            return json.getString("name")
         } finally {
             conn.disconnect()
         }
     }
 
-    /** 接続テスト。保存先フォルダ名を返す。 */
-    fun ping(settings: AppSettings): String =
-        postJson(settings.url, JSONObject().put("token", settings.token).put("action", "ping"))
-            .optString("folder")
-
-    fun startSession(settings: AppSettings, name: String, mimeType: String, size: Long): String =
-        postJson(
-            settings.url,
-            JSONObject()
-                .put("token", settings.token)
-                .put("action", "start")
-                .put("name", name)
-                .put("mimeType", mimeType)
-                .put("size", size)
-        ).getString("uploadUrl")
+    /** 受付 URL をもらう。 */
+    fun startSession(token: String, folderId: String, name: String, mimeType: String, size: Long): String {
+        val conn = open("$apiBase/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true", token, "POST")
+        try {
+            conn.doOutput = true
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            conn.setRequestProperty("X-Upload-Content-Type", mimeType)
+            conn.setRequestProperty("X-Upload-Content-Length", size.toString())
+            val body = JSONObject().put("name", name).put("parents", JSONArray().put(folderId))
+            conn.outputStream.use { it.write(body.toString().toByteArray()) }
+            val code = conn.responseCode
+            if (code != 200) fail(conn, code)
+            return conn.getHeaderField("Location") ?: throw ServerException("受付 URL がありません")
+        } finally {
+            conn.disconnect()
+        }
+    }
 
     /**
      * 受付 URL へ送る。すでに一部送ってあれば続きから。

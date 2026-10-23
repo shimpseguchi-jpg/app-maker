@@ -15,7 +15,24 @@ android {
         versionName = "1.0"
     }
 
+    // Google ログイン（OAuth の Android クライアント）は署名鍵の SHA-1 と結び付くので、
+    // 鍵を環境変数で渡されたらそれで署名する（GitHub Actions では Secrets から渡す）
+    val keystore = System.getenv("PHOTODRIVE_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) {
+            create("shared") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("PHOTODRIVE_KEYSTORE_PASSWORD")
+                keyAlias = "photodrive"
+                keyPassword = System.getenv("PHOTODRIVE_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (keystore != null) signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -42,6 +59,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("com.google.android.gms:play-services-auth:21.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

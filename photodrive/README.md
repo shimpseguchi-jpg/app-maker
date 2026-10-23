@@ -27,45 +27,65 @@
 ## しくみ
 
 ```
-[アプリ] ──① 名前と大きさ──▶ [GAS ウェブアプリ（自分のアカウント）]
-                                   │ 指定フォルダに Drive のアップロード受付を作る
-[アプリ] ◀──② 受付URL────────────┘
-[アプリ] ──③ 8MB ずつ直接送る──▶ [Google ドライブの指定フォルダ]
+[アプリ] ── 組織の Google アカウントでログイン（初回だけ）
+[アプリ] ──① 「このフォルダにこの名前で置きたい」──▶ [Google ドライブ API]
+[アプリ] ◀──② アップロード受付の URL ───────────────┘
+[アプリ] ──③ 8MB ずつ送る ─────────────────────▶ [組織のドライブの指定フォルダ]
 ```
 
-Google Cloud の設定（OAuth クライアントの作成など）をしなくてよいように、Google Apps Script（GAS）を受け口にしています。
-ファイルの中身は GAS を通らず Drive へ直接送るので、GAS の容量制限を受けず、長い動画も送れます。
+アプリで組織の Google アカウントにログインし、その人の権限で指定フォルダ（共有ドライブも可）へ直接アップロードします。
+写真・動画が組織の外のサービスを通ることはありません。
 
-## 準備 1：GAS の受け口を作る（パソコンで1回だけ）
+Google ログインを使うには、Google Cloud に「このアプリ（この署名鍵で署名されたもの）にログインを許す」という登録（OAuth クライアント）が必要です。
+そのため、アプリは **いつも同じ署名鍵** で作ります。
 
-1. Google ドライブで保存先のフォルダを作って開く。URL の `https://drive.google.com/drive/folders/XXXXXXXX` の **`XXXXXXXX`（フォルダID）** を控える
-2. https://script.google.com →「新しいプロジェクト」。名前を「撮ってDrive」などにする
-3. `コード.gs` の中身を全部消して [`gas/Code.gs`](gas/Code.gs) を貼る
-4. 先頭の 2 行を書き換える
-   - `FOLDER_ID` … 1 で控えたフォルダID
-   - `TOKEN` … 合言葉（**20文字以上の推測されにくい文字列**。例：パスワード生成ツールで作る）
-5. 保存して、上の関数選択で **`setup`** を選び「実行」。承認画面が出たら自分のアカウントで許可する
-   （「このアプリは Google で確認されていません」と出たら「詳細」→「（安全ではないページ）に移動」）
-   実行ログに「保存先フォルダ: ○○」「準備 OK」と出れば成功
-6. 右上の「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」
-   - 次のユーザーとして実行：**自分**
-   - アクセスできるユーザー：**全員**（アプリから送るため。合言葉が合わないと何もできません）
-7. 「デプロイ」→ 表示された **ウェブアプリの URL（`…/exec` で終わる）** を控える
+## 準備 1：署名鍵を GitHub に登録する（1回だけ）
 
-`Code.gs` を書き換えたときは「デプロイ」→「デプロイを管理」→ ✏️ → バージョン「新バージョン」→「デプロイ」（URL は変わりません）。
+署名鍵は公開リポジトリには入れず、GitHub の Secrets（暗号化された保管場所）に置きます。
 
-## 準備 2：アプリを入れる
+1. 署名鍵のファイル 2 つ（`PHOTODRIVE_KEYSTORE_BASE64.txt` と `PHOTODRIVE_KEYSTORE_PASSWORD.txt`）を用意する
+   （自分で作る場合：`keytool -genkeypair -keystore photodrive.jks -storetype PKCS12 -alias photodrive -keyalg RSA -keysize 2048 -validity 10000` で作り、`base64 -w0 photodrive.jks` の結果を BASE64 に、決めたパスワードを PASSWORD にする）
+2. GitHub のこのリポジトリ →「Settings」→「Secrets and variables」→「Actions」→「New repository secret」で 2 つ登録する
+   - Name：`PHOTODRIVE_KEYSTORE_BASE64` / Secret：BASE64 のファイルの中身をすべて
+   - Name：`PHOTODRIVE_KEYSTORE_PASSWORD` / Secret：パスワードのファイルの中身
+3. 「Actions」→「photodrive APK」→「Run workflow」で APK を作り直す。実行ログの「Signing key」に **SHA-1** が表示される（準備 2 で使う）
 
-### APK を作る
+鍵のファイルは、なくさないように安全な場所（パスワード管理ツールなど）にも保管してください。鍵が変わると、準備 2 の登録をやり直すことになります。
 
-- **GitHub Actions**：このリポジトリの「Actions」→「photodrive APK」→ 最新の実行 → 下の「Artifacts」の `photodrive-apk` をダウンロード（中に `app-debug.apk`）
-- **自分のパソコン**：Android Studio でこの `photodrive/` フォルダを開いて ▶、または `./gradlew assembleDebug`（`app/build/outputs/apk/debug/app-debug.apk` ができる）
+## 準備 2：Google Cloud に登録する（組織のアカウントで1回だけ）
 
-### 端末に入れる
+組織の設定によってはプロジェクトを作れないことがあります。その場合は、この手順を管理者にお願いしてください。
 
-1. APK を Android 端末へ送って開く（「提供元不明のアプリ」の許可を求められたら許可）
-2. アプリを開くとカメラとマイクの許可を聞かれるので許可（マイクを許可しないと音声なしの動画になります）
-3. 右上の ⚙ → GAS の URL と合言葉を入れて「接続テスト」。**「OK：保存先フォルダ『○○』」** と出れば完了
+1. https://console.cloud.google.com を **組織のアカウント** で開き、上のプロジェクト選択 →「新しいプロジェクト」（名前は「撮ってDrive」など、場所は自分の組織）
+2. 「API とサービス」→「ライブラリ」→ **Google Drive API** を検索して「有効にする」
+3. 「Google Auth Platform」（または「OAuth 同意画面」）→「開始」
+   - アプリ名：撮ってDrive、ユーザーサポートメール：自分
+   - 対象：**内部**（組織の人だけが使える。Google の審査は不要）
+   - 連絡先：自分のメール →「作成」
+4. 「クライアント」→「クライアントを作成」
+   - アプリケーションの種類：**Android**
+   - パッケージ名：`com.shimpseguchi.photodrive`
+   - SHA-1 証明書フィンガープリント：準備 1 の 3 で表示された SHA-1
+   - 「作成」（表示されるクライアント ID はアプリに入れなくてよい）
+
+## 準備 3：アプリを入れて設定する
+
+1. 「Actions」→「photodrive APK」→ 最新の実行 →「Artifacts」の `photodrive-apk` をダウンロード（中に `app-debug.apk`）
+2. APK を Android 端末へ送って開く（「提供元不明のアプリ」の許可を求められたら許可）
+3. アプリを開くとカメラとマイクの許可を聞かれるので許可（マイクを許可しないと音声なしの動画になります）
+4. 右上の ⚙ →「ログイン」→ **組織のアカウント** を選び、Google ドライブへのアクセスを許可
+5. 保存先フォルダを Google ドライブで開いて URL をコピーし、「フォルダの URL」に貼って「接続テストして保存」
+   **「OK：保存先フォルダ『○○』に保存します」** と出れば完了
+
+### うまくいかないとき
+
+| 表示 | 原因と対処 |
+|---|---|
+| ログインで「DEVELOPER_ERROR」や「10:」 | 準備 2 の 4 のパッケージ名か SHA-1 が APK と合っていない。Secrets を登録した**後に作った** APK か確認 |
+| ログインで「アクセスがブロックされました」 | 組織の管理者がアプリを制限している。管理コンソールの「API の制御」で許可してもらう |
+| 「フォルダが見つかりません」 | URL の貼り間違いか、ログインしたアカウントにそのフォルダの編集権限がない |
+| 「権限がありません」 | フォルダが閲覧のみで共有されている。編集者（共有ドライブならコンテンツ管理者以上）にしてもらう |
+| 「Google Drive API has not been used…」 | 準備 2 の 2 で Drive API を有効にしていない |
 
 ## 使い方のメモ
 
@@ -73,7 +93,8 @@ Google Cloud の設定（OAuth クライアントの作成など）をしなく�
 - 動画の録画中にアプリを閉じたり別の画面に移ると、録画はそこで止まり送信待ちに入ります
 - 送信は Android の仕組み（WorkManager）で動くので、アプリを閉じていても・再起動しても Wi-Fi になれば送られます
 - Drive 上のファイル名は `撮影日時.jpg` / `撮影日時.mp4`（例：`20261022_153012_123.jpg`）
-- GitHub Actions で作る APK は毎回署名の鍵が変わるため、新しい版を入れるときは **前の版をアンインストール** してから入れてください（送信待ちが残っていないことを確認してから）
+- 新しい版の APK は、前の版をアンインストールせずにそのまま上書きで入れられます（同じ署名鍵なので。送信待ちもそのまま残ります）
+- 許可が切れたとき（パスワード変更・許可の取り消しなど）は、撮影画面の左上に「ログインし直してください」と出ます。⚙ →「ログイン」でもう一度許可すると、たまっていた分が送られます
 
 ## つくり
 
@@ -83,9 +104,11 @@ app/src/main/java/com/shimpseguchi/photodrive/
   SecureStore.kt       送信待ちの暗号化形式（ファイルごとの鍵を Keystore で包む・1MB ごとに AES-GCM）
   PhotoQueue.kt        送信待ちの置き場（アプリ専用・バックアップ対象外）
   UploadWorker.kt      Wi-Fi のときだけ動く送信係。送れたものから削除
-  DriveUploader.kt     GAS に受付を頼み、Drive へ 8MB ずつ送る（途中から再開できる）
-  SettingsActivity.kt  送信先の設定・接続テスト・送信待ちの削除
-gas/Code.gs            受け口（Google Apps Script）
+  DriveAuth.kt         Google アカウントの許可（アクセストークン）をもらう
+  DriveUploader.kt     Drive API で受付を作り、8MB ずつ送る（途中から再開できる）
+  SettingsActivity.kt  ログイン・保存先フォルダの設定・接続テスト・送信待ちの削除
 ```
 
-テスト：`./gradlew testDebugUnitTest`（GAS の転送・分割送信・途中からの再開をにせのサーバーで確認）
+テスト：`./gradlew testDebugUnitTest`（Drive API の応答・認証切れ・分割送信・途中からの再開をにせのサーバーで確認）
+
+自分のパソコンで作る場合：Android Studio でこの `photodrive/` フォルダを開いて ▶。その場合の SHA-1 は `./gradlew signingReport` で確認でき、準備 2 の Android クライアントにその SHA-1 を追加します（Android クライアントは複数作れます）。

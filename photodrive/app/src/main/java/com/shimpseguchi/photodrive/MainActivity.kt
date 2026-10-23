@@ -376,17 +376,19 @@ class MainActivity : AppCompatActivity() {
         background {
             val count = PhotoQueue.count(this)
             val configured = AppSettings.load(this) != null
+            val needsLogin = AppSettings.needsLogin(this)
             val wifi = Network.isWifi(this)
-            runOnUiThread { showStatus(count, configured, wifi) }
+            runOnUiThread { showStatus(count, configured, needsLogin, wifi) }
         }
     }
 
-    private fun showStatus(count: Int, configured: Boolean, wifi: Boolean) {
+    private fun showStatus(count: Int, configured: Boolean, needsLogin: Boolean, wifi: Boolean) {
         val parts = mutableListOf(
             if (count == 0) getString(R.string.status_none) else getString(R.string.status_pending, count)
         )
         parts += when {
             !configured -> getString(R.string.status_not_configured)
+            needsLogin -> getString(R.string.status_needs_login)
             count > 0 && uploading && wifi -> getString(R.string.status_uploading)
             wifi -> getString(R.string.status_wifi)
             else -> getString(R.string.status_wait_wifi)
