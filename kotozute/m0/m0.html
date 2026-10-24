@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<style>
+  :root {
+    --bg: #fff8ec; --card: #ffffff; --ink: #3a2e22; --sub: #7a6a58; --line: #e8dcc8;
+    --main: #e07a3a; --main-ink: #ffffff; --ok: #2f8f4e; --ng: #c0392b; --wait: #8a7d6d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic", sans-serif;
+    font-size: 20px; line-height: 1.6; padding: 16px 16px 48px; -webkit-text-size-adjust: 100%;
+  }
+  h1 { font-size: 26px; margin: 4px 0 8px; }
+  h2 { font-size: 22px; margin: 0 0 8px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  p { margin: 6px 0; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .note { font-size: 15px; color: var(--sub); }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 16px; margin: 14px 0; }
+  .st { font-size: 15px; font-weight: bold; padding: 2px 12px; border-radius: 999px; background: #efe7da; color: var(--wait); }
+  .st.ok { background: #dff3e5; color: var(--ok); }
+  .st.ng { background: #fbe2df; color: var(--ng); }
+  .st.ok::before { content: "○ "; }
+  .st.ng::before { content: "× "; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+  button, .btn {
+    font: inherit; font-size: 22px; font-weight: bold; min-height: 64px; min-width: 64px; padding: 8px 22px;
+    border-radius: 16px; border: 2px solid var(--main); background: var(--main); color: var(--main-ink);
+    cursor: pointer; touch-action: manipulation; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  button.sub, .btn.sub { background: var(--card); color: var(--main); }
+  button.small { font-size: 16px; min-height: 48px; padding: 4px 14px; background: var(--card); color: var(--sub); border-color: var(--line); }
+  button:disabled { opacity: .45; }
+  .big { font-size: 34px; min-height: 120px; width: 100%; }
+  .msg { font-size: 18px; min-height: 1.6em; }
+  .msg.ok { color: var(--ok); }
+  .msg.ng { color: var(--ng); }
+  .sentence { font-size: 28px; letter-spacing: .05em; }
+  .hidden { display: none !important; }
+  .btn { position: relative; overflow: hidden; }
+  /* display:none だと iPad でカメラが開かないことがあるので、見えなくするだけにする */
+  input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; left: 0; top: 0; }
+  #preview { max-width: 240px; max-height: 180px; border-radius: 10px; border: 2px solid var(--line); }
+  #pad { width: 100%; touch-action: none; border-radius: 10px; border: 2px solid var(--line); background: #fff; display: block; }
+  .slots, .deck { display: flex; gap: 12px; flex-wrap: wrap; min-height: 84px; padding: 8px; border-radius: 14px; }
+  .slots { background: #f6efe3; }
+  .slot { min-width: 150px; min-height: 68px; border: 3px dashed #d8c7ad; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+  .slot.hot { border-color: var(--main); background: #fde9db; }
+  .word {
+    font-size: 28px; font-weight: bold; padding: 8px 18px; min-height: 64px; border-radius: 14px; background: #fff;
+    border: 3px solid #c9b18e; box-shadow: 0 3px 0 #c9b18e; touch-action: none; user-select: none; -webkit-user-select: none;
+    display: flex; align-items: center;
+  }
+  .word.ghost { position: fixed; z-index: 10; pointer-events: none; opacity: .9; transform: translate(-50%, -50%) scale(1.06); }
+  .word.lift { opacity: .3; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  .shake { animation: shake .3s 2; }
+  .banner { background: #fbe2df; color: var(--ng); padding: 10px 14px; border-radius: 12px; font-size: 16px; }
+  .count { font-size: 64px; font-weight: bold; text-align: center; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ことづてむら しさく</h1>
+  <p class="note" id="lead">先生へ：上から順に試してください。結果は自動でスプレッドシートに記録されます。○ と × は、この画面にも出ます。</p>
+  <p class="banner hidden" id="offline">Google Apps Script の外で開いています。記録は送られません。</p>
+
+  <!-- 1 -->
+  <section class="card" data-sec="normal class">
+    <h2>1. あなたは だれ？ <span class="st" data-st="アカウント">しらべちゅう</span></h2>
+    <p id="who">しらべています…</p>
+    <p class="note">学校のアカウントが出れば ○。「わかりませんでした」なら ×（子どもの見分けを、組と番号を選ぶ方式に変えます）。</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="card" data-sec="normal class">
+    <h2>2. ほぞん <span class="st" data-st="ほぞん">しらべちゅう</span></h2>
+    <p id="opens"></p>
+    <p class="note">この iPad で開いた回数です。いったん閉じて、次の日にもう一度開いたときに数が増えていれば、続きから遊べます。</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="card" data-sec="normal">
+    <h2>3. よみあげ <span class="st" data-st="よみあげ">まだ</span></h2>
+    <p class="sentence">ねこが さかなを たべる。</p>
+    <div class="row"><button id="speak">🔊 よむ</button></div>
+    <div class="row hidden" id="heard">
+      <span>きこえた？</span>
+      <button data-heard="1">きこえた</button>
+      <button class="sub" data-heard="0">きこえない</button>
+    </div>
+    <p class="note">iPad の音を大きくし、消音（マナー）を切ってから押してください。</p>
+  </section>
+
+  <!-- 4 -->
+  <section class="card" data-sec="normal">
+    <h2>4. カメラ <span class="st" data-st="カメラ">まだ</span></h2>
+    <p>かみに「ねこ」と かいて、しゃしんを とってね。</p>
+    <div class="row">
+      <label class="btn"><input type="file" id="camera" accept="image/*" capture="environment">📷 しゃしんを とる</label>
+      <button class="small" id="noCamera">カメラが ひらかなかった</button>
+    </div>
+    <div class="row"><img id="preview" class="hidden" alt="とった しゃしん"></div>
+    <p class="msg" id="cameraMsg"></p>
+    <p class="note">紙だけを写してください（顔や名前が写らないように）。写真は先生のドライブのフォルダに入ります。</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="card" data-sec="normal">
+    <h2>5. てがき <span class="st" data-st="てがき">まだ</span></h2>
+    <p>ゆびで「ねこが」と かいてね。</p>
+    <canvas id="pad"></canvas>
+    <div class="row">
+      <button class="sub" id="padClear">🧽 けす</button>
+      <button id="padSend">📨 おくる</button>
+      <button class="small" id="noPad">かけなかった</button>
+    </div>
+    <p class="msg" id="padMsg"></p>
+  </section>
+
+  <!-- 6 -->
+  <section class="card" data-sec="normal">
+    <h2>6. カード <span class="st" data-st="カード">まだ</span></h2>
+    <p>カードを ならべて、ぶんを つくってね。（ゆびで うごかしても、タップしても いいよ）</p>
+    <div class="slots" id="slots"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div>
+    <div class="deck" id="deck"></div>
+    <div class="row"><button class="small" id="noCard">うごかせなかった</button></div>
+    <p class="msg" id="cardMsg"></p>
+  </section>
+
+  <!-- 7 -->
+  <section class="card" data-sec="normal class">
+    <h2>7. いっせいに おくる <span class="st" data-st="いっせい">まだ</span></h2>
+    <div data-sec="class">
+      <p>せんせいが「せーの」と いったら、おしてね。</p>
+      <button class="big" id="go">せーので おす</button>
+    </div>
+    <div data-sec="normal">
+      <p class="note">クラス全員で試すときは、URL の最後に <b>?mode=class</b> をつけたものを子どもの iPad で開いてもらい、「せーの」で同時に押してもらいます。この画面からは、1台で試すことと、まとめを見ることができます。</p>
+      <div class="row">
+        <button class="sub" id="go1">1けん おくる</button>
+        <button class="sub" id="go5">5けん おくる</button>
+        <button id="summary">まとめを みる</button>
+      </div>
+    </div>
+    <p class="count hidden" id="goMark"></p>
+    <p class="msg" id="goMsg"></p>
+    <p class="msg" id="sumMsg"></p>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var bootMs = Math.round(performance.now());
+  var $ = function (s) { return document.querySelector(s); };
+  var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+  var HAS_GAS = !!(window.google && google.script && google.script.run);
+  var UA = [navigator.userAgent, 'タッチ点:' + navigator.maxTouchPoints, '画面:' + screen.width + 'x' + screen.height, 'dpr:' + window.devicePixelRatio].join(' / ');
+
+  // ---- この iPad の番号と、開いた回数（ブラウザの保存領域） ----
+  var store = { ok: true, error: '' };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { store.ok = false; store.error = String(e && e.name || e); return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { store.ok = false; store.error = String(e && e.name || e); } }
+  var DEVICE = lsGet('kz-m0-device');
+  if (!DEVICE) { DEVICE = 'pad-' + Math.random().toString(36).slice(2, 7); lsSet('kz-m0-device', DEVICE); }
+  var opens = Number(lsGet('kz-m0-opens') || 0) + 1;
+  lsSet('kz-m0-opens', String(opens));
+  var stored = lsGet('kz-m0-opens') === String(opens) && lsGet('kz-m0-device') === DEVICE;
+
+  // ---- サーバーを呼ぶ（だめなら少し待って送り直す） ----
+  function call(fn, arg) {
+    return new Promise(function (resolve, reject) {
+      if (!HAS_GAS) { reject(new Error('GAS の外')); return; }
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](arg);
+    });
+  }
+  var WAITS = [1000, 2000, 4000, 8000, 16000];
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // makeArg(何回目) で送るものを作る。結果に「何回目でとどいたか」とエラーをつけて返す
+  function callRetry(fn, makeArg) {
+    var errors = [];
+    function attempt(n) {
+      return call(fn, makeArg(n)).then(function (result) {
+        return { ok: true, result: result, attempt: n, errors: errors };
+      }, function (e) {
+        errors.push(String(e && e.message || e));
+        if (n > WAITS.length || !HAS_GAS) return { ok: false, attempt: n, errors: errors };
+        return wait(WAITS[n - 1] + Math.random() * 1000).then(function () { return attempt(n + 1); });
+      });
+    }
+    return attempt(1);
+  }
+
+  // ---- 結果を画面と記録に残す ----
+  var done = {};
+  function mark(item, ok, label) {
+    $$('[data-st="' + item + '"]').forEach(function (el) {
+      el.className = 'st ' + (ok ? 'ok' : 'ng');
+      el.textContent = label || (ok ? 'できた' : 'できない');
+    });
+  }
+  function log(item, ok, detail) {
+    mark(item, ok);
+    done[item] = ok;
+    return callRetry('saveCheck', function () {
+      return { device: DEVICE, item: item, ok: ok, detail: detail, ua: UA };
+    });
+  }
+  function msg(el, text, ok) {
+    el.textContent = text;
+    el.className = 'msg' + (ok === true ? ' ok' : ok === false ? ' ng' : '');
+  }
+  function sec(ms) { return (ms / 1000).toFixed(1) + 'びょう'; }
+
+  // ---- 画面の切りかえ（?mode=class はクラス全員用） ----
+  function applyMode(mode) {
+    $$('[data-sec]').forEach(function (el) {
+      el.classList.toggle('hidden', el.getAttribute('data-sec').split(' ').indexOf(mode) < 0);
+    });
+    if (mode === 'class') $('#lead').textContent = 'せんせいの あいずを まってね。';
+  }
+  function start(mode) {
+    applyMode(mode);
+    checkWho();
+    checkStore();
+  }
+
+  // 1. アカウント
+  function checkWho() {
+    if (!HAS_GAS) { $('#who').textContent = 'わかりませんでした（GAS の外）'; mark('アカウント', false); return; }
+    callRetry('whoami', function () { return null; }).then(function (r) {
+      var w = r.ok ? r.result : null;
+      if (w && w.email) {
+        $('#who').textContent = 'あなたの アカウント：' + w.email;
+        log('アカウント', !!w.sameDomain, (w.sameDomain ? '学校のドメイン' : 'ちがうドメイン（先生は ' + w.ownerDomain + '）') + '・ひらくまで ' + bootMs + 'ミリ秒');
+      } else {
+        $('#who').textContent = 'わかりませんでした';
+        log('アカウント', false, r.ok ? 'メールアドレスが空' : 'よびだしの エラー：' + r.errors.join(' | '));
+      }
+    });
+  }
+
+  // 2. ほぞん
+  function checkStore() {
+    $('#opens').textContent = stored ? 'この iPad で ひらいた かいすう：' + opens + ' かいめ' : 'ほぞん できませんでした';
+    log('ほぞん', stored, stored ? opens + '回目に開いた' : '保存できない ' + store.error);
+  }
+
+  // 3. よみあげ
+  var speech = { api: 'speechSynthesis' in window, started: false, ended: false, error: '', voice: '', ja: 0 };
+  function jaVoice() {
+    var list = speech.api ? speechSynthesis.getVoices() : [];
+    var ja = list.filter(function (v) { return /^ja/i.test(v.lang); });
+    speech.ja = ja.length;
+    return ja.filter(function (v) { return v.localService; })[0] || ja[0] || null;
+  }
+  if (speech.api && 'onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = jaVoice;
+  $('#speak').addEventListener('click', function () {
+    $('#heard').classList.remove('hidden');
+    if (!speech.api) { log('よみあげ', false, 'speechSynthesis がない'); return; }
+    var u = new SpeechSynthesisUtterance('ねこが さかなを たべる。');
+    u.lang = 'ja-JP';
+    u.rate = 0.9;
+    var v = jaVoice();
+    if (v) { u.voice = v; speech.voice = v.name; }
+    u.onstart = function () { speech.started = true; };
+    u.onend = function () { speech.ended = true; };
+    u.onerror = function (e) { speech.error = e.error || 'error'; };
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  });
+  $$('[data-heard]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var heard = b.getAttribute('data-heard') === '1';
+      log('よみあげ', heard, '日本語の声 ' + speech.ja + '（' + (speech.voice || 'なし') + '）・はじまった ' + (speech.started ? 'はい' : 'いいえ') +
+        '・おわった ' + (speech.ended ? 'はい' : 'いいえ') + (speech.error ? '・エラー ' + speech.error : ''));
+      $('#heard').classList.add('hidden');
+    });
+  });
+
+  // 4. カメラ
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('画像を読めない')); };
+      img.src = url;
+    });
+  }
+  function toJpeg(img, max) {
+    var w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+    var c = document.createElement('canvas');
+    c.width = Math.round(w * s);
+    c.height = Math.round(h * s);
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.8);
+  }
+  function sendImage(kind, dataUrl, msgEl, item, extra) {
+    var t0 = Date.now();
+    msg(msgEl, 'おくっています…');
+    return callRetry('saveImage', function () { return { kind: kind, dataUrl: dataUrl, device: DEVICE }; }).then(function (r) {
+      var ms = Date.now() - t0;
+      if (r.ok) {
+        msg(msgEl, 'おくれた！（' + r.result.kb + 'KB・' + sec(ms) + '）', true);
+        log(item, true, extra + '・' + r.result.kb + 'KB・' + sec(ms) + '（サーバー ' + r.result.serverMs + 'ミリ秒）・おくりなおし ' + (r.attempt - 1) + '回');
+      } else {
+        msg(msgEl, 'おくれませんでした', false);
+        log(item, false, extra + '・送れない：' + r.errors.join(' | '));
+      }
+    });
+  }
+  $('#camera').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    loadImage(file).then(function (img) {
+      var dataUrl = toJpeg(img, 1600);
+      $('#preview').src = dataUrl;
+      $('#preview').classList.remove('hidden');
+      return sendImage('camera', dataUrl, $('#cameraMsg'), 'カメラ', 'もと ' + img.naturalWidth + 'x' + img.naturalHeight + '（' + Math.round(file.size / 1024) + 'KB）');
+    }).catch(function (err) {
+      msg($('#cameraMsg'), 'しゃしんを よめませんでした', false);
+      log('カメラ', false, String(err && err.message || err));
+    });
+    e.target.value = '';
+  });
+  $('#noCamera').addEventListener('click', function () { log('カメラ', false, 'カメラが開かなかった'); });
+
+  // 5. てがき（マス目に指で書く）
+  var pad = $('#pad'), ctx = pad.getContext('2d'), CELLS = 5, strokes = 0, pointerTypes = {}, drawing = null;
+  function sizePad() {
+    var w = pad.clientWidth, h = Math.round(w / CELLS), r = window.devicePixelRatio || 1;
+    pad.style.height = h + 'px';
+    pad.width = Math.round(w * r);
+    pad.height = Math.round(h * r);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+    drawGrid(w, h);
+    strokes = 0;
+  }
+  function drawGrid(w, h) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#d8c7ad';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    for (var i = 1; i < CELLS; i++) { ctx.beginPath(); ctx.moveTo(w * i / CELLS, 0); ctx.lineTo(w * i / CELLS, h); ctx.stroke(); }
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+    for (var j = 0; j < CELLS; j++) { var x = w * (j + 0.5) / CELLS; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  function padPoint(e) { var b = pad.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
+  pad.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (pad.setPointerCapture) pad.setPointerCapture(e.pointerId);
+    drawing = padPoint(e);
+    pointerTypes[e.pointerType || '?'] = true;
+    strokes++;
+  });
+  pad.addEventListener('pointermove', function (e) {
+    if (!drawing) return;
+    var p = padPoint(e);
+    ctx.strokeStyle = '#2b2118';
+    ctx.lineWidth = Math.max(4, pad.clientWidth / CELLS / 14);
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(drawing.x, drawing.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    drawing = p;
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { pad.addEventListener(t, function () { drawing = null; }); });
+  $('#padClear').addEventListener('click', sizePad);
+  $('#padSend').addEventListener('click', function () {
+    if (!strokes) { msg($('#padMsg'), 'まず かいてね', false); return; }
+    sendImage('hand', pad.toDataURL('image/jpeg', 0.85), $('#padMsg'), 'てがき', strokes + '画・' + Object.keys(pointerTypes).join('/'));
+  });
+  $('#noPad').addEventListener('click', function () { log('てがき', false, 'かけなかった'); });
+  window.addEventListener('resize', function () { if (!strokes) sizePad(); });
+
+  // 6. カード（タップでもドラッグでも並べられる）
+  var WORDS = ['ねこが', 'さかなを', 'たべる。'], taps = 0, drags = 0, cardDone = false;
+  function makeWord(t) { var d = document.createElement('div'); d.className = 'word'; d.textContent = t; return d; }
+  function slots() { return $$('#slots .slot'); }
+  function place(word, slot) {
+    var old = slot.firstChild;
+    if (old && old !== word) { var from = word.parentNode; if (from.classList.contains('slot')) from.appendChild(old); else $('#deck').appendChild(old); }
+    slot.appendChild(word);
+    checkCards();
+  }
+  function tapWord(word) {
+    taps++;
+    if (word.parentNode.classList.contains('slot')) { $('#deck').appendChild(word); checkCards(); return; }
+    var empty = slots().filter(function (s) { return !s.firstChild; })[0];
+    if (empty) place(word, empty);
+  }
+  function checkCards() {
+    var got = slots().map(function (s) { return s.firstChild ? s.firstChild.textContent : ''; });
+    if (got.indexOf('') >= 0) { msg($('#cardMsg'), ''); return; }
+    var ok = got[2] === 'たべる。';
+    if (!ok) {
+      msg($('#cardMsg'), 'あれれ？ もういちど ならべてみよう', false);
+      $('#slots').classList.remove('shake'); void $('#slots').offsetWidth; $('#slots').classList.add('shake');
+      return;
+    }
+    msg($('#cardMsg'), 'せいかい！「' + got.join(' ') + '」', true);
+    if (!cardDone) { cardDone = true; log('カード', true, 'ドラッグ ' + drags + '回・タップ ' + taps + '回・「' + got.join(' ') + '」'); }
+  }
+  function slotAt(x, y) {
+    var el = document.elementFromPoint(x, y);
+    while (el && !(el.classList && el.classList.contains('slot'))) el = el.parentNode;
+    return el;
+  }
+  function setupWord(word) {
+    var startX, startY, ghost = null, hot = null;
+    word.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (word.setPointerCapture) word.setPointerCapture(e.pointerId);
+      startX = e.clientX; startY = e.clientY; ghost = null;
+    });
+    word.addEventListener('pointermove', function (e) {
+      if (startX == null) return;
+      if (!ghost && Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY) > 10) {
+        ghost = makeWord(word.textContent);
+        ghost.classList.add('ghost');
+        document.body.appendChild(ghost);
+        word.classList.add('lift');
+      }
+      if (!ghost) return;
+      ghost.style.left = e.clientX + 'px';
+      ghost.style.top = e.clientY + 'px';
+      var s = slotAt(e.clientX, e.clientY);
+      if (hot !== s) { if (hot) hot.classList.remove('hot'); hot = s; if (hot) hot.classList.add('hot'); }
+    });
+    function end(e) {
+      if (startX == null) return;
+      startX = null;
+      if (hot) hot.classList.remove('hot');
+      hot = null;
+      if (!ghost) { if (e.type === 'pointerup') tapWord(word); return; }
+      ghost.remove(); ghost = null;
+      word.classList.remove('lift');
+      drags++;
+      var s = slotAt(e.clientX, e.clientY);
+      if (s) place(word, s); else if (word.parentNode.classList.contains('slot')) { $('#deck').appendChild(word); checkCards(); }
+    }
+    word.addEventListener('pointerup', end);
+    word.addEventListener('pointercancel', end);
+  }
+  WORDS.slice().sort(function () { return Math.random() - 0.5; }).forEach(function (t) {
+    var w = makeWord(t); setupWord(w); $('#deck').appendChild(w);
+  });
+  $('#noCard').addEventListener('click', function () { log('カード', false, 'うごかせなかった・ドラッグ ' + drags + '回・タップ ' + taps + '回'); });
+
+  // 7. いっせいに おくる
+  function runBurst(n, btns) {
+    btns.forEach(function (b) { b.disabled = true; });
+    var t0 = Date.now(), seqs = [];
+    for (var i = 1; i <= n; i++) seqs.push(i);
+    msg($('#goMsg'), 'おくっています…');
+    return Promise.all(seqs.map(function (seq) {
+      return callRetry('burst', function (attempt) { return { device: DEVICE, seq: seq, attempt: attempt }; }).then(function (r) {
+        r.ms = Date.now() - t0;
+        return r;
+      });
+    })).then(function (rs) {
+      var got = rs.filter(function (r) { return r.ok; }).length;
+      var retries = rs.reduce(function (a, r) { return a + r.attempt - 1; }, 0);
+      var slowest = Math.max.apply(null, rs.map(function (r) { return r.ms; }));
+      var firstErr = rs.map(function (r) { return r.errors[0]; }).filter(Boolean)[0] || '';
+      var ok = got === n;
+      $('#goMark').textContent = ok ? '○' : '×';
+      $('#goMark').classList.remove('hidden');
+      msg($('#goMsg'), got + ' / ' + n + ' とどいた（おくりなおし ' + retries + 'かい・' + sec(slowest) + '）', ok);
+      btns.forEach(function (b) { b.disabled = false; });
+      return log('いっせい', ok, n + '件中 ' + got + '件とどいた・おくりなおし ' + retries + '回・いちばんおそい ' + sec(slowest) + (firstErr ? '・エラー「' + firstErr + '」' : ''));
+    });
+  }
+  $('#go').addEventListener('click', function () { runBurst(1, [$('#go')]); });
+  $('#go1').addEventListener('click', function () { runBurst(1, [$('#go1'), $('#go5')]); });
+  $('#go5').addEventListener('click', function () { runBurst(5, [$('#go1'), $('#go5')]); });
+  $('#summary').addEventListener('click', function () {
+    msg($('#sumMsg'), 'しらべています…');
+    callRetry('burstSummary', function () { return 3; }).then(function (r) {
+      if (!r.ok) { msg($('#sumMsg'), 'しらべられませんでした：' + r.errors.join(' | '), false); return; }
+      var s = r.result;
+      msg($('#sumMsg'), 'さいごの 3ぷんかん：iPad ' + s.devices + 'だい・' + s.rows + 'けん とどいた（おくりなおし ' + s.retried + 'けん・いちばん おおくて ' + s.maxAttempt + 'かいめ）');
+    });
+  });
+
+  // ---- はじめる ----
+  sizePad();
+  if (!HAS_GAS) { $('#offline').classList.remove('hidden'); start('normal'); return; }
+  if (google.script.url && google.script.url.getLocation) {
+    google.script.url.getLocation(function (loc) { start(loc && loc.parameter && loc.parameter.mode === 'class' ? 'class' : 'normal'); });
+  } else {
+    start('normal');
+  }
+})();
+</script>
+</body>
+</html>
