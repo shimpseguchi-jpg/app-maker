@@ -7,7 +7,7 @@
 - 光村図書（1年）の単元の時期とねらいに合わせた13の章
 - 先生は、クラス全員の記録と書いた文を Google スプレッドシートで見られる
 
-要件定義は [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)。
+要件定義は [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md)、キャラクターと各章のたのみごとは [`docs/DESIGN.md`](docs/DESIGN.md)。
 
 ## 今あるもの
 
