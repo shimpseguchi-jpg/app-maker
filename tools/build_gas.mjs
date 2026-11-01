@@ -13,6 +13,7 @@ const esbuild = (args) => execFileSync('npx', [...ESBUILD, ...args], { cwd: ROOT
 const GAMES = [
   { id: 'arcanumber', dir: 'arcanumber' },
   { id: 'kazumaho', dir: '.' },
+  { id: 'manabi', dir: 'manabi', cssBundle: true }, // CSS が ルートの style.css を @import している
 ];
 
 // base64 を もどして CSS と JS を うごかす（この なかには「+」を つかわない）
@@ -44,7 +45,7 @@ for (const g of GAMES) {
   let html = readFileSync(join(base, 'index.html'), 'utf8');
   // JS：モジュールを 1つに まとめる（ふるい iPad でも うごくように safari14 むけ）
   const js = esbuild([join(g.dir, 'js/main.js'), '--bundle', '--format=iife', '--minify', '--target=safari14', '--charset=utf8', '--legal-comments=none']);
-  const css = esbuild([join(g.dir, 'css/style.css'), '--minify', '--target=safari14', '--charset=utf8']);
+  const css = esbuild([join(g.dir, 'css/style.css'), ...(g.cssBundle ? ['--bundle'] : []), '--minify', '--target=safari14', '--charset=utf8']);
   // GAS は くばる ときに おおきな スクリプトを こわす ことが あるので、JS と CSS は
   // 英数字だけの base64 にして いれておき、ブラウザの なかで もとに もどして うごかす
   const b64 = (str) => Buffer.from(str, 'utf8').toString('base64').replace(/.{1,100}/g, '$&\n');
