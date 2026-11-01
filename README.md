@@ -3,7 +3,7 @@
 > 姉妹作：本格デッキ構築ゲーム **[アルカナンバー](arcanumber/)**（`arcanumber/` フォルダ）もあります。
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
-> 企画中：サクセス×WING 風の育成型学習ゲーム **[まなびサクセス（仮）](manabi/)**（`manabi/` フォルダ。要件定義は [`manabi/docs/REQUIREMENTS.md`](manabi/docs/REQUIREMENTS.md)）。
+> 企画中：サクセス×WING 風の育成パートと2Dアクションのテストを組み合わせた学習ゲーム **[まなびサクセス（仮）](manabi/)**（`manabi/` フォルダ。要件定義は [`manabi/docs/REQUIREMENTS.md`](manabi/docs/REQUIREMENTS.md)）。
 
 小学1〜3年生むけの **ローグライク × デッキ構築** ゲームです。
 カードを「じゅもんの わく」に並べると、**数が 0 から左→右の順に計算**され、できた数で敵を攻撃します。
