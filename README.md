@@ -2,6 +2,7 @@
 
 > 姉妹作：本格デッキ構築ゲーム **[アルカナンバー](arcanumber/)**（`arcanumber/` フォルダ）もあります。
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
+> Android アプリ：撮ってすぐ Google ドライブへ送る **[撮ってDrive](photodrive/)**（`photodrive/` フォルダ）。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
 > 試作中：サクセス×WING 風の育成パートと2Dアクションのテストを組み合わせた学習ゲーム **[まなびサクセス（仮）](manabi/)**（`manabi/` フォルダ。WEB版で一通り遊べる。要件定義は [`manabi/docs/REQUIREMENTS.md`](manabi/docs/REQUIREMENTS.md)）。
 
