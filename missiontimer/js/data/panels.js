@@ -10,6 +10,7 @@
 //   unit       … すうりょうの たんい（'まい' 'ページ'）。unitOptional … すうりょうは なくても よい
 //   byGrade    … きじゅん ＝ 学年 × byGrade（しゅくだい は 学年×10）。base は 学年が わからないときの めやす
 //   capped     … max は ほごしゃモードの ごほうび じょうげん（F-801）に したがう（ゲーム・どうが）
+//   particle   … ミッション文の じょし（しょきちは 'を'。'に'＝おふろに はいる、''＝もの を いわない「5ふん やすむ こと」）
 //
 // ほごしゃモードの うわがき（F-802）は { ...panel, base, min, max, finish, fixed } の かたちで わたす。
 //   fixed … finish が 'timed' の パネルを ほごしゃが きめた ながさで こてい する（4.3 の 2）
@@ -39,7 +40,7 @@ export const PANELS = [
   { id: 'prepare', obj: '{明日|あした}の {準備|じゅんび}', verb: 'する', emoji: '🎒', kind: 'life', base: 10, min: 5, max: 15, finish: 'done' },
   { id: 'tidy', obj: '{片|かた}づけ', verb: 'する', emoji: '🧹', kind: 'life', base: 10, min: 5, max: 20, finish: 'done' },
   { id: 'chores', obj: 'お{手伝|てつだ}い', verb: 'する', emoji: '🧺', kind: 'life', base: 10, min: 5, max: 20, finish: 'done' },
-  { id: 'bath', obj: 'お{風呂|ふろ}', verb: '{入|はい}る', emoji: '🛁', kind: 'life', base: 20, min: 15, max: 30, finish: 'done' },
+  { id: 'bath', obj: 'お{風呂|ふろ}', verb: '{入|はい}る', emoji: '🛁', kind: 'life', base: 20, min: 15, max: 30, finish: 'done', particle: 'に' },
   { id: 'teeth', obj: '{歯|は}みがき', verb: 'する', emoji: '🪥', kind: 'life', base: 5, min: 5, max: 5, finish: 'timed' },
   { id: 'meal', obj: 'ご{飯|はん}', verb: '{食|た}べる', emoji: '🍚', kind: 'life', base: 30, min: 20, max: 40, finish: 'done' },
   { id: 'change', obj: '{着替|きが}え', verb: 'する', emoji: '👕', kind: 'life', base: 5, min: 5, max: 10, finish: 'done' },
@@ -50,9 +51,15 @@ export const PANELS = [
   { id: 'outside', obj: '{外|そと}あそび', verb: 'する', emoji: '⚽', kind: 'reward', base: 30, min: 15, max: 60, finish: 'timed' },
   { id: 'free', obj: '{自由|じゆう}{時間|じかん}', verb: '{好|す}きにする', emoji: '🌈', kind: 'reward', base: 15, min: 5, max: 60, finish: 'timed' },
   // ── きゅうけい
-  { id: 'rest', obj: '{休憩|きゅうけい}', verb: '{休|やす}む', emoji: '☕', kind: 'rest', base: 5, min: 5, max: 10, finish: 'timed' },
+  { id: 'rest', obj: '{休憩|きゅうけい}', verb: '{休|やす}む', emoji: '☕', kind: 'rest', base: 5, min: 5, max: 10, finish: 'timed', particle: '' },
 ];
 
 export const PANEL_BY_ID = Object.fromEntries(PANELS.map((p) => [p.id, p]));
 
 export function panelById(id) { return PANEL_BY_ID[id] || null; }
+
+// じさく パネル（F-305）の「どうする」の こうほ と えもじの こうほ
+export const VERBS = ['する', 'やる', '{終|お}わらせる', '{読|よ}む', '{書|か}く', '{練習|れんしゅう}する', 'あそぶ', '{見|み}る', '{作|つく}る', '{片|かた}づける', 'てつだう', 'たのしむ'];
+export const EMOJIS = ['📓', '🧮', '🔤', '🌏', '🔬', '🎵', '🥁', '🎻', '🏊', '🤸', '🚲', '🐶', '🐱', '🐹', '🪴', '🍳', '🧦', '🛏️', '🧸', '🧩', '🎲', '🃏', '🪀', '🎤',
+  '📷', '🖍️', '✂️', '🧶', '🏀', '⚾', '🎾', '🥋', '🩰', '🛹', '🌻', '🐟', '🦕', '🚂', '✈️', '🚀', '🍎', '🍙', '🥛', '🧃', '🛒', '🧼', '🧴', '💤',
+  '📮', '🗓️', '⏰', '📦', '🎁', '💌', '⭐', '🌈', '🔥', '💎', '🍀', '🎈'];

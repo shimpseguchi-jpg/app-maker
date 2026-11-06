@@ -2,7 +2,7 @@
 //
 // DOM に さわらない じゅんすいな かんすう だけで できている。Node で うごき、tools/test_schedule.mjs で けんさする（N-07・F-408）。
 //   plan(input)                 … 4.3 の 1〜7：はじまり・おわり と わくの パネル から タイムテーブルを つくる
-//   replan(timetable, event)    … 4.3 の 8：ミッション中の さいけいさん（はやく おわった／もうすこし／おわりを のばす）
+//   replan(timetable, event)    … 4.3 の 8：ミッション中の さいけいさん（はやく おわった／おそく おわった／あとで／もうすこし／おわりを のばす）
 //   earlyChoices(timetable, …)  … はやく おわったときに えらべる もの（F-407）
 //
 // じこくは「その日の 0:00 からの 分」（17:00 → 1020）。日を またぐ ときは 1440 を こえて よい。
@@ -14,6 +14,7 @@
 //     planned,           … ながさ（分・5ふん きざみ）。ミッション中に はやく はじまった ぶんの はした（5ふん みまん）は ふくまない
 //     locked,            … こてい（🔒・ながさを かえた パネル・ほごしゃが きめた ながさ）。おまかせは ながさを かえない
 //     auto,              … false | 'break'（じどうで はさんだ きゅうけい）| 'free'（あまりの じゆうじかん）| 'rest'（ちょっと きゅうけい）
+//                           | 'skipped'（あとで に した パネルの やりかけた じかん。すぎた ぶん だけ）
 //     min, max, weight, capped, src（input.items の ばんごう。auto は -1）, key,
 //     extended（もうすこし の かいすう）, overtime?（じかんぎれの えんちょうの かいすう・F-605） }
 
@@ -168,7 +169,7 @@ function entryOf(item, src, cfg) {
 function itemOf(e) {
   const p = e.p;
   return {
-    panel: p.id, obj: p.obj, verb: p.verb, emoji: p.emoji, kind: p.kind, finish: p.finish, unit: p.unit || null, qty: e.qty,
+    panel: p.id, obj: p.obj, verb: p.verb, emoji: p.emoji, kind: p.kind, finish: p.finish, unit: p.unit || null, qty: e.qty, ...(p.particle != null ? { particle: p.particle } : {}),
     start: 0, end: 0, planned: e.minutes, locked: e.locked, auto: false,
     min: e.lo, max: e.hi, weight: e.w, capped: e.capped, src: e.src, ...(e.key != null ? { key: e.key } : {}), extended: 0,
   };
@@ -177,7 +178,7 @@ function itemOf(e) {
 function autoItem(id, auto, planned, min, max, catalog) {
   const p = catalog[id] || PANEL_BY_ID[id];
   return {
-    panel: p.id, obj: p.obj, verb: p.verb, emoji: p.emoji, kind: p.kind, finish: 'timed', unit: null, qty: null,
+    panel: p.id, obj: p.obj, verb: p.verb, emoji: p.emoji, kind: p.kind, finish: 'timed', unit: null, qty: null, ...(p.particle != null ? { particle: p.particle } : {}),
     start: 0, end: 0, planned, locked: false, auto, min, max, weight: 0, capped: false, src: -1, extended: 0,
   };
 }
@@ -409,9 +410,15 @@ function setEnd(end) { return { id: 'setEnd', text: `おわりを ${clock(end)} 
 //               'reward'       … さいごの ごほうびに たす（じょうげん ない。あふれた ぶんは 'next' と おなじ）
 //               'rest'         … ちょっと きゅうけい（あまりが 10ぷん いか のとき）
 //        5ふん みまんの はしたは つぎの パネルが はやく はじまる ぶんとして つぎの パネルに つく（くぎりは 5ふん きざみの まま）
+//   { type: 'late', index, at }           … できた！が よていの おわりより おそかった（F-505「のこり −3ふん」で まっていた）。
+//        おくれた ぶんを うしろの かへん パネルから「もうすこし」と おなじ じゅんで ちぢめる
+//   { type: 'later', index, at }          … あとで（F-508）：いまの パネルを さいごへ まわす。つかった じかんは もどらないので ちぢめて あわせる。
+//        やりかけた じかんは index に auto: 'skipped' として のこる（つぎの パネルは index + 1）
 //   { type: 'extend', index }             … もうすこし（+5ふん）。うしろの かへん パネルを 5ふん ちぢめる。おわりの じこくは うごかさない
 //   { type: 'extendEnd', index, force? }  … おわりを 5ふん のばして index の パネルに たす。
 //        ほごしゃが ゆるして いる とき（allowEndExtend）か force（F-605 の じかんぎれの えんちょう）だけ
+// ちぢめきれない ときは おわりの じこくを こえて ならべ、こえた ぶんを over（分）に いれる（おわりの じこくは うごかさない。
+// おわりに なったら ミッションの じょうたいきかいが F-605 の えんちょう／「きょうは ここまで」に する）
 // opts で タイムテーブルの きまり（extendMax・allowEndExtend・shrink・rewardCap）を うわがき できる
 export function replan(tt, event, opts = {}) {
   if (!tt || !tt.ok || !Array.isArray(tt.items)) return fail('timetable', 'タイムテーブルが ないよ');
@@ -422,22 +429,24 @@ export function replan(tt, event, opts = {}) {
   const t = { ...tt, items: tt.items.map((it) => ({ ...it })), notices: [], suggestions: [] };
   const i = event?.index;
   if (!Number.isInteger(i) || i < 0 || i >= t.items.length) return fail('index', 'パネルが みつからないよ');
-  if (event.type === 'early') return early(t, i, event, cfg);
-  if (event.type === 'extend') return extend(t, i, cfg);
-  if (event.type === 'extendEnd') return extendEnd(t, i, event, cfg);
-  return fail('event', 'しらない できごと だよ');
+  const run = { early, late, later, extend, extendEnd }[event.type];
+  if (!run) return fail('event', 'しらない できごと だよ');
+  const r = run(t, i, event, cfg);
+  if (r.ok) r.over = Math.max(0, r.items[r.items.length - 1].end - r.end);
+  return r;
 }
 
 const capUsed = (items) => sum(items.filter((it) => it.capped), (it) => it.planned);
+// from いこうを at から ならべた ときに つかえる あまり（5ふん たんい。マイナスは たりない）
+const spare = (t, from, at) => Math.round((t.end - ceilStep(at) - sum(t.items.slice(from), (it) => it.planned)) / STEP);
 
 // はやく おわったときに えらべる もの
 export function earlyChoices(tt, index, at) {
   const items = tt.items, cur = items[index];
-  if (!cur || index >= items.length - 1 || !(at < cur.end - EPS)) return [];
-  const units = Math.round((cur.end - ceilStep(at)) / STEP);
+  if (!cur || index >= items.length - 1 || !(at >= cur.start - EPS && at < cur.end - EPS)) return [];
   const out = ['next'];
   const r = lastReward(items, index + 1);
-  if (units > 0 && r >= 0 && rewardRoom(items, r, tt.rewardCap ?? DEFAULT_REWARD_CAP) >= STEP) out.push('reward');
+  if (spare(tt, index + 1, at) > 0 && r >= 0 && rewardRoom(items, r, tt.rewardCap ?? DEFAULT_REWARD_CAP) >= STEP) out.push('reward');
   if (cur.end - at <= REST_MAX + EPS) out.push('rest');
   return out;
 }
@@ -452,32 +461,64 @@ function rewardRoom(items, j, cap) {
   return Math.max(0, it.capped ? Math.min(room, cap - capUsed(items)) : room);
 }
 
+// from いこうの パネルを at から ならべなおす。あまれば choice の しかたで たし、たりなければ ちぢめる
+function fit(t, from, at, cfg, choice = 'next') {
+  const items = t.items;
+  let units = spare(t, from, at);
+  if (units > 0 && choice === 'reward') {
+    const r = lastReward(items, from);
+    if (r >= 0) {
+      const add = Math.min(units * STEP, floorStep(rewardRoom(items, r, cfg.rewardCap)));
+      items[r].planned += add;
+      units -= add / STEP;
+    }
+  }
+  if (units > 0) spread(t, from, units, cfg);
+  while (units < 0) {
+    const donor = pickDonor(items, from, SHRINK_ORDER[cfg.shrink]);
+    if (donor < 0) break;
+    items[donor].planned -= STEP;
+    units++;
+  }
+  layout(items, from, at, ceilStep(at));
+}
+
 function early(t, i, ev, cfg) {
   const items = t.items, cur = items[i], at = ev.at;
   if (i >= items.length - 1) return fail('last', 'さいごの パネルだよ');
   if (!(at >= cur.start - EPS && at < cur.end - EPS)) return fail('not_early', 'はやく おわって いないよ');
   const choice = ev.choice || 'next';
+  if (!['next', 'reward', 'rest'].includes(choice)) return fail('choice', 'しらない えらびかた だよ');
+  if (choice === 'reward' && lastReward(items, i + 1) < 0) return fail('no_reward', 'うしろに ごほうびが ないよ');
   const oldEnd = cur.end;
-  const g = ceilStep(at);
-  let units = Math.round((oldEnd - g) / STEP);       // 5ふん きざみで つかえる あまり
   cur.end = at;
-
   if (choice === 'rest') {
     if (oldEnd - at > REST_MAX + EPS) return fail('rest_too_long', `ちょっと きゅうけいは ${minText(REST_MAX)} までだよ`);
-    items.splice(i + 1, 0, autoItem('rest', 'rest', units * STEP, 0, REST_MAX, PANEL_BY_ID));
-    layout(items, i + 1, at, g);
+    items.splice(i + 1, 0, autoItem('rest', 'rest', oldEnd - ceilStep(at), 0, REST_MAX, PANEL_BY_ID));
+    layout(items, i + 1, at, ceilStep(at));
     return t;
   }
-  if (choice === 'reward') {
-    const r = lastReward(items, i + 1);
-    if (r < 0) return fail('no_reward', 'うしろに ごほうびが ないよ');
-    const add = Math.min(units * STEP, floorStep(rewardRoom(items, r, cfg.rewardCap)));
-    items[r].planned += add;
-    units -= add / STEP;
-  } else if (choice !== 'next') return fail('choice', 'しらない えらびかた だよ');
+  fit(t, i + 1, at, cfg, choice);
+  return t;
+}
 
-  if (units > 0) spread(t, i + 1, units, cfg);
-  layout(items, i + 1, at, g);
+function late(t, i, ev, cfg) {
+  const cur = t.items[i], at = ev.at;
+  if (!(at >= cur.end - EPS)) return fail('not_late', 'まだ じかんが あるよ');
+  cur.end = at;
+  fit(t, i + 1, at, cfg);
+  return t;
+}
+
+function later(t, i, ev, cfg) {
+  const items = t.items, cur = items[i], at = ev.at;
+  if (i >= items.length - 1) return fail('last', 'さいごの パネルだよ');
+  if (cur.auto) return fail('not_movable', 'きゅうけいは あとに できないよ');
+  if (!(at >= cur.start - EPS)) return fail('not_started', 'まだ はじまって いないよ');
+  // やりかけた じかんは「あとで に した ぶん」として のこし（タイムテーブルに すきまを つくらない）、パネルは さいごへ
+  items.splice(i, 1, { ...cur, auto: 'skipped', planned: 0, end: at, weight: 0, locked: false });
+  items.push({ ...cur, later: (cur.later || 0) + 1 });
+  fit(t, i + 1, at, cfg);
   return t;
 }
 
@@ -507,7 +548,7 @@ function spread(t, from, units, cfg) {
   }
 }
 
-function extend(t, i, cfg) {
+function extend(t, i, ev, cfg) {
   const items = t.items, cur = items[i];
   if (cur.auto === 'break' || cur.auto === 'rest') return fail('not_extendable', 'きゅうけいは のばせないよ');
   if ((cur.extended || 0) >= cfg.extendMax) return fail('limit', 'もうすこし は ここまで だよ');
@@ -539,7 +580,8 @@ function extendEnd(t, i, ev, cfg) {
   cur.end += EXTEND_MINUTES;
   if (ev.force) cur.overtime = (cur.overtime || 0) + 1;   // F-605 じかんぎれの えんちょう（もうすこし とは べつに かぞえる）
   else cur.extended = (cur.extended || 0) + 1;
-  t.end = layout(items, i + 1, cur.end, cur.end);
+  layout(items, i + 1, cur.end, cur.end);
+  t.end += EXTEND_MINUTES;
   t.total = t.end - t.start;
   t.endExtended = (t.endExtended || 0) + 1;
   return t;

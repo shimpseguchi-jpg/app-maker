@@ -5,7 +5,9 @@
 //    こていの ふへん・ならびじゅん・ごほうびの じょうげん を plan と replan の りょうほうで たしかめる
 // 3. UI に だす もじ（パネルの なまえ・おしらせ・ていあん）の 漢字に すべて ふりがな（{漢字|かな}）が ついているか
 import { makeRng } from '../../js/util.js';
-import { PANELS, PANEL_BY_ID } from '../js/data/panels.js';
+import { PANELS, PANEL_BY_ID, KINDS, VERBS } from '../js/data/panels.js';
+import { THEMES } from '../js/data/themes.js';
+import { TEMPLATES } from '../js/data/templates.js';
 import {
   plan, replan, earlyChoices, clock, breakThreshold, STEP, MIN_TOTAL, MAX_TOTAL, EXTEND_MAX, REST_MAX,
 } from '../js/engine/schedule.js';
@@ -190,6 +192,14 @@ eq('F-405 F-307 1つを のばすと ほかが ちぢんで ごうけいを た�
   check('F-407 F-605 おわりを のばすのは ゆるされて いる ときか、じかんぎれの えんちょう（force）だけ', !ef.ok && ef.reason === 'end_locked' && ff.ok && ff.end === S17 + 30, () => short([ef, ff]));
   const br = P({ start: S17, end: E18, items: EX, grade: 3 });
   check('F-407 しらない できごと・ばんごう・タイムテーブル・きゅうけいは のばせない', R(br, { type: 'extend', index: 1 }).reason === 'not_extendable' && R(tt, { type: 'x', index: 0 }).reason === 'event' && R(tt, { type: 'extend', index: 9 }).reason === 'index' && R(null, {}).reason === 'timetable');
+  const lt = R(tt, { type: 'late', index: 1, at: S17 + 43 });   // プリント（〜17:35）が 17:43 に おわった
+  check('F-407 F-505 おそく おわった：おくれた ぶん うしろを ちぢめる（ゲーム 25→15）', lt.ok && near(lt.items[2].start, S17 + 43) && lt.items[2].planned === 15 && lt.items[2].end === E18 && lt.over === 0, () => short(lt));
+  const lt2 = R(tt, { type: 'late', index: 1, at: S17 + 58 });
+  check('F-407 F-605 ちぢめきれない ぶんは おわりを こえて over に のこす（おわりの じこくは うごかさない）', lt2.ok && lt2.items[2].planned === 10 && lt2.end === E18 && lt2.over === 10, () => short(lt2));
+  check('F-407 まだ じかんが ある ときは おそく おわった に しない', R(tt, { type: 'late', index: 1, at: S17 + 30 }).reason === 'not_late');
+  const la = R(tt, { type: 'later', index: 0, at: S17 + 5 });   // 本を 5ふんで あとで に
+  check('F-508 あとで：いまの パネルを さいごへ まわし、つかった 5ふんは うしろを ちぢめて あわせる', la.ok && la.items.map((x) => x.panel + (x.auto ? '(' + x.auto + ')' : '')).join() === 'book(skipped),print,game,book' && la.items[0].end === S17 + 5 && near(la.items[1].start, S17 + 5) && la.items[3].end === E18 && la.items[3].later === 1 && sum(la.items, (x) => x.planned) === 55, () => short(la));
+  check('F-508 あとで：さいごの パネル・きゅうけいは まわせない', R(tt, { type: 'later', index: 2, at: S17 + 40 }).reason === 'last' && R(br, { type: 'later', index: 1, at: S17 + 21 }).reason === 'not_movable');
   const gm = P({ start: S17, end: E18, items: [{ panel: 'book' }, { panel: 'game' }], rewardCap: 30 });
   check('F-407 F-403 ゲームの もうすこし も ごほうびの じょうげん まで', gm.ok && gm.items[1].planned === 30 && R(gm, { type: 'extend', index: 1 }).reason === 'cap', () => short(gm));
 }
@@ -345,7 +355,8 @@ for (const input of okPlans.slice(0, Math.max(500, Math.floor(N / 2)))) {
   let t = deepFreeze(plan({ ...input, ...opts }));
   const E0 = t.end, cap = t.rewardCap;
   const lockedPlan = new Map(t.items.filter((x) => x.locked).map((x) => [x.src, x.planned]));
-  let endExt = 0, i = 0, guard = 0;
+  let endExt = 0, i = 0, guard = 0, laters = 0;
+  let order = t.items.filter((x) => !x.auto).map((x) => x.src);
   sims++;
   while (i < t.items.length && guard++ < 60) {
     const cur = t.items[i];
@@ -374,7 +385,18 @@ for (const input of okPlans.slice(0, Math.max(500, Math.floor(N / 2)))) {
       } else {
         check('F-407 もうすこし が できない りゆう', ext.reason === 'limit' ? (cur.extended || 0) >= EXTEND_MAX : ['not_extendable', 'cap'].includes(ext.reason), () => short(ext));
       }
-    } else if (roll < 0.66) {
+    } else if (roll < 0.72 && !cur.auto) {
+      // できた！が おそかった（F-505 の「のこり −3ふん」の あと）
+      at = cur.end + rng() * 25;
+      next = replan(t, { type: 'late', index: i, at }, opts); kind = 'late';
+      check('F-407 おそく おわった：いつでも うけつける', next.ok, () => short(next));
+    } else if (roll < 0.76 && !cur.auto && i < t.items.length - 1 && laters < 3) {
+      // あとで（F-508）：いまの パネルを さいごへ
+      at = cur.start + rng() * (cur.end - cur.start) * 0.999;
+      next = replan(t, { type: 'later', index: i, at }, opts); kind = 'later'; laters++;
+      check('F-508 あとで：うけつける', next.ok, () => short(next));
+      if (next.ok) order = [...order.filter((x) => x !== cur.src), cur.src];
+    } else if (roll < 0.8) {
       next = replan(t, { type: 'extendEnd', index: i, force: true }, opts); kind = 'extendEnd';
       if (!next.ok) { check('F-605 じかんぎれの えんちょうが できない のは ごほうびの じょうげん だけ', next.reason === 'cap' && cur.capped, () => short(next)); next = null; }
     } else { i++; continue; }
@@ -384,18 +406,22 @@ for (const input of okPlans.slice(0, Math.max(500, Math.floor(N / 2)))) {
     collect(next);
     if (kind === 'extendEnd') endExt++;
     const it = next.items;
-    const info = () => short({ kind, at, i, before: table(t), after: table(next) });
+    const first = i + 1;                                                  // これからの パネルの さいしょ
+    const frac = ['early', 'late', 'later'].includes(kind) ? first : -1;  // はじまりに はしたが ある パネル
+    const info = () => short({ kind, at, i, before: table(t), after: table(next), over: next.over });
     check('F-407 F-402 ごうけい いっち：くぎりが つながり、おわりの じこくは のばした ぶん だけ うごく',
-      it[0].start === t.start && it.every((x, j) => j === 0 || near(x.start, it[j - 1].end)) && near(it[it.length - 1].end, next.end) && next.end === E0 + endExt * 5 && next.total === next.end - next.start, info);
-    check('F-407 F-402 これからの くぎりは 5ふん きざみ（はやく はじまった つぎの パネルの はじまり だけ はした）',
-      it.every((x, j) => j <= i || (onGrid(x.end) && onGrid(x.planned) && (onGrid(x.start) || (kind === 'early' && j === i + 1)))) && it.every((x, j) => j <= i || x.end - x.start >= x.planned - EPS && x.end - x.start < x.planned + STEP), info);
-    check('F-407 F-403 これからの パネルも さいしょう・さいだいを まもる', it.every((x, j) => j <= i || x.extended || x.overtime || (x.auto === 'break' ? x.planned === 5 : x.auto === 'rest' ? x.planned <= REST_MAX : x.auto === 'free' ? x.planned >= STEP : x.planned >= x.min && x.planned <= x.max)), info);
+      it[0].start === t.start && it.every((x, j) => j === 0 || near(x.start, it[j - 1].end)) && near(it[it.length - 1].end, next.end + next.over) && next.end === E0 + endExt * 5 && next.total === next.end - next.start, info);
+    check('F-407 4.3-8 おわりを こえる（over）のは うしろが すべて さいしょう・こてい のとき だけ',
+      next.over >= 0 && (next.over === 0 || !it.some((x, j) => j >= first && !x.locked && x.auto !== 'break' && x.auto !== 'rest' && x.planned - x.min >= STEP)), info);
+    check('F-407 F-402 これからの くぎりは 5ふん きざみ（はやく・おそく はじまった つぎの パネルの はじまり だけ はした）',
+      it.every((x, j) => j < first || (onGrid(x.end) && onGrid(x.planned) && (onGrid(x.start) || j === frac))) && it.every((x, j) => j < first || x.end - x.start >= x.planned - EPS && x.end - x.start < x.planned + STEP), info);
+    check('F-407 F-403 これからの パネルも さいしょう・さいだいを まもる', it.every((x, j) => j < first || x.extended || x.overtime || (x.auto === 'break' ? x.planned === 5 : x.auto === 'rest' ? x.planned <= REST_MAX : x.auto === 'free' ? x.planned >= STEP : x.planned >= x.min && x.planned <= x.max)), info);
     check('F-407 F-403 ごほうびの じょうげんを まもる', sum(it.filter((x) => x.capped), (x) => x.planned) <= cap, info);
     check('F-407 F-403 こていの ふへん（もうすこし・じかんぎれの えんちょう を した パネル いがい）', it.filter((x) => x.locked && !x.extended && !x.overtime).every((x) => lockedPlan.get(x.src) === x.planned), info);
     check(`F-407 もうすこし は 1つの パネルに ${EXTEND_MAX}かい まで`, it.every((x) => (x.extended || 0) <= EXTEND_MAX), info);
-    check('9.1 F-407 ならびじゅんは かわらない', it.filter((x) => !x.auto).map((x) => x.src).join() === t.items.filter((x) => !x.auto).map((x) => x.src).join(), info);
+    check('9.1 F-407 ならびじゅんは かわらない（あとで に した パネルだけ さいごへ）', it.filter((x) => !x.auto).map((x) => x.src).join() === order.join(), info);
     t = deepFreeze(next);
-    if (kind === 'early') i++;
+    if (kind === 'early' || kind === 'late' || kind === 'later') i++;
   }
 }
 
@@ -403,6 +429,9 @@ for (const input of okPlans.slice(0, Math.max(500, Math.floor(N / 2)))) {
 // 3. ふりがな
 
 for (const p of PANELS) texts.push(p.obj, p.verb);
+// テーマ（ブリーフィング・アナウンス）・テンプレ・しゅるい・どうする の もじも（N-12 の データ）
+const strings = (o) => (typeof o === 'string' ? [o] : o && typeof o === 'object' ? Object.values(o).flatMap(strings) : []);
+texts.push(...strings(THEMES).filter((s) => !s.startsWith('#')), ...strings(TEMPLATES), ...strings(KINDS), ...VERBS);
 const bad = [...new Set(texts.filter((s) => s != null && bareKanji(s)))];
 check('ふりがな：UI に だす 漢字には すべて {漢字|かな} が ついている（パネル・おしらせ・ていあん・なおしかた）', !bad.length, () => bad.slice(0, 10));
 check('ふりがな：けんさした もじの かず', texts.length > 100, texts.length);
