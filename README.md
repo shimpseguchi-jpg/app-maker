@@ -4,7 +4,7 @@
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
 > 試作中：サクセス×WING 風の育成パートと2Dアクションのテストを組み合わせた学習ゲーム **[まなびサクセス（仮）](manabi/)**（`manabi/` フォルダ。WEB版で一通り遊べる。要件定義は [`manabi/docs/REQUIREMENTS.md`](manabi/docs/REQUIREMENTS.md)）。
-> 要件定義中：やることパネルを並べると時間を切ってくれる、脱出ゲーム演出つきの小学生向けタイマー **[ミッションタイマー（仮）](missiontimer/)**（`missiontimer/` フォルダ。要件定義は [`missiontimer/docs/REQUIREMENTS.md`](missiontimer/docs/REQUIREMENTS.md)、調査メモは [`missiontimer/docs/RESEARCH.md`](missiontimer/docs/RESEARCH.md)）。
+> 開発中（M1 スケジューラまで）：やることパネルを並べると時間を切ってくれる、脱出ゲーム演出つきの小学生向けタイマー **[ミッションタイマー（仮）](missiontimer/)**（`missiontimer/` フォルダ。要件定義は [`missiontimer/docs/REQUIREMENTS.md`](missiontimer/docs/REQUIREMENTS.md)、調査メモは [`missiontimer/docs/RESEARCH.md`](missiontimer/docs/RESEARCH.md)）。
 
 小学1〜3年生むけの **ローグライク × デッキ構築** ゲームです。
 カードを「じゅもんの わく」に並べると、**数が 0 から左→右の順に計算**され、できた数で敵を攻撃します。

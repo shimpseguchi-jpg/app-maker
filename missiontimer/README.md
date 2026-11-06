@@ -11,4 +11,15 @@
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 要件定義書（正本）。概要・手本から取り入れる要素・流れ・スケジューラの仕様・機能要件（ID つき）・非機能要件・データ設計・開発計画・決定事項と未決事項 |
 | [docs/RESEARCH.md](docs/RESEARCH.md) | 調査メモ。脱出ゲームタイマーの読み解き、市販アプリ11本の仕組みと示唆、家庭学習時間の目安の出典 |
 
-実装はまだありません。開発の順番（スケジューラ → タイマーの骨組み → メイカー画面 → 演出 → きろく・保護者モード）は要件定義書の8章。
+開発の順番（スケジューラ → タイマーの骨組み → メイカー画面 → 演出 → きろく・保護者モード）は要件定義書の8章。いまは **M1（スケジューラ）** まで。画面はまだありません。
+
+| ファイル | 内容 |
+|---|---|
+| [js/engine/schedule.js](js/engine/schedule.js) | おまかせスケジューラ（4.3）。純粋関数 `plan(input)`（配分・クリップ・丸め・きゅうけい挿入・提案）と `replan(timetable, event)`（ミッション中の再計算）。F-401〜F-408 |
+| [js/data/panels.js](js/data/panels.js) | パネルの初期カタログ（4.2）。UI に出す文言はすべて `{漢字|かな}` でふりがなつき |
+| [tools/test_schedule.mjs](tools/test_schedule.mjs) | スケジューラの検査。3.2 の例・4.3 の規則と、乱数入力 数千件で 合計一致・最小最大・5分刻み・きゅうけい規則・固定の不変・ごほうび上限・ふりがな を確かめる |
+
+```sh
+node missiontimer/tools/test_schedule.mjs            # 乱数 5000 件（シード固定）
+node missiontimer/tools/test_schedule.mjs 20000 7    # 件数とシードを変える
+```
