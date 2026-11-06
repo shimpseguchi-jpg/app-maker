@@ -11,7 +11,7 @@ export function runBriefing(root, { theme, mission, onDone }) {
   const T0 = mission.tt.end - mission.tt.start;
   const day = Math.floor(Date.now() / 86400000);
   const pat = theme.briefing[day % theme.briefing.length];                       // F-602 ひがわり
-  const vars = { name: profile.name, count: items.length, minutes: minText(T0) };
+  const vars = { count: items.length, minutes: minText(T0) };
   const short = profile.briefings > 0 || profile.drama === 'quiet';
   const quiet = profile.drama === 'quiet';
   let skipped = false, finished = false;
@@ -47,7 +47,7 @@ export function runBriefing(root, { theme, mission, onDone }) {
     await wait(300);
     if (!short) {
       for (const s of pat.world) await typeLine(fill(s, vars));
-      await typeLine(fill(profile.name ? pat.role : pat.roleNoName, vars));
+      await typeLine(fill(pat.role, vars));
     }
     await typeLine(fill(pat.intro, vars));
     for (const it of items) {                                                    // ③ ミッション文（F-303）

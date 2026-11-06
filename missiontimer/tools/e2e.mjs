@@ -49,20 +49,22 @@ for (const [dev, viewport] of DEVICES) {
   };
   const check = async (label) => { await furigana(label); await noOverflow(label); };
 
-  // ── はじめかた（F-101）
+  // ── はじめかた（F-101）：なまえは きかない。「なんねんせい？」の 1タップ で ホームへ
   await page.goto(BASE); await run(500);
   ok('F-101 はじめかた が でる', (await at()) === 'setup');
+  ok('F-101 なまえの にゅうりょくは ない', await page.locator('input').count() === 0);
   await check('はじめかた'); await shot('setup');
-  await click('[data-seg="grade"] [data-v="2"]');
-  await page.fill('[data-name]', 'はる');
-  await click('[data-start]');
-  ok('F-102 ホームへ', (await at()) === 'home');
+  await click('[data-grade="2"]');
+  ok('F-102 がくねんを 1タップで ホームへ', (await at()) === 'home');
+  ok('F-106 ホームに テンプレと じぶんで つくる', await page.locator('[data-quick^="tpl:"]').count() === 4 && await page.locator('[data-quick="new"]').count() === 1 && await page.locator('[data-quick="last"]').count() === 0);
   await check('ホーム'); await shot('home');
 
-  // ── つくる：ドラッグで わくに いれる（F-302）
-  await click('[data-new]');
+  // ── じぶんで つくる（1がめん）：ドラッグ・タップで いれると その ばで くぎる（F-302・F-401）
+  await click('[data-quick="new"]');
+  ok('F-401 つくる がめんは 1がめん（パネルが ないと かいし できない）', (await at()) === 'maker' && await page.locator('[data-go]').isDisabled());
   await click('[data-tab="focus"]');
-  await page.locator('[data-waku]').scrollIntoViewIfNeeded(); await page.locator('[data-add="kanji"]').scrollIntoViewIfNeeded(); await run(100);
+  // わく（うえ）と パレット（した）が どちらも みえる ように する
+  await page.evaluate(() => { document.querySelector('[data-waku]').scrollIntoView({ block: 'start' }); document.querySelector('[data-add="kanji"]').scrollIntoView({ block: 'nearest', inline: 'center' }); }); await run(100);
   const src = await page.locator('[data-add="kanji"]').boundingBox();
   const dst = await page.locator('[data-waku]').boundingBox();
   await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
@@ -72,15 +74,19 @@ for (const [dev, viewport] of DEVICES) {
   ok('F-302 ドラッグで パネルが わくに はいる', await page.locator('[data-w]').count() === 1);
   await click('[data-add="print"]');
   ok('F-302 タップでも すえに はいる', await page.locator('[data-w]').count() === 2);
+  ok('F-401 いれた ときに タイムテーブルが できて かいし できる', /\d+:\d\d/.test(await page.locator('[data-w="0"] .tt-time').innerText()) && !(await page.locator('[data-go]').isDisabled()));
   await click('[data-qty="1:3"]');
   ok('F-304 すうりょう ボタン', await page.locator('[data-qty="1:3"].on').count() === 1);
+  const len0 = await page.locator('[data-w="0"] .len').innerText();
+  await click('[data-w="0"] [data-adj="5"]');
+  ok('F-405 +5 で のびて こてい（🔒）', (await page.locator('[data-w="0"] .len').innerText()) !== len0 && await page.locator('[data-w="0"] .lock.on').count() === 1);
   await check('スケジュールメイカー'); await shot('maker', true);
   await click('[data-home]');
 
-  // ── テンプレ「ほうかご」→ タイムテーブル（F-106・F-401〜F-406）
-  await click('[data-tpl]'); await click('[data-tp="afterschool"]');
-  ok('F-106 テンプレから タイムテーブルへ', await page.locator('.tt-row').count() >= 3);
-  const rows = await page.locator('.tt-row').allInnerTexts();
+  // ── テンプレ「ほうかご」：おすと タイムテーブルが できた じょうたい → ミッションかいし！（F-106・F-401〜F-406）
+  await click('[data-quick="tpl:afterschool"]');
+  ok('F-106 テンプレを おすと タイムテーブルが できている', await page.locator('.trow').count() >= 4 && !(await page.locator('[data-go]').isDisabled()));
+  const rows = await page.locator('.trow').allInnerTexts();
   ok('F-404 2ねんせい：しゅくだい と ほん の あいだに きゅうけい', rows.some((t) => /きゅうけい|休憩/.test(t)), rows);
   await check('タイムテーブル'); await shot('timetable', true);
   await click('[data-mode="equal"]');
@@ -155,8 +161,14 @@ for (const [dev, viewport] of DEVICES) {
   await check('けっか'); await shot('result', true);
   await click('[data-show]'); await furigana('おうちの ひとに みせる'); await shot('show'); await click('.modal [data-close]');
 
+  // ホームに「このまえと おなじ」→ おすと おなじ ミッションが できている
+  await click('[data-home]');
+  ok('F-106 ホームに「このまえと おなじ」', await page.locator('[data-quick="last"]').count() === 1);
+  await click('[data-quick="last"]');
+  ok('F-106 このまえと おなじ：おなじ パネルで すぐ かいし できる', await page.locator('[data-w]').count() === 3 && !(await page.locator('[data-go]').isDisabled()));
+  await click('[data-home]');
   // きろく（F-702〜F-704）
-  await click('[data-home]'); await click('[data-record]');
+  await click('[data-record]');
   ok('F-702 カレンダーに スタンプ', await page.locator('.cal i.st').count() === 1);
   await check('きろく'); await shot('record', true);
   await click('[data-card]'); await furigana('がんばりカード'); await shot('card'); await click('.modal [data-close]');

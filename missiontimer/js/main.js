@@ -2,12 +2,12 @@
 // はじめかた → ホーム → スケジュールメイカー → ブリーフィング → ミッション中 → だっしゅつ せいこう → けっか → ホーム
 import { setTextMode } from '../../js/text.js';
 import { T, $, el, toast, play, unlockOnce, applyVolume, fullscreen, clock, minText } from './ui/common.js';
-import { profile, saveProfile, loadMission, saveMission, saveDraft, record } from './save.js';
+import { profile, saveProfile, loadMission, saveMission, saveDraft, saveLast, record } from './save.js';
 import { themeById } from './data/themes.js';
 import * as M from './engine/mission.js';
 import { STEP } from './engine/schedule.js';
 import { renderSetup, renderHome, renderSettings, renderParent } from './ui/home.js';
-import { renderMaker, newDraft, draftFromTemplate, planDraft, startOf, endOf, nowMinute } from './ui/maker.js';
+import { renderMaker, newDraft, draftFromTemplate, draftFromLast, lastOf, planDraft, startOf, endOf, nowMinute } from './ui/maker.js';
 import { runBriefing } from './ui/briefing.js';
 import { runTimer } from './ui/timer.js';
 import { renderResult, renderRecord, applyResult } from './ui/result.js';
@@ -45,7 +45,8 @@ const app = {
     if (name === 'parent') return mount(() => renderParent(root, app));
     if (name === 'record') return mount(() => renderRecord(root, app));
     if (name === 'maker') {
-      const draft = params.template ? draftFromTemplate(params.template) : params.draft || (params.fresh ? newDraft() : newDraft());
+      // テンプレ／このまえと おなじ は タイムテーブルが できた じょうたいで ひらく。じぶんで つくる は つくりかけが あれば つづきから
+      const draft = params.template ? draftFromTemplate(params.template) : params.last ? draftFromLast(params.last) : params.draft?.items ? params.draft : newDraft();
       return mount(() => renderMaker(root, app, draft));
     }
     if (name === 'briefing') return mount(() => runBriefing(root, { theme: theme(), mission: params.m, onDone: () => begin(params.m) }));
@@ -64,9 +65,9 @@ const app = {
     else if (S - nowM > STEP && !force) return app.go('waiting', { draft });
     else if (force && S - nowM > STEP) over = { start: ceilNow, end: E };
     const tt = planDraft(draft, now, over);
-    if (!tt.ok) { toast(T(tt.text)); draft.step = 2; return app.go('maker', { draft }); }
+    if (!tt.ok) { toast(T(tt.text)); return app.go('maker', { draft }); }
     const m = M.createMission(tt, { now, theme: profile.theme });
-    saveMission(m); saveDraft(null);
+    saveMission(m); saveDraft(null); saveLast(lastOf(draft, tt.start, tt.end));        // ホームの「このまえと おなじ」
     app.go('briefing', { m });
   },
   resume() {
@@ -102,7 +103,7 @@ function waiting(draft) {
   }, 1000);
   node.querySelector('[data-left]').innerHTML = T(`あと ${minText(Math.ceil(S - nowMinute()))}`);
   node.querySelector('[data-now]').addEventListener('click', () => { play('select'); clearInterval(iv); app.launch(draft, { force: true }); });
-  node.querySelector('[data-back]').addEventListener('click', () => { play('tap'); clearInterval(iv); draft.step = 2; app.go('maker', { draft }); });
+  node.querySelector('[data-back]').addEventListener('click', () => { play('tap'); clearInterval(iv); app.go('maker', { draft }); });
   return () => clearInterval(iv);
 }
 

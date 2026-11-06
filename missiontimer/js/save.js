@@ -4,7 +4,7 @@ function read(k, def) { try { const v = localStorage.getItem(P + k); return v ? 
 function write(k, v) { try { if (v == null) localStorage.removeItem(P + k); else localStorage.setItem(P + k, JSON.stringify(v)); } catch (e) { /* ほぞん できなくても つかえる */ } }
 
 // こども むけの せってい（F-101・F-104）。text は 'hira'（ひらがな）| 'ruby'（{漢字|かんじ}に ふりがな）
-const DEFAULT_PROFILE = { setup: false, name: '', grade: 2, theme: 'detective', view: 'disc', showNumbers: true, volume: 'normal', speech: true, drama: 'normal', text: 'ruby', briefings: 0 };
+const DEFAULT_PROFILE = { setup: false, grade: 2, theme: 'detective', view: 'disc', showNumbers: true, volume: 'normal', speech: true, drama: 'normal', text: 'ruby', briefings: 0 };
 // ほごしゃモード（F-801〜F-805）
 const DEFAULT_PARENT = { rewardCapDay: 30, rewardCapMission: 30, extendMax: 2, allowEndExtend: false, shrink: 'others', pauseLongPress: false, bathAt: '', kidCustom: true };
 
@@ -23,6 +23,8 @@ export function saveRecent() { write('recent', recent); }
 export function loadMission() { return read('mission', null); }
 export function saveMission(m) { write('mission', m); }
 export function loadDraft() { return read('draft', null); }
+export function loadLast() { return read('last', null); }     // このまえの ミッション（ホームの「このまえと おなじ」）
+export function saveLast(l) { write('last', l); }
 export function saveDraft(d) { write('draft', d); }
 
 export function dayKey(ms = Date.now()) {
@@ -48,7 +50,7 @@ export function compactRecord(now = Date.now()) {
 // F-806 かきだし・よみこみ（きしゅへんこう よう）
 export function exportAll() {
   const out = {};
-  for (const k of ['profile', 'parent', 'record', 'custom', 'recent']) out[k] = read(k, null);
+  for (const k of ['profile', 'parent', 'record', 'custom', 'recent', 'last']) out[k] = read(k, null);
   return { app: 'missiontimer', version: 1, at: new Date().toISOString(), data: out };
 }
 export function importAll(obj) {

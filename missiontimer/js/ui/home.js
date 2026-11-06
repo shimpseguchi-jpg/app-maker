@@ -1,9 +1,10 @@
-// はじめかた・ホーム・テンプレ・せってい・ほごしゃモード（REQUIREMENTS.md 5.1・5.8・F-101〜F-106・F-801〜F-807）
-import { T, $, $$, el, esc, modal, toast, play, longPress, confirmBox, applyVolume, clock, minText } from './common.js';
+// はじめかた・ホーム（テンプレ・このまえと おなじ）・せってい・ほごしゃモード（REQUIREMENTS.md 5.1・5.8・F-101〜F-106・F-801〜F-807）
+import { T, $, $$, el, modal, toast, play, longPress, confirmBox, applyVolume, minText } from './common.js';
 import { setTextMode } from '../../../js/text.js';
-import { THEMES, themeById, fill } from '../data/themes.js';
+import { THEMES, themeById } from '../data/themes.js';
 import { TEMPLATES } from '../data/templates.js';
-import { profile, parent, record, saveProfile, saveParent, exportAll, importAll, resetAll, loadDraft } from '../save.js';
+import { PANEL_BY_ID } from '../data/panels.js';
+import { profile, parent, record, custom, saveProfile, saveParent, exportAll, importAll, resetAll, loadDraft, loadLast } from '../save.js';
 import { streak } from './result.js';
 
 const unlockedThemes = () => THEMES.filter((t) => record.totalStars >= t.unlock);
@@ -18,74 +19,69 @@ function wireSeg(root, obj, onChange) {
 }
 const TEXT_MODES = [['hira', 'ひらがな'], ['ruby', '{漢字|かんじ}（ふりがな）']];   // UI の 漢字には かならず ふりがな
 
-// ───────────── F-101 はじめかた
+// ───────────── F-101 はじめかた：すぐ はじめられるように「なんねんせい？」の 1タップ だけ。
+// なまえは きかない。もじ・テーマは しょきち（ふりがな つき・たんてい）で、あとから せってい で かえられる
 export function renderSetup(root, app) {
-  const st = { grade: profile.grade, text: profile.text, theme: profile.theme };
   const node = el(`<div class="screen setup">
     <div class="setup-in card">
       <div class="logo">🗝️⏱️</div><h1>${T('ミッションタイマー')}</h1>
-      <div class="lbl">${T('なんねんせい？')}</div>${seg('grade', [1, 2, 3, 4, 5, 6].map((g) => [g, g + 'ねんせい']), st.grade)}
-      <div class="lbl">${T('なまえ')} <small>（${T('ひらがな 6もじ まで。なくても いいよ')}）</small></div><input data-name maxlength="6" value="${esc(profile.name)}" autocomplete="off">
-      <div class="lbl">${T('もじ')}</div>${seg('text', TEXT_MODES, st.text)}
-      <div class="lbl">${T('テーマ')}</div><div class="themes">${unlockedThemes().map((t) => `<button data-theme="${t.id}" class="${st.theme === t.id ? 'on' : ''}"><span class="em">${t.mascot.emoji}</span>${T(t.name)}</button>`).join('')}</div>
-      <div class="warn" data-err></div>
-      <button class="btn big" data-start>${T('はじめる')} ▶</button>
+      <p class="lead">${T('なんねんせい？')}</p>
+      <div class="grades">${[1, 2, 3, 4, 5, 6].map((g) => `<button data-grade="${g}"><b>${g}</b><small>${T('ねんせい')}</small></button>`).join('')}</div>
+      <p class="sub">${T('あとから せってい で かえられるよ')}</p>
     </div></div>`);
   root.innerHTML = ''; root.appendChild(node);
-  // えらんだ ものは profile に いれておく（もじを かえて かきなおしても きえない）。ほぞんは「はじめる」で
-  wireSeg(node, st, (k, v) => { profile[k] = v; if (k === 'text') { setTextMode(v); renderSetup(root, app); } });
-  $$('[data-theme]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); st.theme = profile.theme = b.dataset.theme;$$('[data-theme]', node).forEach((x) => x.classList.toggle('on', x === b)); app.applyTheme(themeById(st.theme)); }));
-  $('[data-start]', node).addEventListener('click', () => {
-    const name = $('[data-name]', node).value.trim();
-    if (name && !/^[ぁ-ゖー]{1,6}$/.test(name)) { $('[data-err]', node).innerHTML = T('なまえは ひらがなで 6もじ までだよ'); return; }
+  $$('[data-grade]', node).forEach((b) => b.addEventListener('click', () => {
     play('select');
-    Object.assign(profile, { grade: st.grade, text: st.text, theme: st.theme, name, setup: true }); saveProfile();
+    Object.assign(profile, { grade: Number(b.dataset.grade), setup: true }); saveProfile();
     app.go('home');
-  });
+  }));
 }
 
-// ───────────── F-102 ホーム
+// ───────────── F-102・F-106 ホーム：テンプレと「このまえと おなじ」を おおきな ボタンで ならべる。
+// おすと その ひの タイムテーブルが できた じょうたいで ひらき、「ミッションかいし！」で はじまる（2タップ）
 export function renderHome(root, app) {
   const theme = app.theme();
   const m = app.loadMission();
-  const draft = loadDraft();
+  const last = loadLast();
   const going = m && m.state !== 'finished';
   const hello = theme.announce.hello[new Date().getDate() % theme.announce.hello.length];
+  const ems = (items) => items.slice(0, 4).map((it) => panelEmoji(it.panel)).join('');
+  const quick = [
+    ...(last?.items?.length ? [{ key: 'last', emoji: '🔁', name: 'このまえと おなじ', minutes: last.dur, sub: ems(last.items) }] : []),
+    ...TEMPLATES.map((tp) => ({ key: 'tpl:' + tp.id, emoji: tp.emoji, name: tp.name, minutes: tp.minutes, sub: ems(tp.items) })),
+    { key: 'new', emoji: '✏️', name: 'じぶんで つくる', minutes: null, sub: '' },
+  ];
   const node = el(`<div class="screen home">
-    <header class="bar"><h1>${T('ミッションタイマー')}</h1><span class="stars">⭐ ${record.totalStars}　💮 ${streak()}</span><button class="btn ghost" data-settings aria-label="${T('せってい')}">⚙️</button></header>
+    <header class="bar"><h1>${T('ミッションタイマー')}</h1><span class="stars">⭐ ${record.totalStars}　💮 ${streak()}</span><button class="btn ghost" data-record aria-label="${T('きろく')}">📅</button><button class="btn ghost" data-settings aria-label="${T('せってい')}">⚙️</button></header>
     <div class="home-body">
-      <div class="greet"><span class="mascot">${theme.mascot.emoji}</span><div class="bubble">${T(fill(hello, { name: profile.name || 'きみ' }))}</div></div>
-      <div class="home-btns">
-        ${going ? `<button class="btn big go" data-resume>▶ ${T('ミッションの つづき')}</button>` : ''}
-        <button class="btn big" data-new>✏️ ${T('あたらしく つくる')}</button>
-        ${draft && draft.items?.length && !going ? `<button class="btn" data-draft>📝 ${T('つくりかけの つづき')}</button>` : ''}
-        <button class="btn" data-tpl>📋 ${T('テンプレから つくる')}</button>
-        <button class="btn gray" data-record>📅 ${T('きろく')}</button>
+      <div class="greet"><span class="mascot">${theme.mascot.emoji}</span><div class="bubble">${T(going ? 'ミッションの つづきを しよう！' : hello)}</div></div>
+      <div class="home-main">
+        ${going ? `<button class="btn big go" data-resume>▶ ${T('ミッションの つづき')}</button>` : `<p class="home-q">${T('なにを する？')}</p>`}
+        <div class="quick">${quick.map((q) => `<button class="qcard ${q.key === 'last' ? 'last' : ''}" data-quick="${q.key}"><span class="em">${q.emoji}</span><b>${T(q.name)}</b><small>${q.minutes ? minText(q.minutes) : ''} ${q.sub}</small></button>`).join('')}</div>
       </div>
     </div></div>`);
   root.innerHTML = ''; root.appendChild(node);
   $('[data-settings]', node).addEventListener('click', () => { play('tap'); app.go('settings'); });
-  $('[data-new]', node).addEventListener('click', async () => {
-    play('tap');
+  $('[data-record]', node).addEventListener('click', () => { play('tap'); app.go('record'); });
+  $('[data-resume]', node)?.addEventListener('click', () => { play('select'); app.resume(); });
+  $$('[data-quick]', node).forEach((b) => b.addEventListener('click', async () => {
+    play('select');
     if (going && !(await confirmBox('いまの ミッションを おわる？', 'ここまでの カギと スターは のこるよ', 'おわって つくる', 'やめる'))) return;
     if (going) app.quitMission();
-    app.go('maker', { fresh: true });
-  });
-  $('[data-resume]', node)?.addEventListener('click', () => { play('select'); app.resume(); });
-  $('[data-draft]', node)?.addEventListener('click', () => { play('tap'); app.go('maker', { draft }); });
-  $('[data-record]', node).addEventListener('click', () => { play('tap'); app.go('record'); });
-  $('[data-tpl]', node).addEventListener('click', () => {
-    play('tap');
-    const { root: r, close } = modal(`<h2>${T('テンプレから つくる')}</h2><div class="tpl">${TEMPLATES.map((tp) => `<button data-tp="${tp.id}"><span class="em">${tp.emoji}</span><b>${T(tp.name)}</b><small>${minText(tp.minutes)}</small></button>`).join('')}</div><button class="btn gray" data-close>${T('やめる')}</button>`, { cls: 'wide' });
-    $$('[data-tp]', r).forEach((b) => b.addEventListener('click', () => { play('select'); close(); app.go('maker', { template: TEMPLATES.find((x) => x.id === b.dataset.tp) }); }));
-  });
+    const k = b.dataset.quick;
+    if (k === 'last') app.go('maker', { last });
+    else if (k === 'new') app.go('maker', { draft: loadDraft() });
+    else app.go('maker', { template: TEMPLATES.find((x) => 'tpl:' + x.id === k) });
+  }));
 }
+function panelEmoji(id) { return PANEL_BY_ID[id]?.emoji || custom.find((p) => p.id === id)?.emoji || '⭐'; }
 
 // ───────────── F-104 せってい（こども むけ）
 export function renderSettings(root, app) {
   const node = el(`<div class="screen settings">
     <header class="bar"><button class="btn ghost" data-home>← ${T('ホーム')}</button><h1>${T('せってい')}</h1></header>
     <div class="set-body card">
+      <div class="lbl">${T('がくねん')}</div>${seg('grade', [1, 2, 3, 4, 5, 6].map((g) => [g, g + 'ねん']), profile.grade)}
       <div class="lbl">${T('テーマ')}</div><div class="themes">${unlockedThemes().map((t) => `<button data-theme="${t.id}" class="${profile.theme === t.id ? 'on' : ''}"><span class="em">${t.mascot.emoji}</span>${T(t.name)}</button>`).join('')}</div>
       <div class="lbl">${T('のこり じかんの みせかた')}</div>${seg('view', [['disc', 'えんばん'], ['bar', 'バー'], ['mascot', 'マスコット'], ['numbers', 'すうじ']], profile.view)}
       <div class="lbl">${T('すうじを みせる')}</div>${seg('showNumbers', [[true, 'みせる'], [false, 'みせない']], profile.showNumbers)}
@@ -93,8 +89,6 @@ export function renderSettings(root, app) {
       <div class="lbl">${T('よみあげ')}</div>${seg('speech', [[true, 'あり'], [false, 'なし']], profile.speech)}
       <div class="lbl">${T('えんしゅつ')}</div>${seg('drama', [['quiet', 'しずか'], ['normal', 'ふつう'], ['dramatic', 'ドラマチック']], profile.drama)}
       <div class="lbl">${T('もじ')}</div>${seg('text', TEXT_MODES, profile.text)}
-      <div class="lbl">${T('がくねん')}</div>${seg('grade', [1, 2, 3, 4, 5, 6].map((g) => [g, g + 'ねん']), profile.grade)}
-      <div class="lbl">${T('なまえ')}</div><div class="row"><input data-name maxlength="6" value="${esc(profile.name)}" autocomplete="off"><button class="btn small" data-savename>${T('かえる')}</button></div>
       <button class="btn gray parent-btn" data-parent>🔐 ${T('おうちの ひと')} <small>（${T('3びょう ながおし')}）</small><i class="press" data-press></i></button>
     </div></div>`);
   root.innerHTML = ''; root.appendChild(node);
@@ -105,11 +99,6 @@ export function renderSettings(root, app) {
   });
   $$('[data-theme]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); profile.theme = b.dataset.theme; saveProfile(); app.applyTheme(themeById(profile.theme)); renderSettings(root, app); }));
   $('[data-home]', node).addEventListener('click', () => { play('tap'); app.go('home'); });
-  $('[data-savename]', node).addEventListener('click', () => {
-    const name = $('[data-name]', node).value.trim();
-    if (name && !/^[ぁ-ゖー]{1,6}$/.test(name)) { toast(T('なまえは ひらがなで 6もじ までだよ')); return; }
-    play('select'); profile.name = name; saveProfile(); toast(T('なまえを かえたよ'));
-  });
   const pb = $('[data-parent]', node);
   longPress(pb, 3000, () => parentGate(app), (p) => { $('[data-press]', pb).style.width = (p * 100) + '%'; });   // F-105
 }

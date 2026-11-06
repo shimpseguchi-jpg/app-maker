@@ -39,7 +39,6 @@ export function renderResult(root, app, m, gained) {
   const theme = themeById(m.theme);
   const r = m.result;
   const success = r.reason === 'success';
-  const name = profile.name || 'きみ';
   root.innerHTML = '';
   // F-604 だっしゅつ せいこう：とびらが ひらく・かみふぶき・ファンファーレ（10びょう いない）
   const show = el(`<div class="screen escape ${success ? 'win' : ''}">
@@ -81,7 +80,7 @@ export function renderResult(root, app, m, gained) {
     $('[data-home]', node).addEventListener('click', () => { play('tap'); app.go('home'); });
     $('[data-show]', node).addEventListener('click', () => {
       play('tap');
-      modal(`<div class="show-card"><div class="big">${success ? '🏆' : '💪'}</div><h2>${esc(name)}${T('の ミッション')}</h2>
+      modal(`<div class="show-card"><div class="big">${success ? '🏆' : '💪'}</div><h2>${T('{今日|きょう}の ミッション')}</h2>
         <p class="lead">${T(`カギ ${hon(r.keys)} / ${hon(r.total)}`)}　⭐ ${r.stars}</p>
         <div class="res-rows">${m.tt.items.filter((it) => !it.auto).map((it) => `<div class="res-row ${it.state === 'done' ? 'ok' : ''}"><span class="mk">${it.state === 'done' ? '✓' : '・'}</span><span class="em">${it.emoji}</span><span>${T(it.obj)}</span></div>`).join('')}</div>
         <p>${T('しゅうちゅうした じかん')} <b>${minText(r.focusMin)}</b></p><button class="btn" data-close>${T('とじる')}</button></div>`, { cls: 'wide' });
@@ -120,7 +119,7 @@ export function renderRecord(root, app) {
     const count = {};
     for (const r of ks) for (const id of r.items) count[id] = (count[id] || 0) + 1;
     const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
-    modal(`<div class="cert"><div class="cert-in"><h2>🏅 ${T('がんばりカード')}</h2><p class="lead">${esc(profile.name || 'きみ')}${T('さん')}</p>
+    modal(`<div class="cert"><div class="cert-in"><h2>🏅 ${T('がんばりカード')}</h2>
       <p>${T('この 1しゅうかんで スターを')} <b>${stars}</b> ${T('こ あつめました')}</p>
       ${best ? `<p>${T('いちばん がんばった こと')}：<b>${panelOf(best[0]).emoji} ${T(panelOf(best[0]).obj)}</b></p>` : ''}
       <p>${T('スタンプ')} ${ks.filter((r) => r.stamp).length} ${T('こ')}</p><p class="sign">${T('よく がんばりました！')}</p></div>
