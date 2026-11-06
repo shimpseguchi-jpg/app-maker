@@ -20,7 +20,8 @@ applyVolume();
 document.addEventListener('pointerdown', unlockOnce, { capture: true });               // N-05 さいしょの タップで おとを かいほう
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
-if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.__noSW) navigator.serviceWorker.register('sw.js').catch(() => {});
+// サンドボックスの なかでは serviceWorker に さわるだけで エラーに なる ことが あるので かこむ
+try { if (!window.__noSW && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* オフラインに ならない だけ */ }
 
 // テーマの いろ（F-606）
 function applyTheme(th) {
