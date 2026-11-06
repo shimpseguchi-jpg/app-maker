@@ -1,7 +1,7 @@
 // ミッション中の がめん（REQUIREMENTS.md 5.5・F-501〜F-510・F-603・F-605・F-607）
 // うえ：いまの パネル（えもじ・ミッション文） まんなか：のこり じかん（えんばん／バー／マスコット／すうじ）と おおきな かず
 // その した：つぎは ◯◯・できた！  した：そうさ と ミッションの おび（おわった ものは ✓・いまの いち・カギと とびら）
-import { T, $, $$, el, esc, modal, toast, play, speak, hush, confirmBox, longPress, keepAwake, fullscreen, wait, bigParts, hon, discPath, itemColor, clock, minText } from './common.js';
+import { T, $, $$, el, esc, modal, toast, play, speak, hush, confirmBox, longPress, keepAwake, fullscreen, wait, bigParts, hon, discPath, itemColor, minText } from './common.js';
 import * as M from '../engine/mission.js';
 import { fill } from '../data/themes.js';
 import { profile, parent, saveProfile } from '../save.js';
@@ -97,7 +97,7 @@ export function runTimer(root, app, m0) {
     const tot = $('[data-total]', node);
     if (tot) {
       const left = Math.max(0, Math.ceil(rem.total - 1e-9));
-      const txt = `${T('ぜんぶで のこり')} <b>${minText(left)}</b> <small>${T('おわり')} ${clock(M.wallMinute(m, m.tt.end))}</small>`;
+      const txt = `${T('ぜんぶで のこり')} <b>${minText(left)}</b> <small>${minText(m.tt.end - m.tt.start)}${T('の ミッション')}</small>`;
       if (tot.dataset.t !== txt) { tot.dataset.t = txt; tot.innerHTML = txt; }
     }
     const wt = $('[data-wait]', node), db = $('[data-done]', node);
@@ -227,11 +227,11 @@ export function runTimer(root, app, m0) {
     if (r.error === 'no_room') {
       const fx = r.fixes || [];
       const { root: mr, close } = modal(`<h2>${T('うしろの パネルを もう ちぢめられないよ')}</h2><div class="col">
-        ${fx.map((f, i) => `<button class="btn" data-fx="${i}">${T(f.id === 'stop' ? '{今日|きょう}は ここまで にする' : f.text)}</button>`).join('')}
+        ${fx.map((f, i) => `<button class="btn" data-fx="${i}">${T(f.id === 'stop' ? '{今日|きょう}は ここまで にする' : 'ぜんたいを 5ふん のばす')}</button>`).join('')}
         <button class="btn gray" data-close>${T('このまま つづける')}</button></div>`);
       $$('[data-fx]', mr).forEach((b) => b.addEventListener('click', () => {
         const f = fx[Number(b.dataset.fx)]; close();
-        if (f.id === 'extendEnd') { const e = M.extendItem(m, Date.now(), { endExtend: true }); if (!e.error) { toast(T('おわりを 5ふん のばしたよ')); commit(e.m); } }
+        if (f.id === 'extendEnd') { const e = M.extendItem(m, Date.now(), { endExtend: true }); if (!e.error) { toast(T('ぜんたいを 5ふん のばしたよ')); commit(e.m); } }
         else { const q = M.quit(m, Date.now()); commit(q.m, q.events); }
       }));
       return;
@@ -245,7 +245,7 @@ export function runTimer(root, app, m0) {
     commit(M.pause(m, Date.now()));
   }
   function pauseOverlay() {
-    const { root: r, close } = modal(`<div class="pause-over"><div class="big">⏸</div><h2>${T('いちじていし ちゅう')}</h2><p>${T('とまって いた ぶん、おわりも うしろへ ずれるよ')}</p><button class="btn big" data-resume>▶ ${T('つづける')}</button></div>`, { dismiss: false });
+    const { root: r, close } = modal(`<div class="pause-over"><div class="big">⏸</div><h2>${T('いちじていし ちゅう')}</h2><p>${T('とまって いる あいだは のこりの じかんが へらないよ')}</p><button class="btn big" data-resume>▶ ${T('つづける')}</button></div>`, { dismiss: false });
     $('[data-resume]', r).addEventListener('click', () => { play('select'); close(); commit(M.resume(m, Date.now())); });
   }
 

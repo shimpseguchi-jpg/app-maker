@@ -1,18 +1,18 @@
-// スケジュールメイカー（REQUIREMENTS.md 5.2〜5.4・F-201〜F-204・F-301〜F-307・F-401〜F-406）
-// すぐに はじめられるように 1がめん：じかん・きょうの ミッション（タイムテーブル）・パネル。
+// スケジュールメイカー（REQUIREMENTS.md 5.3〜5.4・F-203・F-301〜F-307・F-401〜F-406）
+// 「◯ぷんかん」が きほん：じこく（◯じ〜◯じ）は つかわず、ながさ だけ きめる。いつも いまから はじまる。
+// すぐに はじめられるように 1がめん：なんぷんかん・きょうの ミッション（タイムテーブル）・パネル。
 // パネルを いれる たびに おまかせで くぎり なおすので、「ミッションかいし！」を おすだけで はじまる。
-import { T, $, $$, el, esc, modal, play, speak, clockSvg, itemColor, clock, minText } from './common.js';
+import { T, $, $$, el, esc, modal, play, speak, clockSvg, itemColor, minText } from './common.js';
 import { plan, STEP, MIN_TOTAL, MAX_TOTAL } from '../engine/schedule.js';
 import { PANELS, PANEL_BY_ID, KINDS, VERBS, EMOJIS } from '../data/panels.js';
 import { profile, parent, record, custom, recent, saveCustom, saveDraft, dayKey } from '../save.js';
 
-const ceil5 = (m) => Math.ceil(m / STEP - 1e-9) * STEP;
-export const nowMinute = (now = Date.now()) => { const d = new Date(now); return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60; };
+const DURS = [15, 20, 30, 45, 60, 90, 120];
 let keySeq = 1;
 const newKey = () => 'k' + Date.now().toString(36) + (keySeq++);
 
 export function newDraft(over = {}) {
-  return { startMode: 'now', start: ceil5(nowMinute()), endMode: 'dur', dur: 60, end: null, items: [], mode: 'ratio', autoBreak: true, suppress: [], ...over };
+  return { dur: 60, items: [], mode: 'ratio', autoBreak: true, suppress: [], ...over };
 }
 export function draftFromTemplate(tp) {
   return newDraft({ items: tp.items.map((it) => ({ ...it, key: newKey() })), mode: tp.mode, dur: tp.minutes, template: tp.id });
@@ -21,22 +21,20 @@ export function draftFromTemplate(tp) {
 export function draftFromLast(last) {
   return newDraft({ items: last.items.map((it) => ({ ...it, key: newKey() })), mode: last.mode || 'ratio', dur: last.dur || 60, autoBreak: last.autoBreak !== false });
 }
-export function lastOf(d, S, E) {
-  return { items: d.items.map(({ panel, qty, minutes, locked }) => ({ panel, ...(qty != null ? { qty } : {}), ...(minutes != null ? { minutes } : {}), ...(locked ? { locked } : {}) })), dur: E - S, mode: d.mode, autoBreak: d.autoBreak };
+export function lastOf(d) {
+  return { items: d.items.map(({ panel, qty, minutes, locked }) => ({ panel, ...(qty != null ? { qty } : {}), ...(minutes != null ? { minutes } : {}), ...(locked ? { locked } : {}) })), dur: d.dur, mode: d.mode, autoBreak: d.autoBreak };
 }
 
 export function catalog() { return { ...PANEL_BY_ID, ...Object.fromEntries(custom.map((p) => [p.id, p])) }; }
-export function startOf(d, now = Date.now()) { return d.startMode === 'now' ? ceil5(nowMinute(now)) : d.start; }   // F-204 いまから は かいしまで いまに ついていく
-export function endOf(d, S) { return d.endMode === 'dur' ? S + d.dur : d.end; }
 export function rewardCapNow() {
   const used = record.days[dayKey()]?.rewardMin || 0;
   return Math.max(0, Math.min(parent.rewardCapMission, parent.rewardCapDay - used));        // F-801
 }
-export function planDraft(d, now = Date.now(), over = {}) {
-  const S = over.start ?? startOf(d, now);
+// タイムテーブルは 0〜◯ぷん（はじめた ときから はかる）。じこくの めやす（おふろ 19:00 など）は つかわない
+export function planDraft(d) {
   return plan({
-    start: S, end: over.end ?? endOf(d, S), items: d.items, grade: profile.grade, mode: d.mode, autoBreak: d.autoBreak, suppress: d.suppress,
-    rewardCap: rewardCapNow(), anchors: parent.bathAt ? { bath: parent.bathAt } : {}, catalog: catalog(),
+    start: 0, end: d.dur, items: d.items, grade: profile.grade, mode: d.mode, autoBreak: d.autoBreak, suppress: d.suppress,
+    rewardCap: rewardCapNow(), catalog: catalog(),
     extendMax: parent.extendMax, allowEndExtend: parent.allowEndExtend, shrink: parent.shrink,
   });
 }
@@ -46,41 +44,37 @@ const TABS = [['recent', 'さいきん'], ['focus', 'しゅうちゅう'], ['lif
 
 export function renderMaker(root, app, draft) {
   let tab = recent.length ? 'recent' : 'focus';
-  let timer = null, spoken = '';
+  let spoken = '';
+  if (!(draft.dur >= MIN_TOTAL && draft.dur <= MAX_TOTAL)) draft.dur = 60;           // ふるい つくりかけ（じこく しき）でも ひらける
 
   function draw() {
     const keep = root.querySelector('[data-palette]')?.scrollLeft || 0;
     const y = window.scrollY;
     root.innerHTML = '';
-    clearInterval(timer);
     root.appendChild(screen());
     const pal = root.querySelector('[data-palette]'); if (pal) pal.scrollLeft = keep;
     window.scrollTo(0, y);
     saveDraft(draft);
-    // F-204：いまから の とき、じこくが すすんだら かきなおす
-    if (draft.startMode === 'now') {
-      let last = startOf(draft);
-      timer = setInterval(() => { if (!root.isConnected) return clearInterval(timer); const s = startOf(draft); if (s !== last) { last = s; draw(); } }, 5000);
-    }
   }
 
   function screen() {
-    const S = startOf(draft), E = endOf(draft, S), T0 = E - S;
+    const T0 = draft.dur;
     const tt = draft.items.length ? planDraft(draft) : null;
-    const segs = tt?.ok ? tt.items.map((it) => ({ from: it.start, to: it.end, color: itemColor(it) })) : T0 > 0 ? [{ from: S, to: Math.min(E, S + MAX_TOTAL), color: 'var(--accent)' }] : [];
+    const segs = tt?.ok ? tt.items.map((it) => ({ from: it.start, to: it.end, color: itemColor(it) })) : [{ from: 0, to: T0, color: 'var(--accent)' }];
     const node = el(`<div class="screen maker">
       <header class="bar"><button class="btn ghost" data-home>← ${T('ホーム')}</button><h1>${T('ミッションを つくる')}</h1>
         <div class="seg" role="group"><button data-mode="ratio" class="${draft.mode === 'ratio' ? 'on' : ''}">${T('ひれい')}</button><button data-mode="equal" class="${draft.mode === 'equal' ? 'on' : ''}">${T('おなじ')}</button></div></header>
       <div class="maker-body">
         <section class="card m-time">
           <div class="time-row">
-            <div class="clock-wrap">${clockSvg(segs, S)}</div>
+            <div class="clock-wrap">${clockSvg(segs, null, { minutes: true })}</div>
             <div class="time-ctl">
-              <div class="lbl">${T('はじまり')}</div>
-              <div class="chips"><button data-start-now class="${draft.startMode === 'now' ? 'on' : ''}">${T('いまから')}</button><button data-start-pick class="${draft.startMode === 'fixed' ? 'on' : ''}">🕐 ${clock(S)}</button></div>
-              <div class="lbl">${T('おわり')}</div>
-              <div class="chips">${[30, 45, 60, 90, 120].map((m) => `<button data-dur="${m}" class="${draft.endMode === 'dur' && draft.dur === m ? 'on' : ''}">+${m}</button>`).join('')}<button data-end-pick class="${draft.endMode === 'fixed' ? 'on' : ''}">🕐 ${clock(E)}</button></div>
-              <div class="total ${T0 < MIN_TOTAL || T0 > MAX_TOTAL ? 'bad' : ''}"><b>${T0}</b>${minText(T0).slice(String(T0).length)}<small>${clock(S)}〜${clock(E)}</small></div>
+              <div class="lbl">${T('なんぷんかん？')}</div>
+              <div class="dur-big"><button class="adj" data-step="-5" ${T0 - STEP < MIN_TOTAL ? 'disabled' : ''} aria-label="−5">−5</button>
+                <span class="total"><b>${T0}</b>${minText(T0).slice(String(T0).length)}${T('かん')}</span>
+                <button class="adj" data-step="5" ${T0 + STEP > MAX_TOTAL ? 'disabled' : ''} aria-label="+5">+5</button></div>
+              <div class="chips">${DURS.map((m) => `<button data-dur="${m}" class="${draft.dur === m ? 'on' : ''}">${minText(m)}</button>`).join('')}</div>
+              <div class="sub-note">${T('「ミッションかいし！」で いまから はじまるよ')}</div>
             </div>
           </div>
         </section>
@@ -97,7 +91,7 @@ export function renderMaker(root, app, draft) {
       </div>
       <footer class="foot"><button class="btn big go" data-go ${tt?.ok ? '' : 'disabled'}>🚀 ${T('ミッションかいし！')}</button></footer>
     </div>`);
-    wire(node, tt, S, E);
+    wire(node, tt);
     if (tt?.ok && tt.suggestions[0] && spoken !== tt.suggestions[0].id) { spoken = tt.suggestions[0].id; setTimeout(() => speak(tt.suggestions[0].text), 300); }
     return node;
   }
@@ -108,15 +102,18 @@ export function renderMaker(root, app, draft) {
     return sugg + tt.notices.map((n) => `<div class="notice">${T(n.text)}</div>`).join('');
   }
   function errorHtml(tt) {
-    return `<div class="bubble err"><span class="mascot">${app.theme().mascot.emoji}</span><div><p>${T(tt.text)}</p><div class="row wrap">${(tt.fixes || []).map((f, i) => `<button class="btn small" data-fix="${i}">${T(f.text)}</button>`).join('')}</div></div></div>`;
+    // なおしかたの もじは「◯ぷんかん」で いう（スケジューラの もじは じこく しき）
+    const label = (f) => (f.id === 'extendEnd' ? `${minText(f.minutes)} ふやす` : f.id === 'setEnd' ? `${minText(f.apply.end)}かんに する` : f.text);
+    return `<div class="bubble err"><span class="mascot">${app.theme().mascot.emoji}</span><div><p>${T(tt.text)}</p><div class="row wrap">${(tt.fixes || []).map((f, i) => `<button class="btn small" data-fix="${i}">${T(label(f))}</button>`).join('')}</div></div></div>`;
   }
   function rowsHtml(tt) {
     if (!draft.items.length) return `<div class="empty drop-hint">${T('パネルを タップして いれてね')}</div>`;
     const rows = tt?.ok ? tt.items : draft.items.map((it, i) => ({ ...panelOf(it), ...it, src: i, planned: null, auto: false }));
+    let no = 0;
     return rows.map((it) => {
       const d = it.auto ? null : draft.items[it.src];
       const p = d ? panelOf(d) : null;
-      const time = it.planned != null ? `<span class="tt-time">${clock(it.start)}<small>〜${clock(it.end)}</small></span>` : '<span class="tt-time"></span>';
+      const time = d ? `<span class="no">${++no}</span>` : '<span class="no none"></span>';      // じゅんばん（じこくは ださない）
       const len = it.planned != null ? `<b class="len">${minText(it.planned)}</b>` : '';
       let ctl = '';
       if (it.auto === 'break') ctl = `<button class="btn small gray" data-nobreak>${T('はずす')}</button>`;
@@ -152,20 +149,18 @@ export function renderMaker(root, app, draft) {
     play('place'); speak(p.obj);
   }
 
-  function wire(node, tt, S, E) {
+  function wire(node, tt) {
     $('[data-home]', node).addEventListener('click', () => { play('tap'); app.go('home'); });
     $$('[data-mode]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); draft.mode = b.dataset.mode; draw(); }));
-    $('[data-start-now]', node).addEventListener('click', () => { play('tap'); draft.startMode = 'now'; draw(); });
-    $('[data-start-pick]', node).addEventListener('click', () => { play('tap'); pickTime('はじまりの じかん', S, (m) => { draft.startMode = 'fixed'; draft.start = m; if (draft.endMode === 'fixed' && draft.end <= m) draft.endMode = 'dur'; draw(); }); });
-    $$('[data-dur]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); draft.endMode = 'dur'; draft.dur = Number(b.dataset.dur); draw(); }));
-    $('[data-end-pick]', node).addEventListener('click', () => { play('tap'); pickTime('おわりの じかん', E, (m) => { draft.endMode = 'fixed'; draft.end = m <= S ? m + 1440 : m; draw(); }); });
+    $$('[data-dur]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); draft.dur = Number(b.dataset.dur); draw(); }));
+    $$('[data-step]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); draft.dur = Math.max(MIN_TOTAL, Math.min(MAX_TOTAL, draft.dur + Number(b.dataset.step))); draw(); }));
     $$('[data-tab]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); tab = b.dataset.tab; draw(); }));
     $$('[data-make]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); makePanel(); }));
     $('[data-clear]', node)?.addEventListener('click', () => { play('unplace'); draft.items = []; draft.suppress = []; draft.autoBreak = true; draw(); });
     $$('[data-del]', node).forEach((b) => b.addEventListener('click', () => { play('unplace'); draft.items.splice(Number(b.dataset.del), 1); draw(); }));
     $$('[data-qty]', node).forEach((b) => b.addEventListener('click', () => { play('tap'); const [i, n] = b.dataset.qty.split(':').map(Number); draft.items[i].qty = n; delete draft.items[i].minutes; draw(); }));
     $$('[data-nobreak]', node).forEach((b) => b.addEventListener('click', () => { play('unplace'); draft.autoBreak = false; draw(); }));   // F-404 はずすと もう はさまない
-    $$('[data-fix]', node).forEach((b) => b.addEventListener('click', () => { play('select'); applyFix(tt.fixes[Number(b.dataset.fix)].apply, S); }));
+    $$('[data-fix]', node).forEach((b) => b.addEventListener('click', () => { play('select'); applyFix(tt.fixes[Number(b.dataset.fix)].apply); }));
     $$('[data-sugg]', node).forEach((b) => b.addEventListener('click', () => {
       play('tap');
       const s = tt.suggestions[0];
@@ -190,9 +185,9 @@ export function renderMaker(root, app, draft) {
     $$('[data-add]', node).forEach((b) => dragSource(b, b, { kind: 'new', id: b.dataset.add }, node));
     $$('[data-grip]', node).forEach((g) => dragSource(g, g.closest('.trow'), { kind: 'move', index: Number(g.dataset.grip) }, node));
   }
-  function applyFix(apply, S) {
+  function applyFix(apply) {
     if (apply.items) draft.items = apply.items.map((x) => ({ ...x }));
-    if (apply.end != null) { if (draft.endMode === 'dur') draft.dur = apply.end - S; else draft.end = apply.end; }
+    if (apply.end != null) draft.dur = apply.end;                                        // はじまりは 0 なので おわり ＝ ◯ぷんかん
     draw();
   }
 
@@ -254,19 +249,6 @@ export function renderMaker(root, app, draft) {
     handle.addEventListener('pointercancel', (e) => end(e, true));
   }
 
-  // じかんを えらぶ（じ・ふん を タップ）
-  function pickTime(title, cur, done) {
-    let h = Math.floor(cur / 60) % 24, m = cur % 60;
-    const { root: r, close } = modal(`<h2>${T(title)}</h2><div class="pick-big" data-show></div>
-      <div class="lbl">${T('じ')}</div><div class="chips wrap">${Array.from({ length: 18 }, (_, i) => i + 5).map((x) => `<button data-h="${x}">${x}</button>`).join('')}</div>
-      <div class="lbl">${T('ふん')}</div><div class="chips wrap">${Array.from({ length: 12 }, (_, i) => i * 5).map((x) => `<button data-m="${x}">${String(x).padStart(2, '0')}</button>`).join('')}</div>
-      <div class="row"><button class="btn gray" data-close>${T('やめる')}</button><button class="btn" data-ok>${T('きめる')}</button></div>`, { cls: 'picker' });
-    const show = () => { $('[data-show]', r).textContent = `${h}:${String(m).padStart(2, '0')}`; $$('[data-h]', r).forEach((b) => b.classList.toggle('on', Number(b.dataset.h) === h)); $$('[data-m]', r).forEach((b) => b.classList.toggle('on', Number(b.dataset.m) === m)); };
-    $$('[data-h]', r).forEach((b) => b.addEventListener('click', () => { play('tap'); h = Number(b.dataset.h); show(); }));
-    $$('[data-m]', r).forEach((b) => b.addEventListener('click', () => { play('tap'); m = Number(b.dataset.m); show(); }));
-    $('[data-ok]', r).addEventListener('click', () => { play('select'); close(); done(h * 60 + m); });
-    show();
-  }
 
   // F-305 じさく パネル（パネルの なまえは ひらがな 8もじ まで）
   function makePanel() {
@@ -302,5 +284,4 @@ export function renderMaker(root, app, draft) {
   }
 
   draw();
-  return () => clearInterval(timer);
 }

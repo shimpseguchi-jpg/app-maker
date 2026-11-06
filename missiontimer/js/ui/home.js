@@ -130,7 +130,6 @@ export function renderParent(root, app) {
       <div class="lbl">${T('「もうすこし」で ちぢめる じゅん')}</div>${seg('shrink', [['others', 'ごほうびは さいごに'], ['reward', 'ごほうびから']], parent.shrink)}
       <div class="lbl">${T('いちじていし')}</div>${seg('pauseLongPress', [[false, 'タップ'], [true, 'ながおし だけ']], parent.pauseLongPress)}
       <div class="lbl">${T('こどもが パネルを つくる')}</div>${seg('kidCustom', [[true, 'できる'], [false, 'できない']], parent.kidCustom)}
-      <div class="lbl">${T('お{風呂|ふろ}の じこくの めやす')}</div>${seg('bathAt', [['', 'なし'], ['18:30', '18:30'], ['19:00', '19:00'], ['19:30', '19:30'], ['20:00', '20:00']], parent.bathAt)}
       <div class="row wrap"><button class="btn small" data-export>⬇ ${T('きろくを かきだす')}</button><label class="btn small">⬆ ${T('よみこむ')}<input type="file" accept="application/json" data-import hidden></label><button class="btn small gray" data-reset>🗑 ${T('ぜんぶ けす')}</button></div>
       <div class="guide">
         <h3>${T('おうちの ひとへ')}</h3>

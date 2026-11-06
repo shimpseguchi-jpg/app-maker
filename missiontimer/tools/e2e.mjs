@@ -74,7 +74,14 @@ for (const [dev, viewport] of DEVICES) {
   ok('F-302 ドラッグで パネルが わくに はいる', await page.locator('[data-w]').count() === 1);
   await click('[data-add="print"]');
   ok('F-302 タップでも すえに はいる', await page.locator('[data-w]').count() === 2);
-  ok('F-401 いれた ときに タイムテーブルが できて かいし できる', /\d+:\d\d/.test(await page.locator('[data-w="0"] .tt-time').innerText()) && !(await page.locator('[data-go]').isDisabled()));
+  ok('F-401 いれた ときに タイムテーブル（ながさ）が できて かいし できる', /\d+(ぷん|ふん)/.test(await page.locator('[data-w="0"] .len').innerText()) && !(await page.locator('[data-go]').isDisabled()));
+  // 「◯ぷんかん」が きほん：じこく（◯:◯◯）は ださない。ながさは チップ と ±5 で
+  ok('F-203 ◯ぷんかん：メイカーに じこくが でない', !/\d{1,2}:\d{2}/.test(await page.locator('.screen').innerText()), (await page.locator('.screen').innerText()).match(/\d{1,2}:\d{2}/g));
+  await click('[data-dur="30"]');
+  ok('F-203 ◯ぷんかん：チップで 30ぷんかん', /^30/.test(await page.locator('.dur-big .total').innerText()));
+  await click('[data-step="5"]');
+  ok('F-203 ◯ぷんかん：+5 で 35ふんかん', /^35/.test(await page.locator('.dur-big .total').innerText()));
+  await click('[data-dur="60"]');
   await click('[data-qty="1:3"]');
   ok('F-304 すうりょう ボタン', await page.locator('[data-qty="1:3"].on').count() === 1);
   const len0 = await page.locator('[data-w="0"] .len').innerText();
@@ -108,6 +115,7 @@ for (const [dev, viewport] of DEVICES) {
     return { h: document.documentElement.scrollHeight, vh: innerHeight, num: n.height, short: Math.min(innerWidth, innerHeight) };
   });
   ok('N-02 F-501 ミッション中は 1がめんに おさまる', fit.h <= fit.vh + 1, fit);
+  ok('F-203 ◯ぷんかん：ミッション中も じこくは ださない', !/\d{1,2}:\d{2}/.test(await page.locator('.screen').innerText()));
   ok('F-504 のこりの かずは みじかい ほうの 1/4 いじょう', fit.num >= fit.short / 4, fit);
   ok('F-502 いまの パネル・つぎは・おび・カギ', await page.locator('.t-sentence').count() === 1 && await page.locator('.t-next').count() === 1 && await page.locator('.t-band .seg').count() >= 3 && await page.locator('.door .holes i').count() === 3);
   await page.click('[data-done]', { force: true }).catch(() => {}); await run(200);

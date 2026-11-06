@@ -6,7 +6,7 @@ function write(k, v) { try { if (v == null) localStorage.removeItem(P + k); else
 // こども むけの せってい（F-101・F-104）。text は 'hira'（ひらがな）| 'ruby'（{漢字|かんじ}に ふりがな）
 const DEFAULT_PROFILE = { setup: false, grade: 2, theme: 'detective', view: 'disc', showNumbers: true, volume: 'normal', speech: true, drama: 'normal', text: 'ruby', briefings: 0 };
 // ほごしゃモード（F-801〜F-805）
-const DEFAULT_PARENT = { rewardCapDay: 30, rewardCapMission: 30, extendMax: 2, allowEndExtend: false, shrink: 'others', pauseLongPress: false, bathAt: '', kidCustom: true };
+const DEFAULT_PARENT = { rewardCapDay: 30, rewardCapMission: 30, extendMax: 2, allowEndExtend: false, shrink: 'others', pauseLongPress: false, kidCustom: true };
 
 export const profile = { ...DEFAULT_PROFILE, ...read('profile', {}) };
 export const parent = { ...DEFAULT_PARENT, ...read('parent', {}) };

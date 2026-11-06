@@ -1,13 +1,12 @@
 // ミッションタイマー（仮）：はじまり と がめんの ながれ（REQUIREMENTS.md 5.10）
 // はじめかた → ホーム → スケジュールメイカー → ブリーフィング → ミッション中 → だっしゅつ せいこう → けっか → ホーム
 import { setTextMode } from '../../js/text.js';
-import { T, $, el, toast, play, unlockOnce, applyVolume, fullscreen, clock, minText } from './ui/common.js';
+import { T, $, toast, unlockOnce, applyVolume, fullscreen } from './ui/common.js';
 import { profile, saveProfile, loadMission, saveMission, saveDraft, saveLast, record } from './save.js';
 import { themeById } from './data/themes.js';
 import * as M from './engine/mission.js';
-import { STEP } from './engine/schedule.js';
 import { renderSetup, renderHome, renderSettings, renderParent } from './ui/home.js';
-import { renderMaker, newDraft, draftFromTemplate, draftFromLast, lastOf, planDraft, startOf, endOf, nowMinute } from './ui/maker.js';
+import { renderMaker, newDraft, draftFromTemplate, draftFromLast, lastOf, planDraft } from './ui/maker.js';
 import { runBriefing } from './ui/briefing.js';
 import { runTimer } from './ui/timer.js';
 import { renderResult, renderRecord, applyResult } from './ui/result.js';
@@ -52,22 +51,14 @@ const app = {
     if (name === 'briefing') return mount(() => runBriefing(root, { theme: theme(), mission: params.m, onDone: () => begin(params.m) }));
     if (name === 'timer') return mount(() => runTimer(root, app, params.m));
     if (name === 'result') return mount(() => renderResult(root, app, params.m, params.gained));
-    if (name === 'waiting') return mount(() => waiting(params.draft));
   },
-  // ミッションかいし！（F-204：はじまりが すぎていたら いまに、まだ さき なら まつ）
-  launch(draft, { force = false } = {}) {
+  // ミッションかいし！「◯ぷんかん」の ミッションを いまから はじめる（ブリーフィングの あとから はかる）
+  launch(draft) {
     unlockOnce(); fullscreen(true);
-    const now = Date.now(), nowM = nowMinute(now);
-    const S = startOf(draft, now), E = endOf(draft, S);
-    const ceilNow = Math.ceil(nowM / STEP - 1e-9) * STEP;
-    let over = {};
-    if (S < nowM - 0.5) { over = { start: ceilNow, end: E }; toast(T(`はじまりを ${clock(ceilNow)} に したよ`)); }
-    else if (S - nowM > STEP && !force) return app.go('waiting', { draft });
-    else if (force && S - nowM > STEP) over = { start: ceilNow, end: E };
-    const tt = planDraft(draft, now, over);
+    const tt = planDraft(draft);
     if (!tt.ok) { toast(T(tt.text)); return app.go('maker', { draft }); }
-    const m = M.createMission(tt, { now, theme: profile.theme });
-    saveMission(m); saveDraft(null); saveLast(lastOf(draft, tt.start, tt.end));        // ホームの「このまえと おなじ」
+    const m = M.createMission(tt, { now: Date.now(), theme: profile.theme, relative: true });
+    saveMission(m); saveDraft(null); saveLast(lastOf(draft));                           // ホームの「このまえと おなじ」
     app.go('briefing', { m });
   },
   resume() {
@@ -85,26 +76,6 @@ function begin(m0) {
   profile.briefings = (profile.briefings || 0) + 1; saveProfile();
   saveMission(m);
   app.go('timer', { m });
-}
-
-// はじまりの じこくまで まつ
-function waiting(draft) {
-  const th = theme();
-  const node = el(`<div class="screen waiting"><div class="card"><div class="mascot big">${th.mascot.emoji}</div>
-    <h1 data-at></h1><p class="lead" data-left></p>
-    <div class="col"><button class="btn big" data-now>▶ ${T('いますぐ はじめる')}</button><button class="btn gray" data-back>${T('もどる')}</button></div></div></div>`);
-  root.appendChild(node);
-  const S = startOf(draft);
-  node.querySelector('[data-at]').innerHTML = T(`${clock(S)} に はじまるよ`);
-  const iv = setInterval(() => {
-    const left = S - nowMinute();
-    if (left <= STEP) { clearInterval(iv); app.launch(draft); return; }
-    node.querySelector('[data-left]').innerHTML = T(`あと ${minText(Math.ceil(left))}`);
-  }, 1000);
-  node.querySelector('[data-left]').innerHTML = T(`あと ${minText(Math.ceil(S - nowMinute()))}`);
-  node.querySelector('[data-now]').addEventListener('click', () => { play('select'); clearInterval(iv); app.launch(draft, { force: true }); });
-  node.querySelector('[data-back]').addEventListener('click', () => { play('tap'); clearInterval(iv); app.go('maker', { draft }); });
-  return () => clearInterval(iv);
 }
 
 // ── きどう（F-102・F-902：すすめている ミッションは さいよみこみ しても つづきから）

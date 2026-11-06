@@ -379,3 +379,12 @@ small { font-size: 0.72em; opacity: 0.85; font-weight: 700; }
   .m-panels .pcard { touch-action: none; }
   .grades { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
+/* ──「◯ぷんかん」：なんぷんかん の おおきな かず と ±5、ふんの めもりの とけい、じゅんばんの まる */
+.dur-big { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dur-big .total b { font-size: clamp(44px, 9vmin, 80px); }
+.dur-big .adj { width: 52px; height: 52px; font-size: 18px; }
+.sub-note { color: var(--sub); font-size: 14px; margin-top: 8px; }
+.clock .nums text.mn { font-size: 11px; }
+.trow .no { width: 30px; height: 30px; border-radius: 999px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font: 700 16px Fredoka, sans-serif; justify-self: center; }
+.trow .no.none { background: none; }
+.trow { grid-template-columns: 30px 34px 34px minmax(0, 1fr) auto; }

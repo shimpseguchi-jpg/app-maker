@@ -104,7 +104,26 @@ const names = (m) => m.tt.items.map((it) => `${it.panel}:${it.state}`).join(' ')
   check('F-508 おわる：けっかを のこして おわる', q.m.state === 'finished' && q.m.result.reason === 'quit' && q.m.result.keys === 1, q.m.result);
 }
 
-// 6. らんすう：いろいろな ミッションを さいごまで すすめても こわれない
+// 6.「◯ぷんかん」（relative）：ブリーフィングの あと はじめた ときから はかり、ぴったり ◯ぷんで おわる
+{
+  const tt = plan({ start: 0, end: 60, items: EX, grade: 2, autoBreak: false });
+  let m = deepFreeze(M.createMission(tt, { now: at(16, 57, 23), theme: 'magic', relative: true }));
+  const t0 = at(16, 57, 41);                                                   // ブリーフィングに 18びょう
+  m = deepFreeze(M.startMission(m, t0).m);
+  check('F-203 ◯ぷんかん：はじめた しゅんかんが 0ぷん（ブリーフィングは ふくめない）', Math.abs(M.minuteOf(m, t0)) < 1e-9 && m.tt.items[0].start === 0 && m.tt.items[2].end === 60, { min: M.minuteOf(m, t0) });
+  // 本（〜20ぷん）は じどう、プリント（〜35ぷん）は 35ぷんで できた！、ゲーム（〜60ぷん）は じどう → ちょうど 60ぷんで せいこう
+  let a = run(m, t0, t0 + 35 * 60000, 2000).m;
+  a = deepFreeze(M.finishItem(a, t0 + 35 * 60000, { uid: M.current(a).uid }).m);
+  const r = run(a, t0 + 35 * 60000 + 1000, t0 + 61 * 60000, 1000);
+  const fin = r.events.find((e) => e.type === 'finish');
+  check('F-203 ◯ぷんかん：60ぷんかんの ミッションは はじめて 60ぷんで おわる', r.m.result?.reason === 'success' && fin && fin.now >= t0 + 60 * 60000 && fin.now <= t0 + 60 * 60000 + 1000, { result: r.m.result, at: fin && (fin.now - t0) / 60000 });
+  const g = run(m, t0, t0 + 20 * 60000 + 1000, 1000).m;
+  check('F-203 ◯ぷんかん：本（20ぷん）は はじめて 20ぷんで おわる', M.current(g).panel === 'print' && g.tt.items[0].doneAt === 20, names(g));
+  const p = M.resume(M.pause(g, t0 + 21 * 60000), t0 + 31 * 60000);
+  check('F-508 ◯ぷんかん：いちじていし した 10ぷんは のこりから へらない', Math.abs(M.remaining(p, t0 + 31 * 60000).total - 39) < 1e-6, M.remaining(p, t0 + 31 * 60000));
+}
+
+// 7. らんすう：いろいろな ミッションを さいごまで すすめても こわれない
 {
   const rng = makeRng(7);
   const pool = ['homework', 'print', 'drill', 'kanji', 'calc', 'book', 'tidy', 'bath', 'teeth', 'game', 'video', 'outside', 'free', 'rest'];

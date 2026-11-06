@@ -3,9 +3,11 @@
 // DOM に さわらない じゅんすいな かんすう。いまの じこく now（ms）を ひきすうで うけとり、あたらしい じょうたいと できごとを かえす。
 // tools/test_mission.mjs で じこくを すすめて けんさ する。タイマーは setInterval の かぞえあげ ではなく now から もとめる（F-510・N-04）。
 //
-// じこく：タイムテーブル（engine/schedule.js）は「その日の 0:00 からの 分」。ミッションは base（その日の 0:00 の ms）と
-// offset（いちじていしで とまっていた ms の ごうけい）を もち、ミッションの とけい mm = (now − base − offset) / 60000 で くらべる。
-// いちじていしは おわりの じこくも おなじだけ うしろへ ずらす（タイムテーブルは 5ふん きざみの まま）。
+// じこく：ミッションは base（ms）と offset（いちじていしで とまっていた ms の ごうけい）を もち、
+// ミッションの とけい mm = (now − base − offset) / 60000 で タイムテーブル（engine/schedule.js の 分）と くらべる。
+//   relative：「◯ぷんかん」の ミッション。タイムテーブルは 0〜◯ぷん で、base は はじめた しゅんかん（startMission）
+//   そうでない とき：タイムテーブルは「その日の 0:00 からの 分」で、base は その日の 0:00
+// いちじていしは のこりの じかんを とめる（おわりも おなじだけ うしろへ ずれる。タイムテーブルは 5ふん きざみの まま）。
 //
 // m = { v, id, theme, base, offset, pausedAt, state: 'ready'|'running'|'paused'|'finished',
 //       tt（タイムテーブル。items[] に uid・state・doneAt・star を たす）, cursor, announced[], lastTick, overtimeUsed,
@@ -48,18 +50,20 @@ export function missionText(it, minText) {
 }
 
 // ── はじめる
-// tt は plan() の けっか。theme は テーマの id
-export function createMission(tt, { now, theme, id }) {
+// tt は plan() の けっか。theme は テーマの id。relative は「◯ぷんかん」（タイムテーブルが 0 から）
+export function createMission(tt, { now, theme, id, relative = false }) {
   const items = ensureUids(tt.items.map((it) => ({ ...it, state: 'todo', doneAt: null, star: 0 })));
   return {
-    v: 1, id: id || 'm_' + now.toString(36), theme, base: localMidnight(now), offset: 0, pausedAt: null, state: 'ready',
+    v: 1, id: id || 'm_' + now.toString(36), theme, relative, base: relative ? now - tt.start * MIN : localMidnight(now), offset: 0, pausedAt: null, state: 'ready',
     tt: { ...tt, items }, cursor: 0, announced: [], lastTick: null, overtimeUsed: false, startedAt: null, result: null,
   };
 }
 
-// ブリーフィングの あとに よぶ。はじまりより はやければ、さいしょの パネルが はやく はじまる（はした。F-204・4.3-8 と おなじ かんがえかた）
+// ブリーフィングの あとに よぶ。「◯ぷんかん」は ここから はかる（ブリーフィングの じかんは ふくめない）。
+// じこくで きめた ときは、はじまりより はやければ さいしょの パネルが はやく はじまる（はした。F-204・4.3-8 と おなじ かんがえかた）
 export function startMission(m0, now) {
   const m = clone(m0);
+  if (m.relative) m.base = now - m.tt.start * MIN;
   const t = minuteOf(m, now);
   const first = m.tt.items[0];
   if (t < first.start) first.start = t;
@@ -255,6 +259,4 @@ export function quit(m0, now) {
   return { m, events };
 }
 
-// 5ふん きざみの くぎりを ほんとうの じこくで かえす（ひょうじよう）
-export function wallMinute(m, minute) { return minute + m.offset / MIN; }
 export { STEP };

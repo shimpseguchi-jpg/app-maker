@@ -102,8 +102,9 @@ function arc(cx, cy, r0, r1, a0, a1) {
   const [x0, y0] = p(r1, a0), [x1, y1] = p(r1, a1), [x2, y2] = p(r0, a1), [x3, y3] = p(r0, a0);
   return `M${x0.toFixed(2)},${y0.toFixed(2)} A${r1},${r1} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${r0},${r0} 0 ${large} 0 ${x3.toFixed(2)},${y3.toFixed(2)} Z`;
 }
-// segs = [{ from, to, color }]（その日の 分）。hands = その日の 分（はじまりの じこくを はりで しめす）
-export function clockSvg(segs, hands) {
+// segs = [{ from, to, color }]（分）。hands = その日の 分（はりで しめす。null なら はり なし）
+// minutes：「◯ぷんかん」の めもり（12 の ところが 0／60ぷん、すうじは 5・10・…・60）
+export function clockSvg(segs, hands, { minutes = false } = {}) {
   const cx = 100, cy = 100, R = 92;
   const S0 = segs.length ? segs[0].from : 0;
   const parts = [];
@@ -118,7 +119,7 @@ export function clockSvg(segs, hands) {
       a = b;
     }
   }
-  const nums = Array.from({ length: 12 }, (_, i) => { const a = ((i + 1) / 12) * 2 * Math.PI; return `<text x="${(cx + 86 * Math.sin(a)).toFixed(1)}" y="${(cy - 86 * Math.cos(a) + 4.5).toFixed(1)}">${i + 1}</text>`; }).join('');
+  const nums = Array.from({ length: 12 }, (_, i) => { const a = ((i + 1) / 12) * 2 * Math.PI; return `<text x="${(cx + 86 * Math.sin(a)).toFixed(1)}" y="${(cy - 86 * Math.cos(a) + 4.5).toFixed(1)}"${minutes ? ' class="mn"' : ''}>${minutes ? (i + 1) * 5 : i + 1}</text>`; }).join('');
   const ticks = Array.from({ length: 60 }, (_, i) => { const a = (i / 60) * 2 * Math.PI, r0 = i % 5 ? 95 : 93; return `<line x1="${(cx + r0 * Math.sin(a)).toFixed(1)}" y1="${(cy - r0 * Math.cos(a)).toFixed(1)}" x2="${(cx + 98 * Math.sin(a)).toFixed(1)}" y2="${(cy - 98 * Math.cos(a)).toFixed(1)}"/>`; }).join('');
   let hand = '';
   if (hands != null) {
