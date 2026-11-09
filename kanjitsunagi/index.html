@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>かんじ せんつなぎ</title>
+<style>
+  :root {
+    --bg: #fffdf6;
+    --ink: #333;
+    --pencil: #f08a24;
+    --ok: #2aa84a;
+    --ng: #e0413a;
+    --old: #63c29a;
+    --card: #ffffff;
+    --line: #e6dcc6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 10px 12px 14px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .05em; }
+  .hint { font-size: 14px; color: #666; margin: 4px 0 6px; }
+  .opts { display: flex; gap: 10px; font-size: 14px; align-items: center; flex-wrap: wrap; }
+  .opts label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+
+  .board { position: relative; touch-action: none; padding: 4px 0; }
+  .row { display: grid; grid-template-columns: 78px 1fr; align-items: center; }
+  .row + .row { margin-top: clamp(44px, 9vw, 72px); }
+  .label {
+    font-size: 13px; font-weight: bold; color: #777; text-align: center; line-height: 1.3;
+    writing-mode: horizontal-tb;
+  }
+  .cards { display: flex; justify-content: space-around; gap: 6px; }
+  .card {
+    position: relative; z-index: 2;
+    width: clamp(48px, 12vw, 104px); aspect-ratio: 1 / 1;
+    background: var(--card); border: 3px solid var(--line); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: transform .12s, border-color .12s, box-shadow .12s;
+    box-shadow: 0 2px 0 rgba(0,0,0,.06);
+  }
+  .card svg.pic { width: 86%; height: 86%; pointer-events: none; }
+  .card.selected { border-color: var(--pencil); transform: scale(1.07); box-shadow: 0 0 0 4px rgba(240,138,36,.25); }
+  .card.hover { border-color: var(--pencil); }
+  .kanji { font-size: clamp(28px, 7.4vw, 60px); font-weight: bold; line-height: 1; pointer-events: none;
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", serif; }
+  .yomi { position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+    writing-mode: vertical-rl; font-size: clamp(9px, 1.6vw, 13px); color: #555; pointer-events: none; letter-spacing: .1em; }
+  body.no-yomi .yomi { display: none; }
+  .dot {
+    position: absolute; left: 50%; width: 14px; height: 14px; margin-left: -7px;
+    border-radius: 50%; background: #fff; border: 3px solid #bbb; pointer-events: none;
+  }
+  .dot.b { bottom: -9px; } .dot.t { top: -9px; }
+  .card.linked-t .dot.t, .card.linked-b .dot.b { background: var(--pencil); border-color: var(--pencil); }
+
+  svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: visible; }
+  svg.lines line.vis { stroke: var(--pencil); stroke-width: 5; stroke-linecap: round; }
+  svg.lines line.vis.ok { stroke: var(--ok); }
+  svg.lines line.vis.ng { stroke: var(--ng); stroke-dasharray: 2 9; }
+  svg.lines line.hit { stroke: transparent; stroke-width: 22; cursor: pointer; }
+  svg.lines line.temp { stroke: var(--pencil); stroke-width: 4; stroke-dasharray: 8 7; stroke-linecap: round; opacity: .8; }
+  .mark { font-size: 24px; font-weight: bold; pointer-events: none; }
+
+  .bar { display: flex; justify-content: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-size: 17px; font-weight: bold; padding: 10px 20px; border-radius: 999px;
+    border: none; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.18);
+  }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
+  .b-check { background: var(--pencil); color: #fff; }
+  .b-sub { background: #eee; color: #444; }
+  .msg { text-align: center; font-size: 18px; font-weight: bold; min-height: 1.6em; margin-top: 10px; }
+  .msg.ok { color: var(--ok); } .msg.ng { color: var(--ng); }
+
+  .clear {
+    position: fixed; inset: 0; background: rgba(255,253,246,.88); z-index: 10;
+    display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+  }
+  .clear.show { display: flex; animation: pop .35s ease-out; }
+  .clear .big { font-size: clamp(30px, 7vw, 54px); font-weight: bold; color: var(--ng); }
+  .clear .hanamaru { width: 140px; height: 140px; }
+  @keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr; }
+    .label { text-align: left; margin-bottom: 6px; }
+    .row + .row { margin-top: 30px; }
+    .cards { gap: 3px; }
+    .card { border-radius: 10px; border-width: 2px; }
+    h1 { font-size: 19px; }
+    .yomi { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>かんじ せんつなぎ</h1>
+    <div class="opts">
+      <label><input type="checkbox" id="optYomi" checked> よみがな</label>
+      <label><input type="checkbox" id="optNow"> すぐに こたえあわせ</label>
+    </div>
+  </header>
+  <p class="hint">「え」→「むかしの もじ」→「かんじ」を せんで つなごう。カードを タップするか、ゆびで なぞってね。せんを タップすると けせるよ。</p>
+
+  <div class="board" id="board">
+    <svg class="lines" id="lines"></svg>
+    <div class="row"><div class="label">え</div><div class="cards" id="row0"></div></div>
+    <div class="row"><div class="label">むかしの<br>もじ</div><div class="cards" id="row1"></div></div>
+    <div class="row"><div class="label">かんじ</div><div class="cards" id="row2"></div></div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <div class="bar">
+    <button class="b-check" id="btnCheck">こたえあわせ</button>
+    <button class="b-sub" id="btnReset">けす</button>
+    <button class="b-sub" id="btnNew">ならびかえて もういちど</button>
+  </div>
+</div>
+
+<div class="clear" id="clear">
+  <svg class="hanamaru" viewBox="0 0 100 100" aria-hidden="true">
+    <g fill="none" stroke="#e0413a" stroke-width="4" stroke-linecap="round">
+      <path d="M50 14 C 75 10, 92 35, 84 60 C 76 86, 40 92, 22 74 C 6 58, 14 26, 42 18 C 62 13, 80 26, 80 46"/>
+      <path d="M38 52 l9 10 l17 -22"/>
+    </g>
+  </svg>
+  <div class="big">ぜんぶ せいかい！</div>
+  <button class="b-check" id="btnAgain">もういちど あそぶ</button>
+</div>
+
+<script>
+(() => {
+  // ===== もんだい（ふやすときは ここに たす）=====
+  const G = '#63c29a'; // むかしの もじ の いろ
+  const old = d => `<svg class="pic" viewBox="0 0 100 100"><g fill="none" stroke="${G}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">${d}</g></svg>`;
+  const pic = d => `<svg class="pic" viewBox="0 0 100 100">${d}</svg>`;
+
+  const ITEMS = [
+    { id: 'tsuki', kanji: '月', yomi: 'つき',
+      pic: pic(`<rect x="8" y="8" width="84" height="84" rx="4" fill="#1d3f8f"/>
+        <path d="M60 22 A30 30 0 1 0 64 80 A24 24 0 1 1 60 22 Z" fill="#ffe14d" stroke="#e8b800" stroke-width="2"/>`),
+      old: old(`<path d="M40 16 C 80 22, 84 66, 52 86"/><path d="M40 16 C 26 40, 24 64, 34 82"/><path d="M42 44 L 60 52"/>`) },
+    { id: 'take', kanji: '竹', yomi: 'たけ',
+      pic: pic(`<g stroke="#2f7d32" stroke-width="2">
+        <rect x="28" y="30" width="12" height="62" rx="3" fill="#9bd27a"/><rect x="60" y="30" width="12" height="62" rx="3" fill="#9bd27a"/>
+        <path d="M28 52 h12 M28 72 h12 M60 52 h12 M60 72 h12"/></g>
+        <g fill="#5fb84a" stroke="#2f7d32" stroke-width="2">
+        <path d="M34 30 C 24 18, 16 16, 12 18 C 20 24, 26 28, 34 30 Z"/><path d="M34 30 C 36 16, 40 10, 46 8 C 44 18, 40 24, 34 30 Z"/>
+        <path d="M66 30 C 56 18, 50 14, 46 16 C 52 24, 58 28, 66 30 Z"/><path d="M66 30 C 74 18, 82 14, 88 14 C 82 22, 74 28, 66 30 Z"/></g>`),
+      old: old(`<path d="M32 40 V 90"/><path d="M32 40 L 16 22"/><path d="M32 40 L 46 22"/>
+        <path d="M68 40 V 90"/><path d="M68 40 L 54 22"/><path d="M68 40 L 84 22"/>`) },
+    { id: 'kawa', kanji: '川', yomi: 'かわ',
+      pic: pic(`<path d="M10 18 C 30 10, 60 24, 90 14 L 90 88 L 10 88 Z" fill="#39a7e8" stroke="#1d6fa8" stroke-width="2"/>
+        <path d="M10 18 C 22 30, 14 60, 8 88" fill="#c9a36a"/>
+        <g fill="none" stroke="#e8f6ff" stroke-width="3" stroke-linecap="round">
+        <path d="M36 26 C 30 46, 40 62, 34 82"/><path d="M54 24 C 48 44, 58 62, 52 82"/><path d="M72 22 C 66 42, 76 60, 70 80"/></g>`),
+      old: old(`<path d="M26 14 C 18 34, 34 54, 24 86"/><path d="M50 14 C 42 34, 58 54, 48 86"/><path d="M74 14 C 66 34, 82 54, 72 86"/>`) },
+    { id: 'ta', kanji: '田', yomi: 'た',
+      pic: pic(`<path d="M18 22 L 86 18 L 92 80 L 10 84 Z" fill="#c8a24a" stroke="#7a5a1a" stroke-width="3"/>
+        <g fill="#8fcf5a" stroke="#4f8a2a" stroke-width="2">
+        <path d="M24 28 L 48 26 L 48 48 L 22 50 Z"/><path d="M54 26 L 80 24 L 83 46 L 54 48 Z"/>
+        <path d="M21 56 L 48 54 L 48 76 L 18 78 Z"/><path d="M54 54 L 84 52 L 86 74 L 54 76 Z"/></g>`),
+      old: old(`<rect x="16" y="18" width="68" height="66" rx="10"/><path d="M50 18 V 84"/><path d="M16 51 H 84"/>`) },
+    { id: 'hi_fire', kanji: '火', yomi: 'ひ',
+      pic: pic(`<path d="M50 6 C 58 26, 80 34, 82 62 C 84 82, 68 94, 50 94 C 30 94, 16 82, 18 62 C 20 44, 30 38, 32 24 C 40 34, 42 40, 44 46 C 48 30, 46 20, 50 6 Z" fill="#e8402a" stroke="#a52010" stroke-width="2"/>
+        <path d="M52 40 C 58 54, 68 60, 66 74 C 64 86, 56 90, 50 90 C 40 90, 34 84, 34 74 C 34 64, 42 60, 44 52 C 48 58, 50 50, 52 40 Z" fill="#ffd23a"/>`),
+      old: old(`<path d="M50 14 C 44 40, 40 60, 22 86"/><path d="M50 14 C 56 40, 60 60, 78 86"/><path d="M24 34 L 30 56"/><path d="M76 34 L 70 56"/>`) },
+    { id: 'hi_sun', kanji: '日', yomi: 'ひ',
+      pic: pic(`<g stroke="#333" stroke-width="3" stroke-linecap="round">
+        <path d="M50 4 V 16 M50 84 V 96 M4 50 H 16 M84 50 H 96 M17 17 L 26 26 M74 74 L 83 83 M83 17 L 74 26 M26 74 L 17 83"/></g>
+        <circle cx="50" cy="50" r="26" fill="#e8402a"/>`),
+      old: old(`<rect x="22" y="12" width="56" height="76" rx="16"/><path d="M40 50 H 60"/>`) },
+  ];
+
+  // ===== じょうたい =====
+  const ROWS = 3;
+  let order = [[], [], []];   // 各だんの ならび（id）
+  let links = [new Map(), new Map()]; // links[0]: え→むかし, links[1]: むかし→かんじ（上id → 下id）
+  let checked = false;
+  let selected = null;        // { row, id }
+  let drag = null;            // { row, id, x, y, moved }
+
+  const $ = s => document.querySelector(s);
+  const board = $('#board'), svg = $('#lines'), msg = $('#msg');
+  const rowsEl = [$('#row0'), $('#row1'), $('#row2')];
+  const byId = Object.fromEntries(ITEMS.map(it => [it.id, it]));
+
+  function shuffle(a) {
+    a = a.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+  function newOrders() {
+    const ids = ITEMS.map(i => i.id);
+    for (let tries = 0; tries < 50; tries++) {
+      order = [shuffle(ids), shuffle(ids), shuffle(ids)];
+      // まっすぐ下に こたえが ならびすぎないように
+      let same = 0;
+      for (let k = 0; k < ids.length; k++) { if (order[0][k] === order[1][k]) same++; if (order[1][k] === order[2][k]) same++; }
+      if (same <= 1) break;
+    }
+  }
+
+  function cardEl(row, id) { return rowsEl[row].querySelector(`[data-id="${id}"]`); }
+
+  function build() {
+    rowsEl.forEach((el, r) => {
+      el.innerHTML = '';
+      order[r].forEach(id => {
+        const it = byId[id];
+        const c = document.createElement('div');
+        c.className = 'card';
+        c.dataset.row = r; c.dataset.id = id;
+        if (r === 0) c.innerHTML = it.pic;
+        else if (r === 1) c.innerHTML = it.old;
+        else c.innerHTML = `<span class="kanji">${it.kanji}</span><span class="yomi">${it.yomi}</span>`;
+        c.setAttribute('aria-label', r === 2 ? it.kanji : (r === 0 ? 'え' : 'むかしのもじ'));
+        if (r < ROWS - 1) c.insertAdjacentHTML('beforeend', '<span class="dot b"></span>');
+        if (r > 0) c.insertAdjacentHTML('beforeend', '<span class="dot t"></span>');
+        el.appendChild(c);
+      });
+    });
+    draw();
+  }
+
+  function dotPos(row, id, side) {
+    const b = board.getBoundingClientRect();
+    const r = cardEl(row, id).getBoundingClientRect();
+    return { x: r.left + r.width / 2 - b.left, y: (side === 'b' ? r.bottom + 2 : r.top - 2) - b.top };
+  }
+
+  const NS = 'http://www.w3.org/2000/svg';
+  function mk(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+
+  function draw(temp) {
+    svg.innerHTML = '';
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('linked-t', 'linked-b'));
+    links.forEach((m, gap) => {
+      m.forEach((lowId, upId) => {
+        const a = dotPos(gap, upId, 'b'), b = dotPos(gap + 1, lowId, 't');
+        cardEl(gap, upId).classList.add('linked-b');
+        cardEl(gap + 1, lowId).classList.add('linked-t');
+        const cls = checked ? (upId === lowId ? 'vis ok' : 'vis ng') : 'vis';
+        svg.appendChild(mk('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: cls }));
+        if (checked) {
+          const t = mk('text', { x: (a.x + b.x) / 2 + 8, y: (a.y + b.y) / 2 + 6, class: 'mark', fill: upId === lowId ? '#2aa84a' : '#e0413a' });
+          t.textContent = upId === lowId ? '○' : '×';
+          svg.appendChild(t);
+        }
+        const hit = mk('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'hit' });
+        hit.addEventListener('pointerdown', e => { e.stopPropagation(); });
+        hit.addEventListener('click', () => { m.delete(upId); afterChange(); });
+        svg.appendChild(hit);
+      });
+    });
+    if (temp) svg.appendChild(mk('line', { x1: temp.x1, y1: temp.y1, x2: temp.x2, y2: temp.y2, class: 'temp' }));
+  }
+
+  function connect(a, b) {
+    if (Math.abs(a.row - b.row) !== 1) return false;
+    const [up, low] = a.row < b.row ? [a, b] : [b, a];
+    const m = links[up.row];
+    // 下がわが すでに ほかと つながっていたら はずす
+    for (const [k, v] of m) if (v === low.id) m.delete(k);
+    m.set(up.id, low.id);
+    beep(up.id === low.id && $('#optNow').checked ? 'ok' : 'tap');
+    afterChange();
+    return true;
+  }
+
+  function afterChange() {
+    checked = $('#optNow').checked;
+    msg.textContent = ''; msg.className = 'msg';
+    draw();
+    if (checked) judge(false);
+  }
+
+  function judge(fromButton) {
+    const total = ITEMS.length * 2;
+    let count = 0, good = 0;
+    links.forEach(m => m.forEach((v, k) => { count++; if (k === v) good++; }));
+    if (good === total) {
+      msg.textContent = ''; beep('clear');
+      setTimeout(() => $('#clear').classList.add('show'), 350);
+      return;
+    }
+    if (!fromButton) return;
+    if (count < total) { msg.textContent = `まだ つないで いない せんが あるよ（${count} / ${total}）`; msg.className = 'msg'; }
+    else { msg.textContent = `${good} / ${total} せいかい。× の せんを なおしてみよう`; msg.className = 'msg ng'; beep('ng'); }
+  }
+
+  // ===== そうさ（タップ と なぞり）=====
+  function cardFromPoint(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const c = el && el.closest && el.closest('.card');
+    return c ? { row: +c.dataset.row, id: c.dataset.id, el: c } : null;
+  }
+  function setSelected(s) {
+    document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+    selected = s;
+    if (s) cardEl(s.row, s.id).classList.add('selected');
+  }
+
+  board.addEventListener('pointerdown', e => {
+    const c = cardFromPoint(e.clientX, e.clientY);
+    if (!c) { setSelected(null); return; }
+    e.preventDefault();
+    board.setPointerCapture(e.pointerId);
+    drag = { row: c.row, id: c.id, x: e.clientX, y: e.clientY, moved: false };
+  });
+  board.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 10) return;
+    drag.moved = true;
+    const b = board.getBoundingClientRect();
+    const px = e.clientX - b.left, py = e.clientY - b.top;
+    const cr = cardEl(drag.row, drag.id).getBoundingClientRect();
+    let side = (e.clientY > cr.top + cr.height / 2) ? 'b' : 't';
+    if (drag.row === 0) side = 'b'; if (drag.row === ROWS - 1) side = 't';
+    const s = dotPos(drag.row, drag.id, side);
+    document.querySelectorAll('.card.hover').forEach(x => x.classList.remove('hover'));
+    const over = cardFromPoint(e.clientX, e.clientY);
+    if (over && Math.abs(over.row - drag.row) === 1) over.el.classList.add('hover');
+    draw({ x1: s.x, y1: s.y, x2: px, y2: py });
+  });
+  function endDrag(e) {
+    if (!drag) return;
+    const d = drag; drag = null;
+    document.querySelectorAll('.card.hover').forEach(x => x.classList.remove('hover'));
+    const over = e && e.type !== 'pointercancel' ? cardFromPoint(e.clientX, e.clientY) : null;
+    if (d.moved) {
+      if (over && connect(d, over)) setSelected(null); else draw();
+      return;
+    }
+    // タップ
+    if (selected && !(selected.row === d.row && selected.id === d.id)) {
+      if (connect(selected, d)) { setSelected(null); return; }
+    }
+    if (selected && selected.row === d.row && selected.id === d.id) setSelected(null);
+    else { setSelected({ row: d.row, id: d.id }); beep('tap'); }
+  }
+  board.addEventListener('pointerup', endDrag);
+  board.addEventListener('pointercancel', endDrag);
+
+  // ===== ボタン =====
+  $('#btnCheck').addEventListener('click', () => { checked = true; setSelected(null); draw(); judge(true); });
+  $('#btnReset').addEventListener('click', () => { links = [new Map(), new Map()]; checked = false; setSelected(null); msg.textContent = ''; draw(); });
+  function restart() {
+    $('#clear').classList.remove('show');
+    links = [new Map(), new Map()]; checked = false; selected = null; msg.textContent = '';
+    newOrders(); build();
+  }
+  $('#btnNew').addEventListener('click', restart);
+  $('#btnAgain').addEventListener('click', restart);
+  $('#optYomi').addEventListener('change', e => document.body.classList.toggle('no-yomi', !e.target.checked));
+  $('#optNow').addEventListener('change', () => afterChange());
+
+  // ===== おと =====
+  let ac = null;
+  function beep(kind) {
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const seq = { tap: [[660, .06]], ok: [[784, .08], [1046, .12]], ng: [[300, .15]], clear: [[523, .1], [659, .1], [784, .1], [1046, .25]] }[kind];
+      let t = ac.currentTime;
+      seq.forEach(([f, d]) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+        o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d + .02); t += d;
+      });
+    } catch (_) {}
+  }
+
+  new ResizeObserver(() => draw()).observe(board);
+  window.addEventListener('resize', () => draw());
+  newOrders(); build();
+})();
+</script>
+</body>
+</html>
