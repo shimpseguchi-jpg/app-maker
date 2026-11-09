@@ -29,6 +29,7 @@
   h1 { font-size: 22px; margin: 0; letter-spacing: .05em; }
   .hint { font-size: 14px; color: #666; margin: 4px 0 6px; }
   .opts { display: flex; gap: 10px; font-size: 14px; align-items: center; flex-wrap: wrap; }
+  .opts select { font: inherit; font-size: 14px; padding: 2px 4px; border-radius: 6px; }
   .opts label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 
   .board { position: relative; touch-action: none; padding: 4px 0; }
@@ -106,6 +107,7 @@
   <header>
     <h1>かんじ せんつなぎ</h1>
     <div class="opts">
+      <label>もんだい <select id="optSet"></select></label>
       <label><input type="checkbox" id="optYomi" checked> よみがな</label>
       <label><input type="checkbox" id="optNow"> すぐに こたえあわせ</label>
     </div>
@@ -179,8 +181,126 @@
       pic: pic(`<g stroke="#333" stroke-width="3" stroke-linecap="round">
         <path d="M50 4 V 16 M50 84 V 96 M4 50 H 16 M84 50 H 96 M17 17 L 26 26 M74 74 L 83 83 M83 17 L 74 26 M26 74 L 17 83"/></g>
         <circle cx="50" cy="50" r="26" fill="#e8402a"/>`),
-      old: old(`<rect x="22" y="12" width="56" height="76" rx="16"/><path d="M40 50 H 60"/>`) },
+      old: old(`<rect x="22" y="12" width="56" height="76" rx="16"/><path d="M40 50 H 60"/>`) },    // ---- しぜん ----
+    { id: 'yama', kanji: '山', yomi: 'やま',
+      pic: pic(`<rect x="4" y="4" width="92" height="92" rx="6" fill="#dff1ff"/>
+        <path d="M4 88 L 30 44 L 46 64 L 64 22 L 96 88 Z" fill="#5aa14a" stroke="#2f6d2a" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M56 40 L 64 22 L 72 40 L 66 36 L 62 42 Z" fill="#fff"/>`),
+      old: old(`<path d="M14 82 H 86"/><path d="M14 82 V 50 L 32 66"/><path d="M32 66 L 50 18 L 68 66"/><path d="M68 66 L 86 50 V 82"/>`) },
+    { id: 'ki', kanji: '木', yomi: 'き',
+      pic: pic(`<rect x="44" y="50" width="12" height="42" rx="3" fill="#9a6a3a" stroke="#6b4421" stroke-width="2"/>
+        <circle cx="50" cy="38" r="30" fill="#5fb84a" stroke="#2f7d32" stroke-width="2"/>
+        <circle cx="38" cy="32" r="5" fill="#8fd67a"/><circle cx="60" cy="44" r="4" fill="#8fd67a"/>`),
+      old: old(`<path d="M50 10 V 92"/><path d="M50 36 L 24 14"/><path d="M50 36 L 76 14"/><path d="M50 66 L 24 88"/><path d="M50 66 L 76 88"/>`) },
+    { id: 'hayashi', kanji: '林', yomi: 'はやし',
+      pic: pic(`<g stroke-width="2"><rect x="22" y="54" width="9" height="38" rx="2" fill="#9a6a3a" stroke="#6b4421"/>
+        <rect x="69" y="54" width="9" height="38" rx="2" fill="#9a6a3a" stroke="#6b4421"/>
+        <path d="M26 10 L 46 58 L 6 58 Z" fill="#4f9e3f" stroke="#2f6d2a" stroke-linejoin="round"/>
+        <path d="M74 10 L 94 58 L 54 58 Z" fill="#5fb84a" stroke="#2f6d2a" stroke-linejoin="round"/></g>`),
+      old: old(`<path d="M28 12 V 90"/><path d="M28 36 L 12 18"/><path d="M28 36 L 44 18"/><path d="M28 64 L 12 84"/><path d="M28 64 L 44 84"/>
+        <path d="M72 12 V 90"/><path d="M72 36 L 56 18"/><path d="M72 36 L 88 18"/><path d="M72 64 L 56 84"/><path d="M72 64 L 88 84"/>`) },
+    { id: 'mizu', kanji: '水', yomi: 'みず',
+      pic: pic(`<path d="M50 8 C 64 32, 78 46, 78 64 C 78 82, 64 92, 50 92 C 36 92, 22 82, 22 64 C 22 46, 36 32, 50 8 Z" fill="#4fb3f0" stroke="#1d6fa8" stroke-width="2"/>
+        <path d="M36 62 C 36 72, 42 78, 50 80" fill="none" stroke="#e8f6ff" stroke-width="5" stroke-linecap="round"/>`),
+      old: old(`<path d="M50 10 C 38 30, 62 50, 50 90"/><path d="M24 22 L 32 38"/><path d="M22 58 L 32 72"/><path d="M76 22 L 68 38"/><path d="M78 58 L 68 72"/>`) },
+    { id: 'ame', kanji: '雨', yomi: 'あめ',
+      pic: pic(`<path d="M22 50 C 8 50, 8 30, 24 30 C 26 14, 50 10, 56 24 C 66 14, 88 22, 82 38 C 96 40, 94 56, 80 56 L 26 56 C 24 56, 22 54, 22 50 Z" fill="#c9d6e3" stroke="#6d8296" stroke-width="2"/>
+        <g fill="#39a7e8"><path d="M30 66 l4 10 a4 4 0 1 1 -8 0 Z"/><path d="M52 64 l4 10 a4 4 0 1 1 -8 0 Z"/><path d="M74 66 l4 10 a4 4 0 1 1 -8 0 Z"/>
+        <path d="M41 80 l4 10 a4 4 0 1 1 -8 0 Z"/><path d="M63 80 l4 10 a4 4 0 1 1 -8 0 Z"/></g>`),
+      old: old(`<path d="M14 14 H 86"/><path d="M22 30 H 78"/><path d="M22 30 V 88"/><path d="M78 30 V 88"/><path d="M50 14 V 40"/>
+        <path d="M36 50 V 56"/><path d="M36 70 V 76"/><path d="M64 50 V 56"/><path d="M64 70 V 76"/>`) },
+    { id: 'ishi', kanji: '石', yomi: 'いし',
+      pic: pic(`<path d="M14 80 C 6 62, 18 40, 36 34 C 50 22, 76 26, 86 46 C 96 62, 88 82, 72 84 L 24 86 C 18 86, 16 84, 14 80 Z" fill="#a8a8a8" stroke="#5c5c5c" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M38 44 C 46 40, 56 40, 62 44" fill="none" stroke="#d6d6d6" stroke-width="4" stroke-linecap="round"/>
+        <path d="M60 64 L 70 70" stroke="#777" stroke-width="3" stroke-linecap="round"/>`),
+      old: old(`<path d="M12 18 H 88"/><path d="M40 18 C 36 48, 28 70, 12 88"/><rect x="48" y="54" width="34" height="30" rx="6"/>`) },
+    // ---- からだ ----
+    { id: 'hito', kanji: '人', yomi: 'ひと',
+      pic: pic(`<circle cx="56" cy="20" r="12" fill="#ffd9b3" stroke="#b07a4a" stroke-width="2"/>
+        <g fill="none" stroke="#3a6fd8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M54 36 L 48 62"/><path d="M48 62 L 34 88"/><path d="M48 62 L 62 88"/><path d="M52 44 L 72 56"/><path d="M52 44 L 34 54"/></g>`),
+      old: old(`<path d="M58 12 C 54 40, 44 64, 24 90"/><path d="M52 46 C 62 54, 70 62, 76 72"/>`) },
+    { id: 'kuchi', kanji: '口', yomi: 'くち',
+      pic: pic(`<path d="M10 46 C 26 26, 40 34, 50 38 C 60 34, 74 26, 90 46 C 76 74, 24 74, 10 46 Z" fill="#e2524a" stroke="#9c2a22" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M18 47 C 34 52, 66 52, 82 47 C 70 62, 30 62, 18 47 Z" fill="#7a1f1a"/>
+        <path d="M22 47 C 40 51, 60 51, 78 47 L 76 51 C 60 54, 40 54, 24 51 Z" fill="#fff"/>`),
+      old: old(`<path d="M18 28 H 82"/><path d="M18 28 C 20 60, 26 76, 50 76 C 74 76, 80 60, 82 28"/>`) },
+    { id: 'me', kanji: '目', yomi: 'め',
+      pic: pic(`<path d="M8 52 C 28 22, 72 22, 92 52 C 72 82, 28 82, 8 52 Z" fill="#fff" stroke="#333" stroke-width="3"/>
+        <circle cx="50" cy="52" r="17" fill="#6b4a2a"/><circle cx="50" cy="52" r="8" fill="#111"/><circle cx="55" cy="46" r="4" fill="#fff"/>
+        <g stroke="#333" stroke-width="3" stroke-linecap="round"><path d="M30 30 L 26 20"/><path d="M50 26 V 14"/><path d="M70 30 L 74 20"/></g>`),
+      old: old(`<path d="M10 50 C 30 22, 70 22, 90 50 C 70 78, 30 78, 10 50 Z"/><path d="M50 40 a10 10 0 1 0 0.1 0"/>`) },
+    { id: 'mimi', kanji: '耳', yomi: 'みみ',
+      pic: pic(`<path d="M34 16 C 62 4, 88 24, 80 52 C 76 66, 64 70, 60 80 C 56 92, 40 94, 34 84 C 30 76, 38 70, 36 60 C 34 50, 22 40, 26 28 C 28 22, 30 18, 34 16 Z" fill="#ffd2a8" stroke="#b07a4a" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M44 30 C 60 24, 70 36, 66 48 C 62 58, 52 56, 52 66" fill="none" stroke="#c98c5a" stroke-width="4" stroke-linecap="round"/>`),
+      old: old(`<path d="M38 12 V 72 C 38 82, 44 88, 48 90"/><path d="M38 12 C 72 10, 82 44, 62 62"/><path d="M38 36 H 60"/><path d="M38 54 H 58"/>`) },
+    { id: 'te', kanji: '手', yomi: 'て',
+      pic: pic(`<g fill="#ffd2a8" stroke="#b07a4a" stroke-width="2.5" stroke-linejoin="round">
+        <rect x="27" y="14" width="11" height="46" rx="5.5"/><rect x="40" y="8" width="11" height="50" rx="5.5"/>
+        <rect x="53" y="10" width="11" height="48" rx="5.5"/><rect x="66" y="18" width="10" height="42" rx="5"/>
+        <path d="M24 50 C 24 44, 78 44, 78 52 L 76 74 C 74 88, 64 94, 50 94 C 36 94, 26 86, 24 74 Z"/>
+        <path d="M26 64 C 18 56, 10 46, 14 40 C 18 36, 24 40, 30 50" /></g>`),
+      old: old(`<path d="M50 92 C 54 70, 50 40, 50 12"/><path d="M50 26 L 26 16"/><path d="M50 26 L 74 16"/><path d="M50 46 L 22 42"/><path d="M50 46 L 78 42"/>`) },
+    { id: 'ashi', kanji: '足', yomi: 'あし',
+      pic: pic(`<g fill="#ffd2a8" stroke="#b07a4a" stroke-width="2.5" stroke-linejoin="round">
+        <path d="M36 10 H 58 V 60 C 72 64, 88 70, 88 82 C 88 90, 82 92, 74 92 L 34 92 C 28 92, 26 88, 28 80 C 32 66, 36 60, 36 50 Z"/></g>
+        <path d="M36 30 H 58" stroke="#c98c5a" stroke-width="3" fill="none"/>`),
+      old: old(`<rect x="30" y="10" width="40" height="28" rx="8"/><path d="M50 38 V 86 H 86"/><path d="M50 62 H 30 V 86 H 50"/>`) },
+    // ---- いきもの・もの ----
+    { id: 'ko', kanji: '子', yomi: 'こ',
+      pic: pic(`<circle cx="50" cy="34" r="24" fill="#ffe0bf" stroke="#b07a4a" stroke-width="2"/>
+        <path d="M30 26 C 34 10, 66 10, 70 26 C 62 18, 40 18, 30 26 Z" fill="#5a3a1a"/>
+        <circle cx="41" cy="36" r="3" fill="#333"/><circle cx="59" cy="36" r="3" fill="#333"/>
+        <path d="M43 46 Q 50 52 57 46" fill="none" stroke="#c0392b" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="34" cy="44" r="4" fill="#ffb3b3"/><circle cx="66" cy="44" r="4" fill="#ffb3b3"/>
+        <path d="M30 94 C 30 72, 38 60, 50 60 C 62 60, 70 72, 70 94 Z" fill="#ffcc4d" stroke="#c99a1a" stroke-width="2"/>
+        <g stroke="#ffe0bf" stroke-width="8" stroke-linecap="round"><path d="M34 70 L 16 60"/><path d="M66 70 L 84 60"/></g>`),
+      old: old(`<path d="M50 14 a12 12 0 1 0 0.1 0"/><path d="M50 38 C 50 60, 54 76, 46 90"/><path d="M18 50 Q 50 36 82 50"/>`) },
+    { id: 'inu', kanji: '犬', yomi: 'いぬ',
+      pic: pic(`<path d="M24 22 C 10 22, 8 50, 18 56 C 24 52, 26 40, 30 32 Z" fill="#8a5a32"/>
+        <path d="M76 22 C 90 22, 92 50, 82 56 C 76 52, 74 40, 70 32 Z" fill="#8a5a32"/>
+        <ellipse cx="50" cy="50" rx="28" ry="30" fill="#e8b878" stroke="#8a5a32" stroke-width="2"/>
+        <ellipse cx="50" cy="64" rx="15" ry="12" fill="#fff3e0"/>
+        <circle cx="40" cy="44" r="4" fill="#222"/><circle cx="60" cy="44" r="4" fill="#222"/>
+        <ellipse cx="50" cy="58" rx="6" ry="4.5" fill="#222"/>
+        <path d="M50 62 V 68 M44 70 Q 50 74 56 70" fill="none" stroke="#222" stroke-width="2" stroke-linecap="round"/>`),
+      old: old(`<path d="M18 46 H 70"/><path d="M70 46 L 84 30"/><path d="M78 37 L 88 46"/><path d="M28 46 V 78"/><path d="M62 46 V 78"/><path d="M18 46 C 8 36, 10 22, 20 20"/>`) },
+    { id: 'mushi', kanji: '虫', yomi: 'むし',
+      pic: pic(`<g fill="#8fd65a" stroke="#4f8a2a" stroke-width="2"><circle cx="20" cy="66" r="11"/><circle cx="36" cy="60" r="12"/>
+        <circle cx="53" cy="62" r="12"/><circle cx="70" cy="56" r="13"/></g>
+        <circle cx="80" cy="40" r="15" fill="#f6c94a" stroke="#c99a1a" stroke-width="2"/>
+        <circle cx="76" cy="37" r="2.6" fill="#333"/><circle cx="86" cy="37" r="2.6" fill="#333"/>
+        <g stroke="#333" stroke-width="2.5" stroke-linecap="round"><path d="M74 26 L 70 14"/><path d="M86 26 L 92 15"/></g>`),
+      old: old(`<path d="M50 12 L 30 36 H 70 Z"/><path d="M50 36 C 30 54, 70 68, 50 90"/>`) },
+    { id: 'kai', kanji: '貝', yomi: 'かい',
+      pic: pic(`<path d="M50 14 C 76 14, 92 40, 88 70 L 60 80 L 50 88 L 40 80 L 12 70 C 8 40, 24 14, 50 14 Z" fill="#f7b38a" stroke="#b5643a" stroke-width="2.5" stroke-linejoin="round"/>
+        <g stroke="#b5643a" stroke-width="2.5" stroke-linecap="round" fill="none">
+        <path d="M50 18 V 84"/><path d="M50 18 L 30 76"/><path d="M50 18 L 70 76"/><path d="M50 18 L 16 66"/><path d="M50 18 L 84 66"/></g>`),
+      old: old(`<rect x="26" y="12" width="48" height="56" rx="10"/><path d="M26 32 H 74"/><path d="M26 50 H 74"/><path d="M38 68 L 26 90"/><path d="M62 68 L 74 90"/>`) },
+    { id: 'kuruma', kanji: '車', yomi: 'くるま',
+      pic: pic(`<path d="M10 70 H 90" stroke="#6b4421" stroke-width="5" stroke-linecap="round"/>
+        <rect x="18" y="40" width="64" height="24" rx="4" fill="#d9a35a" stroke="#6b4421" stroke-width="2.5"/>
+        <path d="M82 50 L 96 38" stroke="#6b4421" stroke-width="5" stroke-linecap="round"/>
+        <g fill="#fff" stroke="#6b4421" stroke-width="4"><circle cx="30" cy="72" r="14"/><circle cx="70" cy="72" r="14"/></g>
+        <g stroke="#6b4421" stroke-width="2.5"><path d="M30 58 V 86 M16 72 H 44 M70 58 V 86 M56 72 H 84"/></g>`),
+      old: old(`<path d="M14 50 H 86"/><path d="M14 28 V 72"/><path d="M86 28 V 72"/><rect x="36" y="36" width="28" height="28" rx="4"/><path d="M50 36 V 10"/>`) },
+    { id: 'ito', kanji: '糸', yomi: 'いと',
+      pic: pic(`<rect x="26" y="10" width="48" height="10" rx="3" fill="#b5835a" stroke="#6b4421" stroke-width="2"/>
+        <rect x="26" y="74" width="48" height="10" rx="3" fill="#b5835a" stroke="#6b4421" stroke-width="2"/>
+        <rect x="32" y="20" width="36" height="54" fill="#e8504a" stroke="#9c2a22" stroke-width="2"/>
+        <g stroke="#ff8a84" stroke-width="2"><path d="M32 30 H 68 M32 40 H 68 M32 50 H 68 M32 60 H 68"/></g>
+        <path d="M68 66 C 80 70, 82 82, 92 90" fill="none" stroke="#e8504a" stroke-width="3" stroke-linecap="round"/>`),
+      old: old(`<path d="M50 10 C 30 20, 70 32, 50 42 C 30 52, 70 64, 50 74"/><path d="M50 74 V 82"/><path d="M50 82 L 36 92"/><path d="M50 82 L 64 92"/>`) },
   ];
+
+  // 1かいに だす 6こ の くみあわせ
+  const SETS = [
+    { name: 'その1（月・竹・川・田・火・日）', ids: ['tsuki', 'take', 'kawa', 'ta', 'hi_fire', 'hi_sun'] },
+    { name: 'その2（山・木・林・水・雨・石）', ids: ['yama', 'ki', 'hayashi', 'mizu', 'ame', 'ishi'] },
+    { name: 'その3（人・口・目・耳・手・足）', ids: ['hito', 'kuchi', 'me', 'mimi', 'te', 'ashi'] },
+    { name: 'その4（子・犬・虫・貝・車・糸）', ids: ['ko', 'inu', 'mushi', 'kai', 'kuruma', 'ito'] },
+  ];
+  const PER_ROUND = 6;
 
   // ===== じょうたい =====
   const ROWS = 3;
@@ -194,6 +314,11 @@
   const board = $('#board'), svg = $('#lines'), msg = $('#msg');
   const rowsEl = [$('#row0'), $('#row1'), $('#row2')];
   const byId = Object.fromEntries(ITEMS.map(it => [it.id, it]));
+  let cur = [];               // いまの もんだい（id）
+  function pickRound() {
+    const v = $('#optSet').value;
+    cur = v === 'random' ? shuffle(ITEMS.map(i => i.id)).slice(0, PER_ROUND) : SETS[+v].ids.slice();
+  }
 
   function shuffle(a) {
     a = a.slice();
@@ -201,7 +326,7 @@
     return a;
   }
   function newOrders() {
-    const ids = ITEMS.map(i => i.id);
+    const ids = cur;
     for (let tries = 0; tries < 50; tries++) {
       order = [shuffle(ids), shuffle(ids), shuffle(ids)];
       // まっすぐ下に こたえが ならびすぎないように
@@ -286,7 +411,7 @@
   }
 
   function judge(fromButton) {
-    const total = ITEMS.length * 2;
+    const total = cur.length * 2;
     let count = 0, good = 0;
     links.forEach(m => m.forEach((v, k) => { count++; if (k === v) good++; }));
     if (good === total) {
@@ -358,10 +483,13 @@
   function restart() {
     $('#clear').classList.remove('show');
     links = [new Map(), new Map()]; checked = false; selected = null; msg.textContent = '';
-    newOrders(); build();
+    pickRound(); newOrders(); build();
   }
   $('#btnNew').addEventListener('click', restart);
   $('#btnAgain').addEventListener('click', restart);
+  $('#optSet').innerHTML = SETS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('')
+    + `<option value="random">ぜんぶから ランダム（${ITEMS.length}こ）</option>`;
+  $('#optSet').addEventListener('change', restart);
   $('#optYomi').addEventListener('change', e => document.body.classList.toggle('no-yomi', !e.target.checked));
   $('#optNow').addEventListener('change', () => afterChange());
 
@@ -383,7 +511,7 @@
 
   new ResizeObserver(() => draw()).observe(board);
   window.addEventListener('resize', () => draw());
-  newOrders(); build();
+  pickRound(); newOrders(); build();
 })();
 </script>
 </body>
