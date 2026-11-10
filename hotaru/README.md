@@ -2,6 +2,7 @@
 
 小学1〜3年生向けの、**学習つきダンジョンRPG**（見下ろし型・入るたびに形が変わる迷宮）。
 ランタンを持った主人公が、迷宮に迷いこんだホタルを助けながら、いちばん奥の「やみの ぬし」を目指す。
+迷宮は 3D 表示（斜め上から見下ろすカメラ・立体の壁・ランタンの明かり）。「せってい」で 2D 表示にも切り替えられる。
 iPad の横画面が基準。スマホも横向きで同じ画面が縮んで表示される。ブラウザだけで動く（インストール・ビルド不要）。
 
 | キャンプ | 迷宮 | 迷宮の中の問題 | まなびの きろく |
@@ -54,7 +55,7 @@ GitHub Pages でルートを公開していれば `…/hotaru/` で開ける。S
 
 ## つくり
 
-依存ライブラリなしの素の JavaScript（ES Modules）。絵は絵文字と canvas、音は WebAudio。
+依存ライブラリなしの素の JavaScript（ES Modules）。絵は絵文字と canvas／WebGL、音は WebAudio。
 
 ```
 index.html / css/style.css
@@ -66,7 +67,8 @@ js/engine/game.js       探索のルール。act(G, P, 行動) が1ターン進�
 js/engine/hero.js       主人公の強さ・レベル
 js/engine/camp.js       お店のルール
 js/engine/learn.js      出題・正誤の記録・苦手の管理（問題の生成は manabi/js/engine/quiz.js を利用）
-js/ui/view.js           迷宮の描画（canvas）
+js/ui/view3d.js         迷宮の描画・3D（WebGL を直接使う。魔物や道具は絵文字の板）
+js/ui/view.js           迷宮の描画・2D（canvas。WebGL が使えない端末ではこちらになる）
 js/ui/dungeon.js        迷宮の操作と演出
 js/ui/quiz.js           問題の画面
 共有：../js/text.js（文字切替）・../js/audio.js（音）・../js/util.js・../js/ui/art.js（時計などの図）

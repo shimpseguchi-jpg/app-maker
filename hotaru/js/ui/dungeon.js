@@ -8,6 +8,7 @@ import { MOBS, areaOf, isBossFloor, LAST_FLOOR } from '../data/enemies.js';
 import { ITEMS, WEAPONS, SHIELDS, BAG_MAX } from '../data/items.js';
 import { FIREFLIES, FIREFLY_LIST, FIREFLY_HP, colorOf } from '../data/fireflies.js';
 import { View } from './view.js';
+import { View3D } from './view3d.js';
 import { openModal, alertBox, confirmBox, toast, modalOpen } from './common.js';
 import { settings } from '../save.js';
 import { askQuiz } from './quiz.js';
@@ -45,10 +46,19 @@ export function runDungeon({ stage, P, G, save, openSettings, bgm }) {
       </aside></div>`);
     $$('.screen', stage).forEach((s) => s.remove());
     stage.prepend(screen);
-    const viewEl = $('.view', screen), view = new View($('.cv', screen), $('.mini', screen));
+    // みため：3D（WebGL が つかえる とき）か 2D。せっていで きりかえられる
+    const viewEl = $('.view', screen);
+    let view = null;
     const fit = () => view.resize(viewEl.clientWidth, viewEl.clientHeight);
-    fit(); const ro = new ResizeObserver(fit); ro.observe(viewEl);
-    view.set(G, P);
+    function makeView() {
+      view?.destroy();
+      let v = null;
+      if (settings.view !== '2d' && View3D.supported()) { try { v = new View3D($('.cv', screen), $('.mini', screen)); } catch (e) { $('.cv3d', screen)?.remove(); } }
+      view = v || new View($('.cv', screen), $('.mini', screen));
+      fit(); view.set(G, P);
+    }
+    makeView();
+    const ro = new ResizeObserver(fit); ro.observe(viewEl);
     let done = false, busy = false, walk = null, raf = 0;
     const loop = (now) => { if (done) return; view.draw(now); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
@@ -281,7 +291,7 @@ export function runDungeon({ stage, P, G, save, openSettings, bgm }) {
         <button class="btn gray" data-quit>🏳️ ${T('あきらめて キャンプへ')}</button>
         <p class="sub">${T('とちゅうで やめても、つづきから あそべる。')}</p></div>`, { cls: 'center' });
       $('[data-how]', m).addEventListener('click', () => { close(); openModal(howtoHtml()); });
-      $('[data-set]', m).addEventListener('click', () => { close(); openSettings(() => { $('.dpad', screen).hidden = !settings.pad; refresh(); }); });
+      $('[data-set]', m).addEventListener('click', () => { close(); openSettings(() => { $('.dpad', screen).hidden = !settings.pad; if ((settings.view === '2d') !== (view instanceof View)) makeView(); refresh(); }); });
       $('[data-quit]', m).addEventListener('click', async () => {
         close();
         if (await confirmBox(`<h2>${T('あきらめる？')}</h2><p>${T('やられた ときと おなじで、おかねが はんぶんに なる。')}</p>`, 'あきらめる', 'つづける')) { G.over = 'dead'; save(G); finish('dead'); }

@@ -14,7 +14,7 @@ import { runDungeon, howtoHtml } from './ui/dungeon.js';
 import { askQuiz } from './ui/quiz.js';
 import { SUBJECTS, UNIT_NAMES, newLearn, subjectLevel, accuracy } from './engine/learn.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const stage = $('#stage');
 initCommon(stage);
 setTextMode(settings.text);
@@ -54,13 +54,14 @@ function openSettings(onChange) {
     <div class="set-row"><span>${T('えいごの よみあげ')}</span>${seg('speech', [[true, 'あり'], [false, 'なし']], settings.speech !== false)}</div>
     <div class="set-row"><span>BGM</span>${seg('bgm', [[0, 'なし'], [0.5, 'ふつう'], [1, 'おおきい']], settings.bgm)}</div>
     <div class="set-row"><span>${T('こうかおん')}</span>${seg('sfx', [[0, 'なし'], [0.8, 'あり']], settings.sfx)}</div>
+    <div class="set-row"><span>${T('めいきゅうの みため')}</span>${seg('view', [['3d', '3D（りったい）'], ['2d', '2D（うえから）']], settings.view)}</div>
     <div class="set-row"><span>${T('やじるし ボタン')}</span>${seg('pad', [[true, 'だす'], [false, 'かくす']], settings.pad)}</div>
     <div class="set-row"><button class="btn gray small" data-reset>🗑 ${T('さいしょから やりなおす')}</button></div>
     <div class="sub">${T('ほたるの めいきゅう')} v${VERSION}</div>`);
   $$('[data-seg] button', m).forEach((b) => b.addEventListener('click', () => {
     const k = b.parentElement.dataset.seg, v = b.dataset.v;
     if (k === 'grade') { P.learn.grade = Number(v); P.learn.level = {}; P.learn.streak = {}; persist(); }
-    else settings[k] = k === 'text' ? v : k === 'pad' || k === 'speech' ? v === 'true' : Number(v);
+    else settings[k] = k === 'text' || k === 'view' ? v : k === 'pad' || k === 'speech' ? v === 'true' : Number(v);
     saveSettings(); setTextMode(settings.text); setVolumes(settings.bgm, settings.sfx); sfx('tap');
     close(); onChange && onChange(); openSettings(onChange);
   }));

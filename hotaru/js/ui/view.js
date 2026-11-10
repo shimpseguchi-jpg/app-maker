@@ -22,6 +22,7 @@ export class View {
     this.cv.width = w * this.dpr; this.cv.height = h * this.dpr;
     this.cv.style.width = w + 'px'; this.cv.style.height = h + 'px';
   }
+  destroy() { this.c.setTransform(1, 0, 0, 1, 0, 0); this.c.clearRect(0, 0, this.cv.width, this.cv.height); }
   set(G, P) { this.G = G; this.P = P; }
   reset() { this.cam = null; this.pos.clear(); this.fx = []; }
   // がめんの てん → マス

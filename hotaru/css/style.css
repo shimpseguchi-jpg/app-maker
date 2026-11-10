@@ -75,7 +75,7 @@ small { font-weight: 700; }
 /* ── めいきゅう ── */
 .dungeon { flex-direction: row; background: #05060a; }
 .view { position: relative; flex: 1; min-width: 0; overflow: hidden; }
-.cv { display: block; position: absolute; inset: 0; }
+.cv, .cv3d { display: block; position: absolute; inset: 0; }
 .floor-name { position: absolute; left: 14px; top: 12px; background: rgba(10,14,34,.78); color: #fff; font-weight: 900; font-size: 20px; border-radius: 14px; padding: 6px 16px; pointer-events: none; }
 .floor-name b { font-size: 26px; color: var(--glow); }
 .mini { position: absolute; right: 12px; top: 12px; width: 186px; height: 126px; background: rgba(10,14,34,.72); border-radius: 12px; border: 2px solid rgba(255,255,255,.18); pointer-events: none; image-rendering: pixelated; }
