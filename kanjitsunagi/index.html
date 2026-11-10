@@ -17,6 +17,7 @@
     --bg: #fffdf6;
     --ink: #333;
     --pencil: #f08a24;
+    --linked: #f7cfa6; /* つないだ せん（こたえあわせ まえ）は うすい いろ */
     --ok: #2aa84a;
     --ng: #e0413a;
         --card: #ffffff;
@@ -72,12 +73,13 @@
     border-radius: 50%; background: #fff; border: 3px solid #bbb; pointer-events: none;
   }
   .dot.b { bottom: -9px; } .dot.t { top: -9px; }
-  .card.linked-t .dot.t, .card.linked-b .dot.b { background: var(--pencil); border-color: var(--pencil); }
+  .card.linked-t .dot.t, .card.linked-b .dot.b { background: var(--linked); border-color: var(--linked); }
 
   svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; overflow: visible; }
-  svg.lines line.vis { stroke: var(--pencil); stroke-width: 5; stroke-linecap: round; }
+  svg.lines line.vis { stroke: var(--linked); stroke-width: 5; stroke-linecap: round; }
   svg.lines line.vis.ok { stroke: var(--ok); }
   svg.lines line.vis.ng { stroke: var(--ng); stroke-dasharray: 2 9; }
+  svg.lines line.vis.ok, svg.lines line.vis.ng { stroke-width: 6; }
   svg.lines line.hit { stroke: transparent; stroke-width: 22; cursor: pointer; }
   svg.lines line.temp { stroke: var(--pencil); stroke-width: 4; stroke-dasharray: 8 7; stroke-linecap: round; opacity: .8; }
   .mark { font-size: 24px; font-weight: bold; pointer-events: none; }
