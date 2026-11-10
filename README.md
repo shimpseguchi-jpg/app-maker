@@ -1,6 +1,7 @@
 # かずまほ 〜カードでのぼるまほうのとう〜
 
 > 姉妹作：本格デッキ構築ゲーム **[アルカナンバー](arcanumber/)**（`arcanumber/` フォルダ）もあります。
+> 絵と漢字を線つなぎで学ぶ **[かんじ せんつなぎ](kanjitsunagi/)**（`kanjitsunagi/` フォルダ。Google サイトに埋め込める1ファイル）もあります。
 > ほかに、栃木・千葉・茨城・群馬の **[道の駅チェック](michinoeki/)**（`michinoeki/` フォルダ）もあります。
 > 開発準備中：アイドルマスター題材のダンジョンRPG **[アイドル迷宮（仮）](idoldungeon/)**（`idoldungeon/` フォルダ）。
 > 試作中：サクセス×WING 風の育成パートと2Dアクションのテストを組み合わせた学習ゲーム **[まなびサクセス（仮）](manabi/)**（`manabi/` フォルダ。WEB版で一通り遊べる。要件定義は [`manabi/docs/REQUIREMENTS.md`](manabi/docs/REQUIREMENTS.md)）。
