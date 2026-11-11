@@ -53,7 +53,7 @@ header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;bo
 .panel{background:#fff;border-radius:16px;padding:10px;box-shadow:0 4px 0 #b9dbe9}
 .panel h3{margin:0 0 6px;font-size:16px;color:#2a8c82}
 .pal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.pal button{aspect-ratio:1;border:3px solid #ddd;border-radius:12px;background:#fff;padding:6px;cursor:pointer}
+.pal button{touch-action:none;aspect-ratio:1;cursor:grab;border:3px solid #ddd;border-radius:12px;background:#fff;padding:6px}
 .pal button.on{border-color:#e8590c;background:#fff1e3}
 .pal svg{width:100%;height:100%;display:block}
 .btns{display:flex;flex-wrap:wrap;gap:8px}
@@ -62,6 +62,8 @@ header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;bo
 .count{font-size:18px;font-weight:bold}
 .count big{font-size:26px;color:#e8590c}
 .mini{width:100%;height:auto;max-height:200px;display:block}
+.ghost{position:fixed;left:0;top:0;pointer-events:none;z-index:20;display:none;filter:drop-shadow(0 4px 4px rgba(0,0,0,.3))}
+.howto{font-size:14px;color:#666;margin-top:6px;line-height:1.6}
 .blink{animation:blink .45s ease-in-out 4}
 @keyframes blink{50%{opacity:.15}}
 .shake{animation:shake .35s}
@@ -221,6 +223,60 @@ function shapePreview(rows, colored){
   return '<svg viewBox="'+vb+'" preserveAspectRatio="xMidYMid meet">'+body+'</svg>';
 }
 
+/* ===================== ドラッグの しくみ（いろいた） ===================== */
+var ROT = ['tl','tr','br','bl'];   // タッチで みぎまわりに まわる じゅんばん
+var ghostEl = null;
+function showGhost(o, c, x, y, size){
+  if(!ghostEl){ ghostEl = el('<div class="ghost"></div>'); document.body.appendChild(ghostEl); }
+  ghostEl.innerHTML = '<svg viewBox="0 0 1 1" width="'+size+'" height="'+size+'" style="overflow:visible"><polygon points="'+triPts(0,0,o)+'" fill="'+c+'" stroke="'+EDGE+'" stroke-width="0.04" stroke-linejoin="round"/></svg>';
+  ghostEl.style.left = x+'px'; ghostEl.style.top = y+'px'; ghostEl.style.display = 'block';
+}
+function hideGhost(){ if(ghostEl) ghostEl.style.display = 'none'; }
+function fits(pieces, x, y, o, skip){
+  return !pieces.some(function(a,i){
+    return i!==skip && a.x===x && a.y===y && Q[a.o].some(function(k){ return Q[o].indexOf(k)>=0; });
+  });
+}
+function hitPiece(pieces, p){
+  var x = Math.floor(p.x), y = Math.floor(p.y), q = quarterOf(p.x-x, p.y-y);
+  for(var i=pieces.length-1;i>=0;i--){ var a=pieces[i]; if(a.x===x && a.y===y && Q[a.o].indexOf(q)>=0) return i; }
+  return -1;
+}
+function nextRot(pieces, i){
+  var a = pieces[i], s = ROT.indexOf(a.o);
+  for(var k=1;k<4;k++){ var o = ROT[(s+k)%4]; if(fits(pieces, a.x, a.y, o, i)) return o; }
+  return null;
+}
+/* info: {o, c, offX, offY}  h: {start(), tap(), drop(cell or null), cancel()} */
+function startDrag(e, svg, hg, W, H, info, h){
+  e.preventDefault();
+  var sx = e.clientX, sy = e.clientY, moving = false;
+  function snap(ev){
+    var p = svgPt(svg, ev), x = Math.round(p.x-info.offX), y = Math.round(p.y-info.offY);
+    return (x>=0 && y>=0 && x<W && y<H) ? [x,y] : null;
+  }
+  function mv(ev){
+    if(!moving && Math.hypot(ev.clientX-sx, ev.clientY-sy) < 8) return;
+    if(!moving){ moving = true; if(h.start) h.start(); }
+    var size = svg.getScreenCTM().a;
+    showGhost(info.o, info.c, ev.clientX - info.offX*size, ev.clientY - info.offY*size, size);
+    var cell = snap(ev);
+    hg.innerHTML = cell ? '<polygon points="'+triPts(cell[0],cell[1],info.o)+'" fill="#e8590c" fill-opacity="0.12" stroke="#e8590c" stroke-width="0.05" stroke-dasharray="0.12 0.08" stroke-linejoin="round"/>' : '';
+    ev.preventDefault();
+  }
+  function end(){
+    document.removeEventListener('pointermove', mv);
+    document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointercancel', cancel);
+    hideGhost(); hg.innerHTML = '';
+  }
+  function up(ev){ end(); if(moving) h.drop(snap(ev)); else if(h.tap) h.tap(); }
+  function cancel(){ end(); if(h.cancel) h.cancel(); }
+  document.addEventListener('pointermove', mv, {passive:false});
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', cancel);
+}
+
 /* ===================== 1. いろいたで つくろう ===================== */
 var TILE = [
   { name:'しかく',        rows:['#'] },
@@ -249,16 +305,16 @@ function playTile(li){
       '<svg id="bd" viewBox="-0.1 -0.1 '+(W+0.2)+' '+(H+0.2)+'">'+
         '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fffdf4"/>'+
         silhouetteSvg(target, '#cdd5dc')+ gridLines(W,H)+
-        '<g id="pg"></g><g id="hg"></g>'+
+        '<g id="pg"></g><g id="hg"></g><g id="dg"></g>'+
       '</svg></div>'+
       '<div class="side">'+
-        '<div class="panel"><h3>いろいたの むき</h3><div class="pal" id="pal"></div>'+
-          '<div style="font-size:14px;margin-top:6px;color:#666">むきを えらんで、ますを タッチ。<br>おいた いろいたを タッチすると とれるよ。</div></div>'+
+        '<div class="panel"><h3>いろいた（ボードへ ドラッグ）</h3><div class="pal" id="pal"></div>'+
+          '<div class="howto">・いろいたを ボードへ ひっぱって おく<br>・おいた いろいたも ひっぱって うごかせる<br>・タッチすると くるっと まわる<br>・ボードの そとへ だすと とれる</div></div>'+
         '<div class="panel"><div class="count" id="cnt"></div><div class="msg" id="msg"></div></div>'+
         '<div class="btns"><button class="btn orange" id="hint">💡 ヒント</button><button class="btn" id="clr">ぜんぶ とる</button></div>'+
       '</div></div>';
 
-  var svg = document.getElementById('bd'), pg = document.getElementById('pg'), hg = document.getElementById('hg');
+  var svg = document.getElementById('bd'), pg = document.getElementById('pg'), hg = document.getElementById('hg'), dg = document.getElementById('dg');
   var pal = document.getElementById('pal'), cnt = document.getElementById('cnt'), msgEl = document.getElementById('msg');
   function msg(t){ msgEl.textContent = t||''; }
 
@@ -267,38 +323,63 @@ function playTile(li){
       return '<button data-o="'+o+'" class="'+(o===sel?'on':'')+'">'+triIcon(o, COLORS[ci%4])+'</button>';
     }).join('');
   }
-  pal.onclick = function(e){
-    var b = e.target.closest('button'); if(!b) return;
-    sel = b.getAttribute('data-o'); SFX.sel(); drawPal();
-  };
-  function update(){
-    pg.innerHTML = piecesSvg(placed, function(p){ return p.c; });
-    cnt.innerHTML = 'ならべた かず：<big>'+placed.length+'</big> まい<br><span style="font-size:15px;color:#666">（ぜんぶで '+target.length+' まい つかうよ）</span>';
-    drawPal();
+  function markPal(){
+    Array.prototype.forEach.call(pal.children, function(b){ b.classList.toggle('on', b.getAttribute('data-o')===sel); });
   }
+  function update(){
+    pg.innerHTML = piecesSvg(placed, function(p){ return p.c; }).replace(/<polygon/g, '<polygon class="pc"');
+    placed.forEach(function(p,i){ if(p.drag) pg.children[i].setAttribute('opacity','0.25'); });
+    cnt.innerHTML = 'ならべた かず：<big>'+placed.length+'</big> まい<br><span style="font-size:15px;color:#666">（ぜんぶで '+target.length+' まい つかうよ）</span>';
+  }
+  function afterChange(){
+    update();
+    if(!done && sameCover(placed, target)){
+      done = true;
+      setTimeout(function(){ celebrate('tile', li); }, 350);
+    }
+  }
+  function placeNew(x, y, o){
+    if(!fits(placed, x, y, o, -1)){ SFX.ng(); msg('そこには はいらないよ。むきを かえてみよう'); return false; }
+    placed.push({x:x,y:y,o:o,c:COLORS[ci%4]}); ci++;
+    SFX.put(); msg(''); drawPal(); afterChange(); return true;
+  }
+
+  // いろいたを ボードへ ドラッグ（タッチだけなら むきを えらぶ）
+  pal.addEventListener('pointerdown', function(e){
+    var b = e.target.closest('button'); if(!b || done) return;
+    sel = b.getAttribute('data-o'); markPal();
+    startDrag(e, svg, dg, W, H, {o:sel, c:COLORS[ci%4], offX:0.5, offY:0.5}, {
+      tap:function(){ SFX.sel(); msg('ボードの ますを タッチしても おけるよ'); },
+      drop:function(cell){ if(cell) placeNew(cell[0], cell[1], sel); }
+    });
+  });
+
   svg.addEventListener('pointerdown', function(e){
     if(done) return;
     var p = svgPt(svg,e), x = Math.floor(p.x), y = Math.floor(p.y);
     if(x<0||y<0||x>=W||y>=H) return;
-    var q = quarterOf(p.x-x, p.y-y);
-    for(var i=0;i<placed.length;i++){
-      var a = placed[i];
-      if(a.x===x && a.y===y && Q[a.o].indexOf(q)>=0){ placed.splice(i,1); SFX.pop(); msg(''); update(); return; }
-    }
-    var occ = {};
-    placed.forEach(function(a){ if(a.x===x&&a.y===y) Q[a.o].forEach(function(k){ occ[k]=1; }); });
-    if(Q[sel].some(function(k){ return occ[k]; })){
-      SFX.ng(); msg('そこには はいらないよ。むきを かえてみよう'); return;
-    }
-    placed.push({x:x,y:y,o:sel,c:COLORS[ci%4]}); ci++;
-    SFX.put(); msg(''); update();
-    if(sameCover(placed, target)){
-      done = true;
-      setTimeout(function(){ celebrate('tile', li); }, 350);
-    }
+    var i = hitPiece(placed, p);
+    if(i<0){ e.preventDefault(); placeNew(x, y, sel); return; }
+    var a = placed[i];
+    startDrag(e, svg, dg, W, H, {o:a.o, c:a.c, offX:p.x-a.x, offY:p.y-a.y}, {
+      start:function(){ a.drag = true; update(); },
+      tap:function(){
+        var o = nextRot(placed, i);
+        if(!o){ SFX.ng(); msg('ここでは まわせないよ'); return; }
+        a.o = o; SFX.sel(); msg(''); afterChange();
+      },
+      drop:function(cell){
+        a.drag = false;
+        if(!cell){ placed.splice(placed.indexOf(a),1); SFX.pop(); msg('いろいたを とったよ'); afterChange(); return; }
+        if(!fits(placed, cell[0], cell[1], a.o, placed.indexOf(a))){ SFX.ng(); msg('そこには はいらないよ'); update(); return; }
+        a.x = cell[0]; a.y = cell[1]; SFX.put(); msg(''); afterChange();
+      },
+      cancel:function(){ a.drag = false; update(); }
+    });
   });
-  document.getElementById('clr').onclick = function(){ placed=[]; msg(''); update(); };
+  document.getElementById('clr').onclick = function(){ if(done) return; placed=[]; msg(''); update(); };
   document.getElementById('hint').onclick = function(){
+    if(done) return;
     var bad = placed.filter(function(a){ return Q[a.o].some(function(k){ return !tcov[a.x+','+a.y+','+k]; }); })[0];
     if(bad){ flash(bad,'#ff3b30'); msg('かたちから はみだして いるよ'); return; }
     var cov = coverage(placed);
@@ -307,15 +388,15 @@ function playTile(li){
     for(var i=0;i<cands.length;i++){
       var c = cands[i];
       var ok = Q[c.o].every(function(k){ var key=c.x+','+c.y+','+k; return tcov[key] && !cov[key]; });
-      if(ok){ flash(c,'#e8590c'); sel=c.o; drawPal(); msg('ひかって いる ところに おいてみよう'); return; }
+      if(ok){ flash(c,'#e8590c'); sel=c.o; markPal(); msg('ひかって いる ところに おいてみよう'); return; }
     }
-    msg('いちど とって、むきを かえてみよう');
+    msg('いろいたを まわしたり うごかしたり してみよう');
   };
   function flash(p, color){
     hg.innerHTML = '<polygon class="blink" points="'+triPts(p.x,p.y,p.o)+'" fill="'+color+'" fill-opacity="0.35" stroke="'+color+'" stroke-width="0.08" stroke-linejoin="round"/>';
     setTimeout(function(){ hg.innerHTML=''; }, 1900);
   }
-  update();
+  drawPal(); update();
 }
 
 /* ===================== 2. 1まいだけ うごかそう ===================== */
@@ -335,7 +416,7 @@ function playMove(li){
   var ox = Math.floor((W-sw)/2), oy = Math.floor((H-sh)/2);
   var start = parseShape(L.start, ox, oy).pieces.map(function(p,i){ p.c = COLORS[i%4]; return p; });
   var target = parseShape(L.target, ox, oy).pieces;
-  var pieces, held, moved, done, sel;
+  var pieces, active, done;
 
   setHeader('<span class="no">'+(li+1)+'</span>'+L.name, function(){ showLevels('move'); });
   screen.innerHTML =
@@ -343,61 +424,68 @@ function playMove(li){
     '<div class="play"><div class="boardWrap">'+
       '<svg id="bd" viewBox="-0.1 -0.1 '+(W+0.2)+' '+(H+0.2)+'">'+
         '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fffdf4"/>'+ gridLines(W,H,'#dde4ea')+
-        '<g id="pg"></g>'+
+        '<g id="pg"></g><g id="dg"></g>'+
       '</svg></div>'+
       '<div class="side">'+
         '<div class="panel"><h3>➡ この かたちに しよう</h3>'+shapePreview(L.target,false).replace('<svg ','<svg class="mini" ')+'</div>'+
-        '<div class="panel" id="palP" style="display:none"><h3>どの むきで おく？</h3><div class="pal" id="pal"></div></div>'+
-        '<div class="panel"><div class="msg" id="msg"></div></div>'+
+        '<div class="panel"><div class="howto">・いろいたを ひっぱって うごかす<br>・タッチすると くるっと まわる<br>・うごかせるのは 1まいだけ</div><div class="msg" id="msg"></div></div>'+
         '<div class="btns"><button class="btn" id="rst">↺ はじめから</button></div>'+
       '</div></div>';
 
-  var svg = document.getElementById('bd'), pg = document.getElementById('pg');
-  var pal = document.getElementById('pal'), palP = document.getElementById('palP'), msgEl = document.getElementById('msg');
+  var svg = document.getElementById('bd'), pg = document.getElementById('pg'), dg = document.getElementById('dg');
+  var msgEl = document.getElementById('msg');
   function msg(t){ msgEl.textContent = t||''; }
   function reset(){
-    pieces = start.map(function(p){ return {x:p.x,y:p.y,o:p.o,c:p.c}; });
-    held = null; moved = false; done = false; sel = 'br';
-    msg('うごかす いろいたを 1まい タッチしてね'); update();
+    pieces = start.map(function(p,i){ return {x:p.x,y:p.y,o:p.o,c:p.c,id:i}; });
+    active = -1; done = false;
+    msg('うごかす いろいたを 1まい えらんでね'); update();
   }
-  function drawPal(){
-    palP.style.display = held ? '' : 'none';
-    if(!held) return;
-    pal.innerHTML = ORI.map(function(o){
-      return '<button data-o="'+o+'" class="'+(o===sel?'on':'')+'">'+triIcon(o, held.c)+'</button>';
-    }).join('');
-  }
-  pal.onclick = function(e){ var b=e.target.closest('button'); if(!b) return; sel=b.getAttribute('data-o'); SFX.sel(); drawPal(); };
   function update(){
     pg.innerHTML = piecesSvg(pieces, function(p){ return p.c; });
-    drawPal();
-  }
-  svg.addEventListener('pointerdown', function(e){
-    if(done || moved) return;
-    var p = svgPt(svg,e), x = Math.floor(p.x), y = Math.floor(p.y);
-    if(x<0||y<0||x>=W||y>=H) return;
-    var q = quarterOf(p.x-x, p.y-y);
-    var hit = -1;
-    pieces.forEach(function(a,i){ if(a.x===x && a.y===y && Q[a.o].indexOf(q)>=0) hit=i; });
-    if(!held){
-      if(hit<0) return;
-      held = pieces.splice(hit,1)[0]; sel = held.o;
-      SFX.pop(); msg('どこに おく？ むきも かえられるよ'); update(); return;
+    pieces.forEach(function(p,i){
+      var n = pg.children[i];
+      if(p.drag) n.setAttribute('opacity','0.25');
+      if(p.id===active){ n.setAttribute('stroke','#e8590c'); n.setAttribute('stroke-width','0.08'); }
+    });
+    if(active>=0){ // えらんだ いろいたを いちばん うえに
+      pieces.forEach(function(p,i){ if(p.id===active) pg.appendChild(pg.children[i]); });
     }
-    if(hit>=0){ SFX.ng(); msg('あいて いる ところに おいてね'); return; }
-    var occ = {};
-    pieces.forEach(function(a){ if(a.x===x&&a.y===y) Q[a.o].forEach(function(k){ occ[k]=1; }); });
-    if(Q[sel].some(function(k){ return occ[k]; })){ SFX.ng(); msg('そこには はいらないよ。むきを かえてみよう'); return; }
-    pieces.push({x:x,y:y,o:sel,c:held.c}); held = null; moved = true;
-    SFX.put(); update();
+  }
+  function afterChange(a){
+    var s = start[a.id];
+    active = (a.x===s.x && a.y===s.y && a.o===s.o) ? -1 : a.id;   // もとに もどしたら えらびなおせる
+    update();
     if(sameCover(pieces, target)){
       done = true; msg('');
       setTimeout(function(){ celebrate('move', li); }, 350);
-    }else{
-      setTimeout(SFX.ng, 200);
-      msg('ざんねん！ ちがう かたちに なったよ。「はじめから」で もういちど');
-      svg.parentNode.classList.remove('shake'); void svg.parentNode.offsetWidth; svg.parentNode.classList.add('shake');
+    }else if(active<0){ msg('もとに もどったよ。べつの いろいたも えらべるよ'); }
+    else msg('');
+  }
+  svg.addEventListener('pointerdown', function(e){
+    if(done) return;
+    var p = svgPt(svg,e), i = hitPiece(pieces, p);
+    if(i<0) return;
+    var a = pieces[i];
+    if(active>=0 && a.id!==active){
+      e.preventDefault(); SFX.ng();
+      msg('うごかせるのは 1まいだけ。オレンジの いろいたを うごかそう（「はじめから」で えらびなおせるよ）');
+      return;
     }
+    startDrag(e, svg, dg, W, H, {o:a.o, c:a.c, offX:p.x-a.x, offY:p.y-a.y}, {
+      start:function(){ a.drag = true; active = a.id; update(); },
+      tap:function(){
+        var o = nextRot(pieces, pieces.indexOf(a));
+        if(!o){ SFX.ng(); msg('ここでは まわせないよ'); return; }
+        a.o = o; SFX.sel(); afterChange(a);
+      },
+      drop:function(cell){
+        a.drag = false;
+        if(!cell){ SFX.ng(); msg('ボードの なかに おいてね'); afterChange(a); return; }
+        if(!fits(pieces, cell[0], cell[1], a.o, pieces.indexOf(a))){ SFX.ng(); msg('そこには はいらないよ'); afterChange(a); return; }
+        a.x = cell[0]; a.y = cell[1]; SFX.put(); afterChange(a);
+      },
+      cancel:function(){ a.drag = false; afterChange(a); }
+    });
   });
   document.getElementById('rst').onclick = reset;
   reset();
