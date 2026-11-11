@@ -9,6 +9,7 @@ import { newLearn, nextQuestion, recordAnswer, subjectLevel, UNIT_NAMES } from '
 import { FIREFLY_LIST, FIREFLY_HP } from '../js/data/fireflies.js';
 import { fixed, swapOf, GA, JOSHI } from '../js/data/quiz_bun.js';
 import { DAKU, SOKU, CHOON, YOON, PAIRS, HYOKI } from '../js/data/quiz_hyoki.js';
+import { SAN, sanTopics } from '../js/data/quiz_san.js';
 import { SPAWN, MOBS, LAST_FLOOR, isBossFloor } from '../js/data/enemies.js';
 
 let n = 0; const test = (name, f) => { f(); n++; console.log('ok  ' + name); };
@@ -89,7 +90,11 @@ test('まなび：がくねん・きょうかごとに もんだいが つくれ
     for (let k = 0; k < 30; k++) {
       const q = nextQuestion(L, rng, { keypad });
       assert.ok(q.q && q.answer !== undefined && q.answer !== '', `${subj} g${grade} lv${lv}`);
-      if (q.type) {
+      if (q.type === 'steps') {
+        assert.ok(keypad, 'たたかいの さいちゅうに steps が でた'); assert.ok(q.steps.length >= 2);
+        for (const st of q.steps) { assert.ok(st.choices ? st.choices.includes(st.answer) : /^\d+$/.test(String(st.answer)), st.text); assert.equal(st.text.includes('□'), !st.choices); }
+        assert.ok(q.answer.endsWith(String(q.steps[q.steps.length - 1].answer)));
+      } else if (q.type) {
         assert.ok(['build', 'fill', 'fix'].includes(q.type) && (keypad || q.type === 'fill'), `たたかいの さいちゅうに ${q.type} が でた`);
         if (q.type === 'build') { assert.equal(new Set(q.cards).size, q.cards.length); assert.equal(q.order.map((i) => q.cards[i]).join('').replace('。', ''), q.answer.replace(/[ 。]/g, '')); }
         if (q.type === 'fill') { assert.equal(q.parts.filter((p) => p === null).length, q.slots.length); let k = 0; assert.equal(q.parts.map((p) => p ?? q.slots[k++]).join(''), q.answer.replace(/ /g, '')); q.slots.forEach((c) => assert.ok(q.pool.includes(c))); }
@@ -138,5 +143,29 @@ test('かなの きまり：ことばの かたち・4たんげんが レベル�
   assert.equal(count(4, { keypad: false, group: 'hyoki' }).fix, 0);
   const mix = count(3, { keypad: true }); const h = mix.hyoDaku + mix.hyoSoku + mix.hyoChoon + mix.hyoYoon;
   assert.ok(h > 130 && h < 240, `かなの きまり ${h}/600`);
+});
+test('さんすう：こたえが あっている・ならう じゅんに ひろがる・1てずつの もんだいは かんがえかたの とおり', () => {
+  const rng = makeRng(77);
+  for (const t of Object.keys(SAN)) assert.ok(UNIT_NAMES['math:' + t], t);
+  for (let lv = 1; lv <= 5; lv++) for (const t of sanTopics(1, lv)) assert.ok(SAN[t]);
+  assert.ok(!sanTopics(1, 1).includes('sanMake10') && sanTopics(1, 3).includes('sanMake10') && sanTopics(1, 4).includes('sanSub10'));
+  const calc = (e) => { const m = e.match(/^(\d+) ([+−]) (\d+)(?: ([+−]) (\d+))?/); let v = m[2] === '+' ? +m[1] + +m[3] : m[1] - m[3]; if (m[4]) v = m[4] === '+' ? v + +m[5] : v - m[5]; return v; };
+  for (let k = 0; k < 400; k++) {
+    let q = SAN.sanMake10(3, rng, false), s = q.steps, [a, b] = q.q.match(/\d+/g).map(Number);
+    assert.ok(a + s[0].answer === 10 && s[0].answer + s[1].answer === b && 10 + s[1].answer === s[2].answer && s[2].answer === a + b && a + b > 10);
+    q = SAN.sanSub10(4, rng, false); s = q.steps; [a, b] = q.q.match(/\d+/g).map(Number);
+    assert.ok(10 + s[0].answer === a && 10 - b === s[1].answer && s[1].answer + s[0].answer === s[2].answer && s[2].answer === a - b && a - b >= 1 && a - b <= 9);
+    q = SAN.san3(4, rng, false); assert.equal(calc(q.q), q.answer); assert.ok(q.answer >= 0);
+    for (const lv of [2, 5]) {
+      q = SAN.sanStory(lv, rng, false); const m = q.steps[1].text; assert.equal(calc(m), q.steps[1].answer); assert.ok(q.steps[1].answer >= 1);
+      assert.equal(q.steps[0].answer, m.includes('+') ? 'たしざん' : 'ひきざん'); if (/にん/.test(q.q)) assert.ok(/います。/.test(q.q)); if (lv === 2) assert.ok(q.steps[1].answer <= 10);
+      const quick = SAN.sanStory(lv, rng, true); assert.equal(new Set(quick.choices).size, 3); assert.ok(quick.choices.includes(quick.answer));
+    }
+    q = SAN.sanBond(2, rng, false); const d = q.q.match(/\d+/g).map(Number); assert.ok(d.includes(q.vis.a) && q.vis.a + q.vis.b <= 10);
+    q = SAN.sanBig(5, rng, false); assert.ok(q.answer >= 1 && q.answer <= 99);
+  }
+  const count = (grade, lv) => { const L = newLearn(grade, ['math']); let c = 0; for (let k = 0; k < 500; k++) { L.level.math = lv; L.recent = []; if (/^san/.test(nextQuestion(L, rng, { keypad: true }).unit || '')) c++; } return c; };
+  const g1 = count(1, 3), g2 = count(2, 4), g3 = count(3, 5);
+  assert.ok(g1 > 300 && g1 < 400, `1ねんせい ${g1}/500`); assert.ok(g2 > 60 && g2 < 150, `2ねんせい ${g2}/500`); assert.equal(g3, 0);
 });
 console.log(`\n${n} こ ぜんぶ OK`);

@@ -20,8 +20,43 @@ function visHtml(vis) {
   if (vis.type === 'grid') return `<div class="quiz-vis" style="width:${vis.W * 56}px;max-width:340px">${gridSvg(vis)}</div>`;
   if (vis.type === 'coins') return `<div class="quiz-vis" style="height:80px">${coinsSvg(vis.c10, vis.c1)}</div>`;
   if (vis.type === 'shape') return `<div class="quiz-vis" style="width:120px;height:120px">${shapeSvg(vis.shape)}</div>`;
-  if (vis.type === 'emoji') return `<div class="quiz-vis emoji" style="font-size:${vis.rows.length === 1 && vis.rows[0][1] === 1 ? 100 : 42}px">${vis.rows.map(([e, n]) => `<div>${e.repeat(n)}</div>`).join('')}</div>`;
+  if (vis.type === 'emoji') return `<div class="quiz-vis emoji" style="font-size:${vis.small ? 48 : vis.rows.length === 1 && vis.rows[0][1] === 1 ? 100 : 42}px">${vis.rows.map(([e, n]) => `<div>${e.repeat(n)}</div>`).join('')}</div>`;
+  // まるを ならべる（10こで 1れつ）。a こは あか、b こは あお
+  if (vis.type === 'dots') return `<div class="quiz-vis dots10">${Array.from({ length: vis.a + vis.b }, (_, i) => `<i class="${i < vis.a ? 'a' : 'b'}"></i>`).join('')}</div>`;
   return '';
+}
+
+// ── かんがえかたを 1てずつ いれる もんだい（steps）。まちがえた ところで おわり、ただしい かんがえかたを みせる
+const padHtml = () => `<div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'del', 0, 'ok'].map((k) => (k === 'del' ? '<button class="del" data-k="del">⌫</button>' : k === 'ok' ? `<button class="ok" data-k="ok">${T('けってい')}</button>` : `<button data-k="${k}">${k}</button>`)).join('')}</div>`;
+function stepsHtml(q) {
+  return `<div class="steps">${q.steps.map((s, i) => `<div class="step" data-step="${i}" ${i ? 'hidden' : ''}><span class="no">${i + 1}</span><span class="tx">${T(s.text).replace('□', '<b class="blank">？</b>')}</span>${s.choices ? `<span class="ops">${s.choices.map((c) => `<button class="op" data-op="${c}">${T(c)}</button>`).join('')}</span>` : ''}</div>`).join('')}</div>${padHtml()}`;
+}
+function wireSteps(back, q, finish) {
+  let cur = 0, buf = '';
+  const pad = $('.keypad', back);
+  const show = () => {
+    const el2 = $(`[data-step="${cur}"]`, back); el2.hidden = false; el2.classList.add('cur');
+    pad.classList.toggle('off', !!q.steps[cur].choices); buf = '';
+  };
+  const answer = (v, btn) => {
+    const s = q.steps[cur], row = $(`[data-step="${cur}"]`, back), ok = String(v) === String(s.answer);
+    row.classList.remove('cur'); row.classList.add(ok ? 'right' : 'wrong');
+    const blank = $('.blank', row); if (blank) blank.textContent = ok ? v : `${v} → ${s.answer}`;
+    if (btn) { btn.classList.add(ok ? 'right' : 'wrong'); $$('.op', row).forEach((b) => { b.disabled = true; if (String(b.dataset.op) === String(s.answer)) b.classList.add('right'); }); }
+    if (!ok) { finish(false); return; }
+    if (++cur >= q.steps.length) { finish(true); return; }
+    sfx('place'); show();
+  };
+  $$('.op', back).forEach((b) => b.addEventListener('click', () => { if (+b.closest('.step').dataset.step === cur) answer(b.dataset.op, b); }));
+  $$('button', pad).forEach((b) => b.addEventListener('click', () => {
+    const k = b.dataset.k, blank = $(`[data-step="${cur}"] .blank`, back); if (!blank || q.steps[cur].choices) return;
+    sfx('tap');
+    if (k === 'del') buf = buf.slice(0, -1);
+    else if (k === 'ok') { if (buf) answer(Number(buf)); return; }
+    else if (buf.length < 3) buf += k;
+    blank.textContent = buf || '？';
+  }));
+  show();
 }
 
 // 1もん だす。opts: { head（なんの ための もんだいか）, keypad, subj, reviewOnly, dots:[true/false/null…] }
@@ -35,11 +70,11 @@ export function askQuiz(stage, P, opts = {}) {
     const dots = opts.dots ? `<span class="dots">${opts.dots.map((d) => `<i class="${d === true ? 'ok' : d === false ? 'ng' : ''}"></i>`).join('')}</span>` : '';
     const back = el(`<div class="modal-back quiz-back"><div class="modal quiz">
       <div class="quiz-head">${opts.head ? `<span class="why">${T(opts.head)}</span>` : ''}<span class="sp"></span>${dots}${q.review ? `<span class="tag review">🔁 ${T('ふくしゅう')}</span>` : ''}<span class="tag subj" style="--c:${sj.color}">${sj.emo} ${T(sj.name)}</span>${L.combo >= 2 ? `<span class="tag combo">🔥 ${L.combo}${T('れんぞく')}</span>` : ''}</div>
-      <div class="quiz-q">${T(q.q)}</div>
+      <div class="quiz-q ${q.long ? 'long' : ''}">${T(q.q)}</div>
       ${q.audio && canSpeak() ? `<button class="btn small gray" data-speak>🔊 ${T('きく')}</button>` : ''}
       <div class="quiz-body">
         ${visHtml(q.vis)}
-        ${q.type ? `<div class="bun">${bunHtml(q)}</div>` : q.choices ? `<div class="choices${q.big ? 'big' : ''} n${q.choices.length}">${q.choices.map((c, i) => `<button class="choice" data-c="${i}">${T(String(c))}</button>`).join('')}</div>`
+        ${q.type === 'steps' ? stepsHtml(q) : q.type ? `<div class="bun">${bunHtml(q)}</div>` : q.choices ? `<div class="choices ${q.big ? 'big' : ''} ${q.row ? 'row' : ''} n${q.choices.length}">${q.choices.map((c, i) => `<button class="choice" data-c="${i}">${T(String(c))}</button>`).join('')}</div>`
           : `<div class="answer-box empty" data-box>？</div><div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 'del', 0, 'ok'].map((k) => (k === 'del' ? '<button class="del" data-k="del">⌫</button>' : k === 'ok' ? `<button class="ok" data-k="ok">${T('けってい')}</button>` : `<button data-k="${k}">${k}</button>`)).join('')}</div>`}
       </div>
       <div class="explain" hidden></div>
@@ -55,7 +90,7 @@ export function askQuiz(stage, P, opts = {}) {
       const r = recordAnswer(L, q, ok, today());
       $$('.keypad button, .choice, [data-giveup], .bun button', back).forEach((b) => { b.disabled = true; });
       $$('.choice', back).forEach((b) => { if (String(q.choices[+b.dataset.c]) === String(q.answer)) b.classList.add('right'); });
-      if (q.type && !ok) $('.bun', back).insertAdjacentHTML('beforeend', `<div class="bun-right">${T(q.answer)}</div>`);
+      if (q.type && q.type !== 'steps' && !ok) $('.bun', back).insertAdjacentHTML('beforeend', `<div class="bun-right">${T(q.answer)}</div>`);
       $('[data-giveup]', back).hidden = true;
       const ex = $('.explain', back);
       ex.hidden = false; ex.classList.add(ok ? 'ok' : 'ng');
@@ -81,7 +116,7 @@ export function askQuiz(stage, P, opts = {}) {
         box.textContent = buf || '？'; box.classList.toggle('empty', !buf);
       }));
     }
-    if (q.type) wireBun(back, q, finish);
+    if (q.type === 'steps') wireSteps(back, q, finish); else if (q.type) wireBun(back, q, finish);
     window.__quizSolve = (right) => finish(!!right); // つうしテスト用
     $('[data-giveup]', back).addEventListener('click', () => { sfx('tap'); finish(false); });
   });

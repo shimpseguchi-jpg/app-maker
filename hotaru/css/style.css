@@ -217,6 +217,24 @@ button.item { cursor: pointer; box-shadow: 0 4px 0 #cfc198; } button.item:active
 .bun-right { font-size: 28px; font-weight: 900; color: #1f6b3a; background: #e2f9e6; border-radius: 14px; padding: 4px 18px; }
 .bun [data-bunok][disabled] { opacity: .35; }
 
+/* ── さんすう：かんがえかたを 1てずつ（steps）・まるの ず・よこ 1れつの えらぶ ── */
+.quiz-q.long { font-size: 26px; line-height: 1.6; }
+.steps { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.step { display: flex; align-items: center; gap: 12px; background: #fff; border: 4px solid #e6dcb8; border-radius: 18px; padding: 8px 14px; font-size: 28px; font-weight: 900; }
+.step .no { width: 34px; height: 34px; border-radius: 50%; background: #e6dcb8; font-size: 18px; display: flex; align-items: center; justify-content: center; flex: none; }
+.step .blank { display: inline-block; min-width: 56px; text-align: center; border: 3px solid #cfc198; border-radius: 12px; background: #fff8e6; color: #b25a00; padding: 0 8px; margin: 0 4px; }
+.step.cur { border-color: #ffb92e; box-shadow: 0 0 12px #ffcf5c; } .step.cur .blank { border-color: #ffb92e; }
+.step.right { border-color: var(--green); background: #f1fcf3; } .step.right .blank { border-color: var(--green); color: #1f6b3a; background: #e2f9e6; }
+.step.wrong { border-color: var(--red); background: #fff3f0; } .step.wrong .blank { border-color: var(--red); color: #d2452e; }
+.step .ops { display: flex; gap: 10px; margin-left: auto; } .step .tx, .step .op { white-space: nowrap; }
+.step .op { border: none; border-radius: 14px; background: #fff3b0; box-shadow: 0 4px 0 #d9b84a; font: inherit; font-size: 22px; padding: 6px 12px; cursor: pointer; color: var(--ink); }
+.step .op.right { background: #b8f5c4; box-shadow: 0 4px 0 #4a9a66; } .step .op.wrong { background: #ffc9c2; box-shadow: 0 4px 0 #c9675c; }
+.keypad.off { opacity: .25; pointer-events: none; }
+.dots10 { display: grid; grid-template-columns: repeat(5, 26px); gap: 6px; padding: 10px; background: #fff; border-radius: 16px; border: 3px solid #e6dcb8; }
+.dots10 i { width: 26px; height: 26px; border-radius: 50%; display: block; } .dots10 i.a { background: #ff6b5e; } .dots10 i.b { background: #5aa9ff; }
+.dots10 i:nth-child(10n) { margin-bottom: 10px; }
+.choices.row { grid-template-columns: repeat(5, 1fr); max-width: none; gap: 10px; } .choices.row .choice { font-size: 50px; min-height: 96px; padding: 0; }
+
 /* ── ひらめき こうげき ── */
 .spark { border: none; border-radius: 20px; background: linear-gradient(#fff3a0, #ffc93c); color: #4a3200; box-shadow: 0 6px 0 #b98a16; padding: 12px 8px 10px; display: flex; flex-direction: column; align-items: center; font-weight: 900; cursor: pointer; }
 .spark:active { transform: translateY(4px); box-shadow: 0 2px 0 #b98a16; }

@@ -14,7 +14,7 @@ import { runDungeon, howtoHtml } from './ui/dungeon.js';
 import { askQuiz } from './ui/quiz.js';
 import { SUBJECTS, UNIT_NAMES, newLearn, subjectLevel, accuracy } from './engine/learn.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const stage = $('#stage');
 initCommon(stage);
 setTextMode(settings.text);
@@ -192,6 +192,7 @@ function openStudy() {
     <div class="col">
       <button class="btn big" data-st="any">✨ ${T('おまかせ')}</button>
       ${L.subjects.map((id) => `<button class="btn big gray" data-st="${id}">${SUBJECTS[id].emo} ${T(SUBJECTS[id].name)} <small>${T('レベル')} ${subjectLevel(L, id)}</small></button>`).join('')}
+      ${L.subjects.includes('math') ? `<button class="btn big gray" data-st="san">🧮 ${T('けいさんの しかた')} <small>${T('10の まとまり・ぶんしょうだい')}</small></button>` : ''}
       ${L.subjects.includes('ja') ? `<button class="btn big gray" data-st="hyoki">🔡 ${T('かなの きまり')} <small>${T('゛゜・っ・のばす おん・ゃゅょ')}</small></button>` : ''}
       ${L.subjects.includes('ja') ? `<button class="btn big gray" data-st="bun">✏️ ${T('ぶんづくり')} <small>${T('は・を・へ')}</small></button>` : ''}
       <button class="btn big gray" data-st="review" ${L.mistakes.length ? '' : 'disabled'}>🔁 ${T('にがてを ふくしゅう')} <small>${L.mistakes.length ? L.mistakes.length + T('しゅるい') : T('いまは ない')}</small></button>
@@ -200,7 +201,7 @@ function openStudy() {
     const mode = b.dataset.st; close(); sfx('select');
     const dots = [null, null, null, null, null]; let lvUp = false;
     for (let i = 0; i < 5; i++) {
-      const r = await askQuiz(stage, P, { head: `🏫 まなびの こや　${i + 1} / 5`, keypad: true, dots: dots.slice(), subj: SUBJECTS[mode] ? mode : null, reviewOnly: mode === 'review' && P.learn.mistakes.length > 0, group: mode === 'bun' || mode === 'hyoki' ? mode : null });
+      const r = await askQuiz(stage, P, { head: `🏫 まなびの こや　${i + 1} / 5`, keypad: true, dots: dots.slice(), subj: SUBJECTS[mode] ? mode : null, reviewOnly: mode === 'review' && P.learn.mistakes.length > 0, group: ['bun', 'hyoki', 'san'].includes(mode) ? mode : null });
       dots[i] = r.ok; if (g.learnReward(null, P, r.ok, r.combo).some((e) => e.t === 'levelup')) lvUp = true;
     }
     const n = dots.filter(Boolean).length, gold = n * (6 + 2 * P.learn.grade) + (n === 5 ? 20 : 0);

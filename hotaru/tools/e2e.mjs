@@ -26,6 +26,12 @@ async function answer(rate = 0.8) {
   const q = await page.evaluate(() => window.__q); asked++;
   const right = Math.random() < rate;
   if (q.type && !right) await page.click('.quiz [data-giveup]');
+  else if (q.type === 'steps') {
+    for (const st of q.steps) {
+      if (st.choices) await page.click(`.quiz .step.cur [data-op="${st.answer}"]`);
+      else { for (const ch of String(st.answer)) await page.click(`.quiz .keypad [data-k="${ch}"]`); await page.click('.quiz .keypad [data-k="ok"]'); }
+    }
+  }
   else if (q.type === 'build') { for (const i of q.order) await page.click(`.quiz .bun-pool [data-i="${i}"]`); await page.click('.quiz [data-bunok]'); }
   else if (q.type === 'fill') { for (const c of q.slots) await page.click(`.quiz .bun-pool [data-p="${c}"]`); await page.click('.quiz [data-bunok]'); }
   else if (q.type === 'fix') { for (const i of q.wrong) await page.click(`.quiz .ch[data-i="${i}"]`); await page.click('.quiz [data-bunok]'); }
@@ -44,22 +50,23 @@ for (let i = 0; i < 5; i++) { await page.waitForSelector('.quiz'); if (i === 1) 
 await page.waitForSelector('.modal [data-ok]'); await shot('study-result'); await ok();
 // ぶんづくり（カードを ならべる・□に いれる・まちがいを なおす）を ほんとうに タップして とく
 const kinds = new Set();
-for (let round = 0; round < 5; round++) { // 0〜2：ぶんづくり、3〜4：かなの きまり
-  await page.evaluate((lv) => { const P = JSON.parse(localStorage.getItem('hotaru.profile')); P.learn.level.ja = lv; P.learn.streak.ja = 0; localStorage.setItem('hotaru.profile', JSON.stringify(P)); }, [2, 3, 5][round % 3]);
+for (let round = 0; round < 8; round++) { // 0〜2：ぶんづくり、3〜4：かなの きまり、5〜7：さんすう
+  await page.evaluate((lv) => { const P = JSON.parse(localStorage.getItem('hotaru.profile')); P.learn.level.ja = lv; P.learn.streak.ja = 0; P.learn.level.math = lv; P.learn.streak.math = 0; localStorage.setItem('hotaru.profile', JSON.stringify(P)); }, [2, 3, 5][round % 3]);
   await page.reload(); await page.evaluate(() => { window.__robot = true; }); await click('[data-go]'); await page.waitForSelector('.camp');
-  await click('[data-cmd="study"]'); await click(round >= 3 ? '[data-st="hyoki"]' : '[data-st="bun"]');
+  await click('[data-cmd="study"]'); await click(round >= 5 ? '[data-st="san"]' : round >= 3 ? '[data-st="hyoki"]' : '[data-st="bun"]');
   for (let i = 0; i < 5; i++) {
     await page.waitForSelector('.quiz'); const t = await page.evaluate(() => window.__q.type);
     const u = await page.evaluate(() => window.__q.unit);
-    if (!/^(bun|hyo)/.test(u)) errors.push('ぶんづくり・かなの きまりで ほかの もんだいが でた：' + u);
+    if (!/^(bun|hyo|san)/.test(u)) errors.push('ぶんづくり・かなの きまりで ほかの もんだいが でた：' + u);
     if (round < 3 && !kinds.has(t)) { kinds.add(t); await shot('bun-' + t); }
-    if (round >= 3 && !kinds.has(u + t)) { kinds.add(u + t); if (kinds.size < 9) await shot('kana-' + u + (t ? '-fix' : '')); }
+    if (round >= 3 && !kinds.has(u + t)) { kinds.add(u + t); if (round >= 5 || kinds.size < 9) await shot((round >= 5 ? 'san-' : 'kana-') + u + (t ? '-' + t : '')); }
     await answer(1);
   }
   const ok = await page.evaluate(() => /5 \/ 5/.test(document.querySelector('.modal h2')?.textContent || ''));
   if (!ok) errors.push('ぶんづくり：ただしく タップしたのに 5もん せいかいに ならない');
   await page.click('.modal [data-ok]'); await page.waitForSelector('.camp');
 }
+if (![...kinds].some((k) => k.endsWith('steps'))) errors.push('さんすうの 1てずつの もんだいが でなかった');
 if (!['build', 'fill', 'fix'].every((k) => kinds.has(k))) errors.push('ぶんづくりの 3しゅるいが そろわない：' + [...kinds].join(','));
 await click('[data-cmd="record"]'); await shot('record'); await click('.modal [data-x]');
 // キャンプの がめんを ひととおり ひらく

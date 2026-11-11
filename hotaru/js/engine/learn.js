@@ -3,6 +3,7 @@
 import { makeQuestion, adaptLevel, levelRange } from '../../../manabi/js/engine/quiz.js';
 import { makeBun, BUN } from '../data/quiz_bun.js';
 import { makeHyoki, HYOKI } from '../data/quiz_hyoki.js';
+import { makeSan, SAN } from '../data/quiz_san.js';
 
 export const SUBJECTS = {
   math: { id: 'math', name: 'さんすう', emo: '🔢', color: '#4f8dff' },
@@ -12,6 +13,8 @@ export const SUBJECTS = {
 // たんげんの なまえ（きろくの がめんで つかう）
 export const UNIT_NAMES = {
   'math:arith': 'けいさん', 'math:tenComp': '10の まとまり', 'math:missing': '□の かず', 'math:legs': 'あしの かず', 'math:pattern': 'きまり さがし',
+  'math:sanKazu': 'かずを かぞえる・なんばんめ', 'math:sanBond': 'いくつと いくつ', 'math:sanTeen': '10より おおきい かず', 'math:san3': '3つの かずの けいさん',
+  'math:sanMake10': 'くりあがりの たしざん', 'math:sanSub10': 'くりさがりの ひきざん', 'math:sanStory': 'ぶんしょうだい', 'math:sanBig': 'おおきい かず',
   'math:clock': 'とけい', 'math:money': 'おかね', 'math:shape': 'かたち', 'math:unit': 'たんい',
   'ja:kanji': 'かんじ', 'ja:antonym': 'はんたいの ことば', 'ja:katakana': 'カタカナ', 'ja:group': 'なかまの ことば', 'ja:particle': 'は・を・へ', 'ja:order': 'ぶんの じゅんばん', 'ja:kosoado': 'こそあど',
   'ja:hyoDaku': '゛゜の つく じ', 'ja:hyoSoku': 'ちいさい「っ」', 'ja:hyoChoon': 'のばす おん', 'ja:hyoYoon': 'ちいさい「ゃ・ゅ・ょ」',
@@ -26,14 +29,14 @@ export const subjectLevel = (L, subj) => L.level[subj] ?? levelRange(L.grade)[0]
 
 // つぎの もんだい。にがてな たんげんが あれば ときどき そこから だす（ふくしゅう）
 // keypad: true＝すうじは じぶんで うつ / false＝3たく（たたかいの さいちゅう など）
-// group＝こくごの 'bun'（ぶんづくり）か 'hyoki'（かなの きまり）だけを だす（まなびの こや）
+// group＝こくごの 'bun'（ぶんづくり）・'hyoki'（かなの きまり）、さんすうの 'san'（けいさんの しかた・ぶんしょうだい）だけを だす（まなびの こや）
 export function nextQuestion(L, rng, { keypad = false, subj = null, reviewOnly = false, group = null } = {}) {
   const subjects = L.subjects.length ? L.subjects : ['math'];
   const weak = L.mistakes.filter((m) => subjects.includes(m.subj) && (!subj || m.subj === subj));
   let topic = null, review = false;
   if (weak.length && !group && (reviewOnly || rng() < 0.3)) { const m = weak[Math.floor(rng() * weak.length)]; subj = m.subj; topic = m.topic; review = true; }
   if (!subj) subj = subjects[Math.floor(rng() * subjects.length)];
-  if (group) subj = 'ja';
+  if (group) subj = group === 'san' ? 'math' : 'ja';
   // こくごは、かなの きまり（゛゜・っ・のばす おん・ゃゅょ）と ぶんづくり（は・を・へ）を おおめに だす
   // 1ねんせい：かな 3わり・ぶん 3わり ／ 2・3ねんせい：ふくしゅうとして かな 1わり・ぶん 2わり
   let kind = null;
@@ -42,8 +45,16 @@ export function nextQuestion(L, rng, { keypad = false, subj = null, reviewOnly =
     else if (topic) kind = BUN[topic] ? 'bun' : HYOKI[topic] ? 'hyoki' : null;
     else { const r = rng(), g1 = L.grade === 1; kind = r < (g1 ? 0.3 : 0.1) ? 'hyoki' : r < (g1 ? 0.6 : 0.3) ? 'bun' : null; }
   }
+  // さんすうは、1ねんせいの ないようを ならう じゅんに だす（7わり）。2ねんせいは ふくしゅうとして 2わり
+  if (subj === 'math') {
+    if (group) kind = 'san';
+    else if (topic) kind = SAN[topic] ? 'san' : null;
+    else if (rng() < (L.grade === 1 ? 0.7 : L.grade === 2 ? 0.2 : 0)) kind = 'san';
+  }
   let q;
-  if (kind) {
+  if (kind === 'san') {
+    for (let k = 0; k < 8; k++) { q = makeSan(SAN[topic] ? topic : null, L.grade, subjectLevel(L, 'math'), rng, { quick: !keypad }); if (!L.recent.includes(q.q + '|' + q.answer)) break; }
+  } else if (kind) {
     const make = kind === 'bun' ? makeBun : makeHyoki, t = (kind === 'bun' ? BUN : HYOKI)[topic] ? topic : null;
     for (let k = 0; k < 8; k++) { q = make(t, subjectLevel(L, 'ja'), rng, { quick: !keypad }); if (!L.recent.includes(q.q + '|' + q.answer)) break; }
   } else {
