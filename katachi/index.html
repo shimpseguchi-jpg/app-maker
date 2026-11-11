@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>かたちづくり</title>
+<!--
+  かたちづくり（小学1年 算数「かたちづくり」の練習ゲーム）
+  ・このファイル1つだけで動きます（外部の画像・フォント・ライブラリなし）。
+  ・Google サイト：「挿入」→「埋め込む」→「コードを埋め込む」に、このファイルの中身をまるごと貼りつけてください。
+-->
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:"Hiragino Maru Gothic ProN","BIZ UDPGothic","Meiryo","Yu Gothic",system-ui,sans-serif;
+  background:#e9f6ff;color:#333;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+#app{max-width:1000px;margin:0 auto;padding:8px;min-height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+header h1{font-size:clamp(18px,4vw,28px);margin:0;flex:1;display:flex;align-items:center;gap:8px}
+header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;border-radius:50%;background:#3bb3a6;color:#fff;font-size:.8em}
+.ibtn{font:inherit;font-size:16px;font-weight:bold;border:none;border-radius:12px;background:#fff;color:#2a8c82;padding:8px 12px;cursor:pointer;box-shadow:0 2px 0 #9cc}
+.ibtn:active{transform:translateY(2px);box-shadow:none}
+.btn{font:inherit;font-size:17px;font-weight:bold;padding:10px 14px;border-radius:14px;border:3px solid #2a8c82;background:#fff;color:#2a8c82;cursor:pointer;box-shadow:0 3px 0 #2a8c82}
+.btn:active{transform:translateY(3px);box-shadow:none}
+.btn.primary{background:#2a8c82;color:#fff}
+.btn.orange{border-color:#e8590c;color:#e8590c;box-shadow:0 3px 0 #e8590c}
+.btn:disabled{opacity:.4}
+.q{font-size:clamp(16px,2.6vw,22px);font-weight:bold;background:#fff;border-radius:12px;padding:8px 12px;margin-bottom:10px;border-left:8px solid #3bb3a6;line-height:1.5}
+/* ホーム */
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.mode{background:#fff;border-radius:18px;padding:12px;cursor:pointer;border:4px solid transparent;box-shadow:0 4px 0 #b9dbe9;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.mode:active{transform:translateY(3px);box-shadow:none}
+.mode:hover{border-color:#3bb3a6}
+.mode svg{width:100%;max-width:200px;height:110px}
+.mode b{font-size:18px;word-break:keep-all}
+.mode small{font-size:14px;color:#666}
+.mode .prog{font-size:14px;color:#e8590c;font-weight:bold}
+/* ステージえらび */
+.levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.lv{position:relative;background:#fff;border-radius:16px;padding:8px;cursor:pointer;border:3px solid #cfe6ee;display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:bold;font-size:16px}
+.lv:active{transform:translateY(2px)}
+.lv svg{width:100%;height:90px}
+.lv .num{position:absolute;left:6px;top:4px;background:#3bb3a6;color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-size:14px}
+.lv .star{position:absolute;right:6px;top:2px;font-size:22px}
+/* あそぶ */
+.play{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:center}
+.boardWrap{flex:1 1 340px;max-width:620px;background:#fff;border-radius:16px;padding:8px;box-shadow:0 4px 0 #b9dbe9}
+.boardWrap svg{display:block;width:100%;height:auto;max-height:calc(100vh - 160px);min-height:220px;touch-action:none;cursor:pointer}
+.side{flex:0 1 270px;display:flex;flex-direction:column;gap:10px;min-width:220px}
+.panel{background:#fff;border-radius:16px;padding:10px;box-shadow:0 4px 0 #b9dbe9}
+.panel h3{margin:0 0 6px;font-size:16px;color:#2a8c82}
+.pal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pal button{aspect-ratio:1;border:3px solid #ddd;border-radius:12px;background:#fff;padding:6px;cursor:pointer}
+.pal button.on{border-color:#e8590c;background:#fff1e3}
+.pal svg{width:100%;height:100%;display:block}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btns .btn{flex:1 1 auto}
+.msg{min-height:1.5em;font-weight:bold;color:#e8590c;font-size:17px}
+.count{font-size:18px;font-weight:bold}
+.count big{font-size:26px;color:#e8590c}
+.mini{width:100%;height:auto;max-height:200px;display:block}
+.blink{animation:blink .45s ease-in-out 4}
+@keyframes blink{50%{opacity:.15}}
+.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+/* できた */
+.overlay{position:fixed;inset:0;background:rgba(0,40,60,.35);display:grid;place-items:center;z-index:10;overflow:hidden}
+.ok{background:#fff;border-radius:24px;padding:22px 26px;text-align:center;box-shadow:0 8px 0 #2a8c82;animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.ok .big{font-size:clamp(36px,9vw,64px);font-weight:900;color:#e8590c;letter-spacing:.1em}
+.ok .stars{font-size:40px;margin:4px 0 12px}
+.ok .btns{justify-content:center}
+@keyframes pop{from{transform:scale(.3)}to{transform:scale(1)}}
+.conf{position:absolute;top:-30px;width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:18px solid red;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+footer{margin-top:auto;padding-top:10px;text-align:center;font-size:12px;color:#7a9}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="ibtn" id="backBtn" style="visibility:hidden">◀ もどる</button>
+    <h1 id="title"><span class="no">14</span>かたちづくり</h1>
+    <button class="ibtn" id="sndBtn" title="おと">🔊</button>
+  </header>
+  <main id="screen"></main>
+  <footer>いろいた・ぼう・てんを つかって、いろいろな かたちを つくろう</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ===================== きほん ===================== */
+var screen = document.getElementById('screen');
+var titleEl = document.getElementById('title');
+var backBtn = document.getElementById('backBtn');
+var sndBtn = document.getElementById('sndBtn');
+var COLORS = ['#f7a8b8','#fbe38a','#8fd3f5','#b5d957'];   // ピンク・きいろ・みずいろ・きみどり
+var EDGE = '#555';
+var backAction = null;
+
+function h(s){ return s; }
+function el(html){ var d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+function svgPt(svg, e){
+  var p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+  return p.matrixTransform(svg.getScreenCTM().inverse());
+}
+function gcd(a,b){ while(b){ var t=a%b; a=b; b=t; } return a; }
+
+/* きろく（Google サイトの埋め込みで保存できないときは、そのあいだだけ覚える） */
+var store = (function(){
+  var KEY='katachi-v1', data={};
+  try{ data = JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){}
+  return {
+    get:function(m,i){ return !!(data[m] && data[m][i]); },
+    set:function(m,i){ (data[m]=data[m]||{})[i]=1; try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){} },
+    n:function(m){ return data[m] ? Object.keys(data[m]).length : 0; }
+  };
+})();
+
+/* おと（WebAudio でその場でつくる） */
+var soundOn = true, actx = null;
+function beep(freqs, dur, type){
+  if(!soundOn) return;
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    var t0 = actx.currentTime;
+    freqs.forEach(function(f,i){
+      var o=actx.createOscillator(), g=actx.createGain();
+      o.type = type || 'triangle'; o.frequency.value = f;
+      var s = t0 + i*dur;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.18, s+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s+dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(s); o.stop(s+dur+0.05);
+    });
+  }catch(e){}
+}
+var SFX = {
+  put:function(){ beep([660],0.09); },
+  pop:function(){ beep([392],0.08); },
+  sel:function(){ beep([880],0.05); },
+  ng:function(){ beep([240,200],0.13,'square'); },
+  ok:function(){ beep([523,659,784,1047],0.13); }
+};
+sndBtn.onclick = function(){ soundOn=!soundOn; sndBtn.textContent = soundOn?'🔊':'🔇'; };
+backBtn.onclick = function(){ if(backAction) backAction(); };
+
+function setHeader(text, back){
+  titleEl.innerHTML = text;
+  backAction = back || null;
+  backBtn.style.visibility = back ? 'visible' : 'hidden';
+}
+
+/* ===================== いろいた（さんかく）の しくみ =====================
+   1つの ますを 2本の ななめ線で 4つに わけて（0:うえ 1:みぎ 2:した 3:ひだり）、
+   いろいた（ますの はんぶんの さんかく）が どこを うめるかで くらべる。
+   ◤=tl ◥=tr ◢=br ◣=bl（かどが ある ほう）。# は ます1つぶん（さんかく2まい）。 */
+var Q = { tl:[0,3], tr:[0,1], br:[1,2], bl:[2,3] };
+var ORI = ['br','bl','tr','tl'];
+var CH = { '◤':'tl', '◥':'tr', '◢':'br', '◣':'bl' };
+var TRI = { tl:[[0,0],[1,0],[0,1]], tr:[[0,0],[1,0],[1,1]], br:[[1,0],[1,1],[0,1]], bl:[[0,0],[1,1],[0,1]] };
+function triPts(x,y,o){ return TRI[o].map(function(p){ return (x+p[0])+','+(y+p[1]); }).join(' '); }
+function parseShape(rows, dx, dy){
+  dx=dx||0; dy=dy||0;
+  var pieces=[], w=0;
+  rows.forEach(function(r,y){
+    var cs = Array.from(r); w = Math.max(w, cs.length);
+    cs.forEach(function(c,x){
+      if(c==='#'){ pieces.push({x:x+dx,y:y+dy,o:'tl'},{x:x+dx,y:y+dy,o:'br'}); }
+      else if(CH[c]){ pieces.push({x:x+dx,y:y+dy,o:CH[c]}); }
+    });
+  });
+  return { pieces:pieces, w:w, h:rows.length };
+}
+function coverage(pieces){
+  var m = {};
+  pieces.forEach(function(p){ Q[p.o].forEach(function(q){ var k=p.x+','+p.y+','+q; m[k]=(m[k]||0)+1; }); });
+  return m;
+}
+function sameCover(a,b){
+  var A=coverage(a), B=coverage(b), ka=Object.keys(A), kb=Object.keys(B);
+  if(ka.length!==kb.length) return false;
+  return ka.every(function(k){ return A[k]===1 && B[k]===1; });
+}
+function quarterOf(fx,fy){
+  var d1 = fy-fx, d2 = fy+fx-1;
+  if(d1<0 && d2<0) return 0;
+  if(d1<0) return 1;
+  if(d2>=0) return 2;
+  return 3;
+}
+function gridLines(W,H,color){
+  var s='', c=color||'#b9c6d0';
+  for(var x=0;x<=W;x++) s+='<line x1="'+x+'" y1="0" x2="'+x+'" y2="'+H+'" stroke="'+c+'" stroke-width="0.02"/>';
+  for(var y=0;y<=H;y++) s+='<line x1="0" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="'+c+'" stroke-width="0.02"/>';
+  return s;
+}
+function piecesSvg(pieces, colorFn, sw){
+  return pieces.map(function(p,i){
+    return '<polygon points="'+triPts(p.x,p.y,p.o)+'" fill="'+colorFn(p,i)+'" stroke="'+EDGE+'" stroke-width="'+(sw||0.035)+'" stroke-linejoin="round"/>';
+  }).join('');
+}
+function silhouetteSvg(pieces, fill){
+  return pieces.map(function(p){
+    return '<polygon points="'+triPts(p.x,p.y,p.o)+'" fill="'+fill+'" stroke="'+fill+'" stroke-width="0.03" stroke-linejoin="round"/>';
+  }).join('');
+}
+function triIcon(o, fill){
+  return '<svg viewBox="-0.1 -0.1 1.2 1.2"><polygon points="'+triPts(0,0,o)+'" fill="'+(fill||'#f7a8b8')+'" stroke="'+EDGE+'" stroke-width="0.05" stroke-linejoin="round"/></svg>';
+}
+function shapePreview(rows, colored){
+  var S = parseShape(rows);
+  var vb = '-0.2 -0.2 '+(S.w+0.4)+' '+(S.h+0.4);
+  var body = colored ? piecesSvg(S.pieces, function(p,i){ return COLORS[i%4]; }, 0.05)
+                     : silhouetteSvg(S.pieces, '#aab4be');
+  return '<svg viewBox="'+vb+'" preserveAspectRatio="xMidYMid meet">'+body+'</svg>';
+}
+
+/* ===================== 1. いろいたで つくろう ===================== */
+var TILE = [
+  { name:'しかく',        rows:['#'] },
+  { name:'さんかく',      rows:['◢◣'] },
+  { name:'リボン',        rows:['◣◢','◤◥'] },
+  { name:'おうち',        rows:['◢◣','##'] },
+  { name:'さかな',        rows:['◢◣◢','◥◤◥'] },
+  { name:'おやま',        rows:['.◢◣.','◢##◣'] },
+  { name:'ヨット',        rows:['..◣..','..#◣.','◥###◤'] },
+  { name:'ロケット',      rows:['.◢◣.','.##.','.##.','◢##◣'] }
+];
+
+function playTile(li){
+  var L = TILE[li];
+  var T = parseShape(L.rows);
+  var W = Math.max(T.w+2, 6), H = Math.max(T.h+2, 4);
+  var ox = Math.floor((W-T.w)/2), oy = Math.floor((H-T.h)/2);
+  var target = parseShape(L.rows, ox, oy).pieces;
+  var tcov = coverage(target);
+  var placed = [], sel = 'br', ci = 0, done = false;
+
+  setHeader('<span class="no">'+(li+1)+'</span>'+L.name, function(){ showLevels('tile'); });
+  screen.innerHTML =
+    '<div class="q">いろいたを ならべて、はいいろの かたちを つくりましょう。</div>'+
+    '<div class="play"><div class="boardWrap">'+
+      '<svg id="bd" viewBox="-0.1 -0.1 '+(W+0.2)+' '+(H+0.2)+'">'+
+        '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fffdf4"/>'+
+        silhouetteSvg(target, '#cdd5dc')+ gridLines(W,H)+
+        '<g id="pg"></g><g id="hg"></g>'+
+      '</svg></div>'+
+      '<div class="side">'+
+        '<div class="panel"><h3>いろいたの むき</h3><div class="pal" id="pal"></div>'+
+          '<div style="font-size:14px;margin-top:6px;color:#666">むきを えらんで、ますを タッチ。<br>おいた いろいたを タッチすると とれるよ。</div></div>'+
+        '<div class="panel"><div class="count" id="cnt"></div><div class="msg" id="msg"></div></div>'+
+        '<div class="btns"><button class="btn orange" id="hint">💡 ヒント</button><button class="btn" id="clr">ぜんぶ とる</button></div>'+
+      '</div></div>';
+
+  var svg = document.getElementById('bd'), pg = document.getElementById('pg'), hg = document.getElementById('hg');
+  var pal = document.getElementById('pal'), cnt = document.getElementById('cnt'), msgEl = document.getElementById('msg');
+  function msg(t){ msgEl.textContent = t||''; }
+
+  function drawPal(){
+    pal.innerHTML = ORI.map(function(o){
+      return '<button data-o="'+o+'" class="'+(o===sel?'on':'')+'">'+triIcon(o, COLORS[ci%4])+'</button>';
+    }).join('');
+  }
+  pal.onclick = function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    sel = b.getAttribute('data-o'); SFX.sel(); drawPal();
+  };
+  function update(){
+    pg.innerHTML = piecesSvg(placed, function(p){ return p.c; });
+    cnt.innerHTML = 'ならべた かず：<big>'+placed.length+'</big> まい<br><span style="font-size:15px;color:#666">（ぜんぶで '+target.length+' まい つかうよ）</span>';
+    drawPal();
+  }
+  svg.addEventListener('pointerdown', function(e){
+    if(done) return;
+    var p = svgPt(svg,e), x = Math.floor(p.x), y = Math.floor(p.y);
+    if(x<0||y<0||x>=W||y>=H) return;
+    var q = quarterOf(p.x-x, p.y-y);
+    for(var i=0;i<placed.length;i++){
+      var a = placed[i];
+      if(a.x===x && a.y===y && Q[a.o].indexOf(q)>=0){ placed.splice(i,1); SFX.pop(); msg(''); update(); return; }
+    }
+    var occ = {};
+    placed.forEach(function(a){ if(a.x===x&&a.y===y) Q[a.o].forEach(function(k){ occ[k]=1; }); });
+    if(Q[sel].some(function(k){ return occ[k]; })){
+      SFX.ng(); msg('そこには はいらないよ。むきを かえてみよう'); return;
+    }
+    placed.push({x:x,y:y,o:sel,c:COLORS[ci%4]}); ci++;
+    SFX.put(); msg(''); update();
+    if(sameCover(placed, target)){
+      done = true;
+      setTimeout(function(){ celebrate('tile', li); }, 350);
+    }
+  });
+  document.getElementById('clr').onclick = function(){ placed=[]; msg(''); update(); };
+  document.getElementById('hint').onclick = function(){
+    var bad = placed.filter(function(a){ return Q[a.o].some(function(k){ return !tcov[a.x+','+a.y+','+k]; }); })[0];
+    if(bad){ flash(bad,'#ff3b30'); msg('かたちから はみだして いるよ'); return; }
+    var cov = coverage(placed);
+    var cands = target.concat([]);
+    target.forEach(function(t){ ORI.forEach(function(o){ cands.push({x:t.x,y:t.y,o:o}); }); });
+    for(var i=0;i<cands.length;i++){
+      var c = cands[i];
+      var ok = Q[c.o].every(function(k){ var key=c.x+','+c.y+','+k; return tcov[key] && !cov[key]; });
+      if(ok){ flash(c,'#e8590c'); sel=c.o; drawPal(); msg('ひかって いる ところに おいてみよう'); return; }
+    }
+    msg('いちど とって、むきを かえてみよう');
+  };
+  function flash(p, color){
+    hg.innerHTML = '<polygon class="blink" points="'+triPts(p.x,p.y,p.o)+'" fill="'+color+'" fill-opacity="0.35" stroke="'+color+'" stroke-width="0.08" stroke-linejoin="round"/>';
+    setTimeout(function(){ hg.innerHTML=''; }, 1900);
+  }
+  update();
+}
+
+/* ===================== 2. 1まいだけ うごかそう ===================== */
+var MOVE = [
+  { name:'しかく → やま',   start:['##'],                         target:['◢#◣'] },
+  { name:'おうちに しよう', start:['◢..','##◣'],         target:['◢◣','##'] },
+  { name:'さんかく → しかく', start:['◣.','#◣'],          target:['..','##'] },
+  { name:'ななめの かたち', start:['◢#◣'],               target:['◢#◤'] },
+  { name:'さかなの しっぽ', start:['◢◣◥','◥◤◥'], target:['◢◣◢','◥◤◥'] }
+];
+
+function playMove(li){
+  var L = MOVE[li];
+  var S0 = parseShape(L.start), T0 = parseShape(L.target);
+  var sw = Math.max(S0.w, T0.w), sh = Math.max(S0.h, T0.h);
+  var W = Math.max(sw+2, 5), H = Math.max(sh+2, 4);
+  var ox = Math.floor((W-sw)/2), oy = Math.floor((H-sh)/2);
+  var start = parseShape(L.start, ox, oy).pieces.map(function(p,i){ p.c = COLORS[i%4]; return p; });
+  var target = parseShape(L.target, ox, oy).pieces;
+  var pieces, held, moved, done, sel;
+
+  setHeader('<span class="no">'+(li+1)+'</span>'+L.name, function(){ showLevels('move'); });
+  screen.innerHTML =
+    '<div class="q">1まいだけ うごかして、みぎの かたちに かえましょう。</div>'+
+    '<div class="play"><div class="boardWrap">'+
+      '<svg id="bd" viewBox="-0.1 -0.1 '+(W+0.2)+' '+(H+0.2)+'">'+
+        '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#fffdf4"/>'+ gridLines(W,H,'#dde4ea')+
+        '<g id="pg"></g>'+
+      '</svg></div>'+
+      '<div class="side">'+
+        '<div class="panel"><h3>➡ この かたちに しよう</h3>'+shapePreview(L.target,false).replace('<svg ','<svg class="mini" ')+'</div>'+
+        '<div class="panel" id="palP" style="display:none"><h3>どの むきで おく？</h3><div class="pal" id="pal"></div></div>'+
+        '<div class="panel"><div class="msg" id="msg"></div></div>'+
+        '<div class="btns"><button class="btn" id="rst">↺ はじめから</button></div>'+
+      '</div></div>';
+
+  var svg = document.getElementById('bd'), pg = document.getElementById('pg');
+  var pal = document.getElementById('pal'), palP = document.getElementById('palP'), msgEl = document.getElementById('msg');
+  function msg(t){ msgEl.textContent = t||''; }
+  function reset(){
+    pieces = start.map(function(p){ return {x:p.x,y:p.y,o:p.o,c:p.c}; });
+    held = null; moved = false; done = false; sel = 'br';
+    msg('うごかす いろいたを 1まい タッチしてね'); update();
+  }
+  function drawPal(){
+    palP.style.display = held ? '' : 'none';
+    if(!held) return;
+    pal.innerHTML = ORI.map(function(o){
+      return '<button data-o="'+o+'" class="'+(o===sel?'on':'')+'">'+triIcon(o, held.c)+'</button>';
+    }).join('');
+  }
+  pal.onclick = function(e){ var b=e.target.closest('button'); if(!b) return; sel=b.getAttribute('data-o'); SFX.sel(); drawPal(); };
+  function update(){
+    pg.innerHTML = piecesSvg(pieces, function(p){ return p.c; });
+    drawPal();
+  }
+  svg.addEventListener('pointerdown', function(e){
+    if(done || moved) return;
+    var p = svgPt(svg,e), x = Math.floor(p.x), y = Math.floor(p.y);
+    if(x<0||y<0||x>=W||y>=H) return;
+    var q = quarterOf(p.x-x, p.y-y);
+    var hit = -1;
+    pieces.forEach(function(a,i){ if(a.x===x && a.y===y && Q[a.o].indexOf(q)>=0) hit=i; });
+    if(!held){
+      if(hit<0) return;
+      held = pieces.splice(hit,1)[0]; sel = held.o;
+      SFX.pop(); msg('どこに おく？ むきも かえられるよ'); update(); return;
+    }
+    if(hit>=0){ SFX.ng(); msg('あいて いる ところに おいてね'); return; }
+    var occ = {};
+    pieces.forEach(function(a){ if(a.x===x&&a.y===y) Q[a.o].forEach(function(k){ occ[k]=1; }); });
+    if(Q[sel].some(function(k){ return occ[k]; })){ SFX.ng(); msg('そこには はいらないよ。むきを かえてみよう'); return; }
+    pieces.push({x:x,y:y,o:sel,c:held.c}); held = null; moved = true;
+    SFX.put(); update();
+    if(sameCover(pieces, target)){
+      done = true; msg('');
+      setTimeout(function(){ celebrate('move', li); }, 350);
+    }else{
+      setTimeout(SFX.ng, 200);
+      msg('ざんねん！ ちがう かたちに なったよ。「はじめから」で もういちど');
+      svg.parentNode.classList.remove('shake'); void svg.parentNode.offsetWidth; svg.parentNode.classList.add('shake');
+    }
+  });
+  document.getElementById('rst').onclick = reset;
+  reset();
+}
+
+/* ===================== 3. てんを つなごう ===================== */
+var DOTS = [
+  { name:'しかく',     lines:[[[0,0],[2,0],[2,2],[0,2],[0,0]]] },
+  { name:'さんかく',   lines:[[[1,0],[2,2],[0,2],[1,0]]] },
+  { name:'ながしかく', lines:[[[0,0],[3,0],[3,1],[0,1],[0,0]]] },
+  { name:'ひしがた',   lines:[[[1,0],[2,1],[1,2],[0,1],[1,0]]] },
+  { name:'おうち',     lines:[[[0,1],[1,0],[2,1]],[[0,1],[2,1],[2,3],[0,3],[0,1]]] },
+  { name:'さかな',     lines:[[[0,1],[1,0],[2,1],[1,2],[0,1]],[[2,1],[3,0],[3,2],[2,1]]] },
+  { name:'き',         lines:[[[2,0],[4,2],[0,2],[2,0]],[[2,2],[2,3]]] },
+  { name:'ヨット',     lines:[[[0,2],[4,2],[3,3],[1,3],[0,2]],[[2,2],[2,0],[4,2]]] },
+  { name:'じゆうに かこう', free:true, lines:[] }
+];
+function polyToLines(polys){
+  var out=[];
+  polys.forEach(function(pl){ for(var i=0;i+1<pl.length;i++) out.push([pl[i],pl[i+1]]); });
+  return out;
+}
+function unitKey(lines){
+  var segs = {}, list=[];
+  lines.forEach(function(ln){
+    var a=ln[0], b=ln[1], dx=b[0]-a[0], dy=b[1]-a[1], g=gcd(Math.abs(dx),Math.abs(dy));
+    if(!g) return;
+    var sx=dx/g, sy=dy/g;
+    for(var i=0;i<g;i++){
+      var p=[a[0]+sx*i, a[1]+sy*i], q=[p[0]+sx, p[1]+sy];
+      if(q[0]<p[0] || (q[0]===p[0] && q[1]<p[1])){ var t=p; p=q; q=t; }
+      var k=p+'|'+q; if(!segs[k]){ segs[k]=1; list.push([p,q]); }
+    }
+  });
+  if(!list.length) return '';
+  var mx=Infinity, my=Infinity;
+  list.forEach(function(s){ s.forEach(function(pt){ mx=Math.min(mx,pt[0]); my=Math.min(my,pt[1]); }); });
+  return list.map(function(s){ return [s[0][0]-mx,s[0][1]-my,s[1][0]-mx,s[1][1]-my].join(','); }).sort().join(' ');
+}
+function dotsSvgContent(NX,NY,lines,color,sw){
+  var s='';
+  lines.forEach(function(l){ s+='<line x1="'+l[0][0]+'" y1="'+l[0][1]+'" x2="'+l[1][0]+'" y2="'+l[1][1]+'" stroke="'+color+'" stroke-width="'+sw+'" stroke-linecap="round"/>'; });
+  for(var y=0;y<NY;y++) for(var x=0;x<NX;x++) s+='<circle cx="'+x+'" cy="'+y+'" r="0.09" fill="#45aee0"/>';
+  return s;
+}
+function linesBox(lines){
+  var mx=0,my=0; lines.forEach(function(l){ l.forEach(function(p){ mx=Math.max(mx,p[0]); my=Math.max(my,p[1]); }); });
+  return [mx,my];
+}
+
+function playDots(li){
+  var L = DOTS[li];
+  var model = polyToLines(L.lines);
+  var NX = L.free ? 9 : 7, NY = L.free ? 7 : 6;
+  var lines = [], sel = null, drag = null, done = false;
+  var modelKey = unitKey(model);
+
+  setHeader('<span class="no">'+(li+1)+'</span>'+L.name, function(){ showLevels('dots'); });
+  var side;
+  if(L.free){
+    side = '<div class="panel"><h3>じゆうに かこう</h3><div style="font-size:15px">てんと てんを つないで、すきな かたちを かいてみよう。<br>できたら「できた！」を おしてね。</div></div>';
+  }else{
+    var bx = linesBox(model);
+    side = '<div class="panel"><h3>おてほん</h3><svg class="mini" viewBox="-0.5 -0.5 '+(bx[0]+1)+' '+(bx[1]+1)+'">'+dotsSvgContent(bx[0]+1,bx[1]+1,model,'#2a8c82',0.12)+'</svg>'+
+           '<div style="font-size:14px;color:#666;margin-top:4px">おなじ かたちなら、どこに かいても いいよ</div></div>';
+  }
+  screen.innerHTML =
+    '<div class="q">てんと てんを せんで つないで、'+(L.free?'いろいろな かたちを':'おてほんと おなじ かたちを')+' つくりましょう。</div>'+
+    '<div class="play"><div class="boardWrap">'+
+      '<svg id="bd" viewBox="-0.6 -0.6 '+(NX+0.2)+' '+(NY+0.2)+'">'+
+        '<rect x="-0.6" y="-0.6" width="'+(NX+0.2)+'" height="'+(NY+0.2)+'" fill="#fffdf4"/>'+
+        '<g id="lg"></g><line id="rub" stroke="#e8590c" stroke-width="0.08" stroke-dasharray="0.15 0.12" stroke-linecap="round" visibility="hidden"/>'+
+        '<g id="sg"></g>'+
+      '</svg></div>'+
+      '<div class="side">'+ side +
+        '<div class="panel" style="font-size:14px;color:#666">てんを タッチして、つぎの てんを タッチ（なぞっても いいよ）。<br>なにも ない ところを タッチすると えらびなおせるよ。<div class="msg" id="msg"></div></div>'+
+        '<div class="btns"><button class="btn" id="undo">↶ 1つ けす</button><button class="btn" id="clr">ぜんぶ けす</button>'+
+        (L.free?'<button class="btn primary" id="fin">できた！</button>':'')+'</div>'+
+      '</div></div>';
+
+  var svg=document.getElementById('bd'), lg=document.getElementById('lg'), sg=document.getElementById('sg'), rub=document.getElementById('rub');
+  var msgEl=document.getElementById('msg');
+  function msg(t){ msgEl.textContent=t||''; }
+  function update(){
+    var s='';
+    lines.forEach(function(l){ s+='<line x1="'+l[0][0]+'" y1="'+l[0][1]+'" x2="'+l[1][0]+'" y2="'+l[1][1]+'" stroke="#e8590c" stroke-width="0.11" stroke-linecap="round"/>'; });
+    lg.innerHTML = s;
+    var d='';
+    for(var y=0;y<NY;y++) for(var x=0;x<NX;x++) d+='<circle cx="'+x+'" cy="'+y+'" r="0.1" fill="#45aee0"/>';
+    if(sel) d+='<circle cx="'+sel[0]+'" cy="'+sel[1]+'" r="0.26" fill="none" stroke="#e8590c" stroke-width="0.07"/>';
+    sg.innerHTML = d;
+  }
+  function nearest(p){
+    var x=Math.round(p.x), y=Math.round(p.y);
+    if(x<0||y<0||x>=NX||y>=NY) return null;
+    if(Math.hypot(p.x-x,p.y-y) > 0.42) return null;
+    return [x,y];
+  }
+  function same(a,b){ return a && b && a[0]===b[0] && a[1]===b[1]; }
+  function add(a,b){
+    lines.push([a,b]); SFX.put(); msg('');
+    if(!L.free && unitKey(lines)===modelKey){
+      done=true; sel=null; update();
+      setTimeout(function(){ celebrate('dots', li); }, 350);
+    }
+  }
+  svg.addEventListener('pointerdown', function(e){
+    if(done) return;
+    var p=svgPt(svg,e), d=nearest(p);
+    if(!d){ sel=null; drag=null; update(); return; }
+    if(sel && !same(sel,d)){ add(sel,d); sel=d; drag=null; }
+    else if(same(sel,d)){ sel=null; drag=null; }
+    else { sel=d; drag=d; SFX.sel(); try{ svg.setPointerCapture(e.pointerId); }catch(er){} }
+    update();
+  });
+  svg.addEventListener('pointermove', function(e){
+    if(!drag) return;
+    var p=svgPt(svg,e);
+    rub.setAttribute('x1',drag[0]); rub.setAttribute('y1',drag[1]); rub.setAttribute('x2',p.x); rub.setAttribute('y2',p.y);
+    rub.setAttribute('visibility', Math.hypot(p.x-drag[0],p.y-drag[1])>0.3 ? 'visible':'hidden');
+  });
+  function up(e){
+    if(!drag) return;
+    rub.setAttribute('visibility','hidden');
+    var u=nearest(svgPt(svg,e));
+    if(u && !same(u,drag) && !done){ add(drag,u); if(!done) sel=u; }
+    drag=null; update();
+  }
+  svg.addEventListener('pointerup', up);
+  svg.addEventListener('pointercancel', function(){ drag=null; rub.setAttribute('visibility','hidden'); });
+  document.getElementById('undo').onclick=function(){ if(done) return; lines.pop(); sel=null; SFX.pop(); update(); };
+  document.getElementById('clr').onclick=function(){ if(done) return; lines=[]; sel=null; update(); };
+  if(L.free) document.getElementById('fin').onclick=function(){
+    if(!lines.length){ msg('まずは せんを かいてみよう'); return; }
+    celebrate('dots', li);
+  };
+  update();
+}
+
+/* ===================== 4. ぼうを とろう ===================== */
+var SEG = { a:[0,0,1,0], b:[1,0,1,1], c:[1,1,1,2], d:[0,2,1,2], e:[0,1,0,2], f:[0,0,0,1], g:[0,1,1,1] };
+function digit(segs){ return Array.from(segs).map(function(k){ return SEG[k]; }); }
+var GRID = [[0,0,1,0],[1,0,2,0],[0,1,1,1],[1,1,2,1],[0,2,1,2],[1,2,2,2],
+            [0,0,0,1],[0,1,0,2],[1,0,1,1],[1,1,1,2],[2,0,2,1],[2,1,2,2]];
+function without(list, rm){ var k=rm.map(String); return list.filter(function(s){ return k.indexOf(String(s))<0; }); }
+var STICK = [
+  { name:'8 → 0', start:digit('abcdefg'), target:digit('abcdef') },
+  { name:'8 → 6', start:digit('abcdefg'), target:digit('acdefg') },
+  { name:'8 → 9', start:digit('abcdefg'), target:digit('abcdfg') },
+  { name:'8 → 5', start:digit('abcdefg'), target:digit('acdfg') },
+  { name:'8 → 3', start:digit('abcdefg'), target:digit('abcdg') },
+  { name:'8 → 2', start:digit('abcdefg'), target:digit('abdeg') },
+  { name:'8 → 4', start:digit('abcdefg'), target:digit('bcfg') },
+  { name:'おおきな しかく', start:GRID, target:without(GRID,[[0,1,1,1],[1,1,2,1],[1,0,1,1],[1,1,1,2]]), sym:true },
+  { name:'ながしかく 2つ', start:GRID, target:without(GRID,[[1,0,1,1],[1,1,1,2]]), sym:true },
+  { name:'しかく 3つ', start:GRID, target:without(GRID,[[0,0,1,0],[0,0,0,1]]), sym:true }
+];
+function stickKey(s){
+  var a=[s[0],s[1]], b=[s[2],s[3]];
+  if(b[0]<a[0] || (b[0]===a[0] && b[1]<a[1])){ var t=a; a=b; b=t; }
+  return a.concat(b).join(',');
+}
+var SYM = [
+  function(u,v){return [u,v];}, function(u,v){return [-v,u];}, function(u,v){return [-u,-v];}, function(u,v){return [v,-u];},
+  function(u,v){return [-u,v];}, function(u,v){return [u,-v];}, function(u,v){return [v,u];}, function(u,v){return [-v,-u];}
+];
+function stickSetKey(list, f){
+  return list.map(function(s){
+    var p=f(s[0]-1,s[1]-1), q=f(s[2]-1,s[3]-1);
+    return stickKey([p[0]+1,p[1]+1,q[0]+1,q[1]+1]);
+  }).sort().join(' ');
+}
+var WOOD = ['#f5c46b','#8fd3f5','#f7a8b8','#b5d957'];
+function stickSvg(s, i, state){
+  var x1=s[0],y1=s[1],x2=s[2],y2=s[3], dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy), g=0.07;
+  var ux=dx/len, uy=dy/len;
+  var a=[x1+ux*g, y1+uy*g], b=[x2-ux*g, y2-uy*g];
+  if(state==='gone'){
+    return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="#bbb" stroke-width="0.04" stroke-dasharray="0.08 0.08" stroke-linecap="round"/>';
+  }
+  var col = WOOD[i%WOOD.length];
+  return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="#666" stroke-width="0.15" stroke-linecap="round"/>'+
+         '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+col+'" stroke-width="0.1" stroke-linecap="round"/>';
+}
+function sticksView(list){
+  var mx=0,my=0; list.forEach(function(s){ mx=Math.max(mx,s[0],s[2]); my=Math.max(my,s[1],s[3]); });
+  return '-0.4 -0.4 '+(Math.max(mx,1)+0.8)+' '+(Math.max(my,1)+0.8);
+}
+function sticksPreview(list, all){
+  var s=''; list.forEach(function(st,i){ s+=stickSvg(st,i,''); });
+  return '<svg viewBox="'+sticksView(all||list)+'" preserveAspectRatio="xMidYMid meet">'+s+'</svg>';
+}
+
+function playSticks(li){
+  var L = STICK[li];
+  var need = L.start.length - L.target.length;
+  var gone, done;
+  var targetKeys = stickSetKey(L.target, SYM[0]);
+  setHeader('<span class="no">'+(li+1)+'</span>'+L.name, function(){ showLevels('sticks'); });
+  screen.innerHTML =
+    '<div class="q">ぼうを <b style="color:#e8590c">'+need+'ぽん</b> とって、みぎの かたちに かえましょう。</div>'+
+    '<div class="play"><div class="boardWrap" style="max-width:420px">'+
+      '<svg id="bd" viewBox="'+sticksView(L.start)+'"><g id="sg"></g></svg></div>'+
+      '<div class="side">'+
+        '<div class="panel"><h3>➡ この かたちに しよう</h3>'+sticksPreview(L.target, L.start).replace('<svg ','<svg class="mini" ')+'</div>'+
+        '<div class="panel"><div class="count" id="cnt"></div><div class="msg" id="msg"></div>'+
+          '<div style="font-size:14px;color:#666">ぼうを タッチすると とれるよ。<br>もういちど タッチすると もどるよ。</div></div>'+
+        '<div class="btns"><button class="btn" id="rst">↺ はじめから</button></div>'+
+      '</div></div>';
+  var svg=document.getElementById('bd'), sg=document.getElementById('sg'), cnt=document.getElementById('cnt'), msgEl=document.getElementById('msg');
+  function msg(t){ msgEl.textContent=t||''; }
+  function reset(){ gone={}; done=false; msg(''); update(); }
+  function nGone(){ return Object.keys(gone).length; }
+  function update(){
+    var s='';
+    L.start.forEach(function(st,i){ s+=stickSvg(st,i,gone[i]?'gone':''); });
+    sg.innerHTML=s;
+    cnt.innerHTML='とった ぼう：<big>'+nGone()+'</big> / '+need+' ぽん';
+  }
+  function distSeg(px,py,s){
+    var x1=s[0],y1=s[1],x2=s[2],y2=s[3],dx=x2-x1,dy=y2-y1;
+    var t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy)));
+    return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
+  }
+  svg.addEventListener('pointerdown', function(e){
+    if(done) return;
+    var p=svgPt(svg,e), best=-1, bd=0.3;
+    L.start.forEach(function(st,i){ var d=distSeg(p.x,p.y,st); if(d<bd){ bd=d; best=i; } });
+    if(best<0) return;
+    if(gone[best]){ delete gone[best]; SFX.put(); msg(''); update(); return; }
+    if(nGone()>=need){ SFX.ng(); msg('とれるのは '+need+'ぽん までだよ。とった ぼうを タッチして もどそう'); return; }
+    gone[best]=1; SFX.pop(); msg(''); update();
+    if(nGone()===need){
+      var rest = L.start.filter(function(s,i){ return !gone[i]; });
+      var ok = (L.sym ? SYM : [SYM[0]]).some(function(f){ return stickSetKey(rest,f)===targetKeys; });
+      if(ok){ done=true; setTimeout(function(){ celebrate('sticks', li); }, 350); }
+      else{ setTimeout(SFX.ng,200); msg('ちがう かたちに なったよ。ぼうを もどして やりなおそう'); }
+    }
+  });
+  document.getElementById('rst').onclick=reset;
+  reset();
+}
+
+/* ===================== がめん ===================== */
+var MODES = {
+  tile:  { no:1, name:'いろいたで つくろう', sub:'さんかくの いろいたを ならべて かたちを つくる', levels:TILE, play:playTile,
+           prev:function(l){ return shapePreview(l.rows,false); } },
+  move:  { no:2, name:'1まいだけ うごかそう', sub:'いろいたを 1まい うごかして かたちを かえる', levels:MOVE, play:playMove,
+           prev:function(l){ return shapePreview(l.start,true); } },
+  dots:  { no:3, name:'てんを つなごう', sub:'てんと てんを せんで つないで かたちを かく', levels:DOTS, play:playDots,
+           prev:function(l){
+             if(l.free) return '<svg viewBox="-0.5 -0.5 4 3">'+dotsSvgContent(4,3,[],'#000',0)+'<text x="1.5" y="1.25" font-size="1.2" text-anchor="middle">✏️</text></svg>';
+             var m=polyToLines(l.lines), b=linesBox(m);
+             return '<svg viewBox="-0.5 -0.5 '+(b[0]+1)+' '+(b[1]+1)+'">'+dotsSvgContent(b[0]+1,b[1]+1,m,'#2a8c82',0.14)+'</svg>'; } },
+  sticks:{ no:4, name:'ぼうを とろう', sub:'ぼうを とって、ちがう かたちに かえる', levels:STICK, play:playSticks,
+           prev:function(l){ return sticksPreview(l.target, l.start); } }
+};
+var MODE_ART = {
+  tile: shapePreview(['◢◣','##'], true),
+  move: '<svg viewBox="-0.2 -0.2 7.4 2.4"><g>'+piecesSvg(parseShape(['##']).pieces,function(p,i){return COLORS[i%4];},0.06)+'</g>'+
+        '<text x="3.15" y="1.35" font-size="1.2" text-anchor="middle" fill="#3bb3a6">➡</text>'+
+        '<g>'+piecesSvg(parseShape(['◢#◣'],4,0).pieces,function(p,i){return COLORS[[1,0,1,3][i]];},0.06)+'</g></svg>',
+  dots: (function(){ var m=polyToLines(DOTS[4].lines); return '<svg viewBox="-0.5 -0.5 3 4">'+dotsSvgContent(3,4,m,'#e8590c',0.14)+'</svg>'; })(),
+  sticks: sticksPreview(digit('abcdefg'))
+};
+
+function showHome(){
+  setHeader('<span class="no">14</span>かたちづくり', null);
+  var s='<div class="q">あそびたい ゲームを えらんでね。</div><div class="modes">';
+  Object.keys(MODES).forEach(function(k){
+    var m=MODES[k];
+    s+='<div class="mode" data-m="'+k+'">'+MODE_ART[k]+'<b>'+m.no+'. '+m.name+'</b><small>'+m.sub+'</small>'+
+       '<span class="prog">⭐ '+store.n(k)+' / '+m.levels.length+'</span></div>';
+  });
+  s+='</div>';
+  screen.innerHTML=s;
+  screen.querySelectorAll('.mode').forEach(function(d){
+    d.onclick=function(){ SFX.sel(); showLevels(d.getAttribute('data-m')); };
+  });
+}
+function showLevels(k){
+  var m=MODES[k];
+  setHeader('<span class="no">'+m.no+'</span>'+m.name, showHome);
+  var s='<div class="q">もんだいを えらんでね。（⭐は できた もんだい）</div><div class="levels">';
+  m.levels.forEach(function(l,i){
+    s+='<div class="lv" data-i="'+i+'"><span class="num">'+(i+1)+'</span>'+(store.get(k,i)?'<span class="star">⭐</span>':'')+m.prev(l)+'<span>'+l.name+'</span></div>';
+  });
+  s+='</div>';
+  screen.innerHTML=s;
+  screen.querySelectorAll('.lv').forEach(function(d){
+    d.onclick=function(){ SFX.sel(); m.play(+d.getAttribute('data-i')); };
+  });
+}
+function celebrate(k, li){
+  store.set(k, li); SFX.ok();
+  var m=MODES[k], hasNext = li+1 < m.levels.length;
+  var conf='';
+  for(var i=0;i<36;i++){
+    conf+='<i class="conf" style="left:'+(Math.random()*100)+'%;border-bottom-color:'+COLORS[i%4]+';animation-duration:'+(1.6+Math.random()*1.6)+'s;animation-delay:'+(Math.random()*0.6)+'s"></i>';
+  }
+  var ov=el('<div class="overlay">'+conf+'<div class="ok"><div class="big">できた！</div><div class="stars">⭐</div><div class="btns">'+
+    (hasNext?'<button class="btn primary" data-a="next">つぎの もんだい ▶</button>':'')+
+    '<button class="btn" data-a="again">もういちど</button><button class="btn" data-a="list">もんだいを えらぶ</button></div></div></div>');
+  document.body.appendChild(ov);
+  ov.onclick=function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var a=b.getAttribute('data-a');
+    ov.remove();
+    if(a==='next') m.play(li+1);
+    else if(a==='again') m.play(li);
+    else showLevels(k);
+  };
+}
+
+showHome();
+})();
+</script>
+</body>
+</html>
