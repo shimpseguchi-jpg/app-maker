@@ -48,7 +48,7 @@ header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;bo
 .grade:nth-child(3) .gnum{background:#8a63d2}
 .grade .gbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .grade .gbody b{font-size:clamp(20px,4vw,26px)}
-.grade .gart{flex:0 0 110px;height:70px;display:grid;place-items:center}
+.grade .gart{flex:0 0 110px;height:76px;display:grid;place-items:center}
 .grade .gart svg{width:100%;height:100%}
 .grade .prog{font-size:15px;color:#e8590c;font-weight:bold}
 .grade.locked{background:#eef1f3;cursor:not-allowed;box-shadow:0 5px 0 #cfd6dc}
@@ -58,7 +58,10 @@ header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;bo
 .lock{font-size:40px}
 .bar{height:12px;border-radius:6px;background:#e3eef2;overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffcf3f,#f08c3a);border-radius:6px}
-.gprog{float:right;color:#e8590c}
+.gcs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%;max-width:220px}
+.gc{font-size:12px;font-weight:bold;border-radius:10px;padding:2px 2px;white-space:nowrap;line-height:1.35;text-align:center;background:#e6f6f3;color:#2a8c82;border:2px solid #9fd8cf}
+.gc.clear{background:#fff4d6;color:#c26a00;border-color:#ffcf6b}
+.gc.off{background:#eef1f3;color:#8a959c;border-color:#d5dbe0}
 .gchip{font-size:.55em;background:#fff;color:#2a8c82;border:2px solid #3bb3a6;border-radius:999px;padding:2px 10px;margin-left:6px}
 .tag{font-size:12px;color:#fff;background:#f08c3a;border-radius:999px;padding:1px 8px}
 .unlock{font-size:clamp(18px,4vw,22px);font-weight:bold;color:#2a8c82;background:#eafaf6;border-radius:14px;padding:10px 14px;margin:0 0 14px;line-height:1.6}
@@ -997,15 +1000,15 @@ function openLevel(k, li){
 }
 
 /* ===================== がくねん（レベル） =====================
-   1ねんせいの もんだいを ぜんぶ とくと 2ねんせいが、2ねんせいを ぜんぶ とくと 3ねんせいが ひらく */
+   たんげん（ゲーム）ごとに、1ねんせいの もんだいを ぜんぶ とくと 2ねんせいが、2ねんせいを ぜんぶ とくと 3ねんせいが ひらく */
 var GRADES = ['1ねんせい','2ねんせい','3ねんせい'];
 var DATA = { tile:TILE_G, move:MOVE_G, dots:DOTS_G, sticks:STICK_G };
 var CUR_G = 0;
 function LV(k, g){ return DATA[k][g==null ? CUR_G : g]; }
 function sk(k, g){ return 'g'+(g==null ? CUR_G : g)+'-'+k; }
-function gradeTotal(g){ var n=0; Object.keys(DATA).forEach(function(k){ n+=DATA[k][g].length; }); return n; }
-function gradeDone(g){ var n=0; Object.keys(DATA).forEach(function(k){ DATA[k][g].forEach(function(_,i){ if(store.get(sk(k,g),i)) n++; }); }); return n; }
-function unlocked(g){ return g===0 || gradeDone(g-1) >= gradeTotal(g-1); }
+function gradeTotal(k, g){ return DATA[k][g].length; }
+function gradeDone(k, g){ return DATA[k][g].filter(function(_,i){ return store.get(sk(k,g),i); }).length; }
+function unlocked(k, g){ return g===0 || gradeDone(k,g-1) >= gradeTotal(k,g-1); }
 window.KATACHI_DATA = DATA;   // テストよう
 
 /* ===================== がめん ===================== */
@@ -1030,53 +1033,56 @@ var MODE_ART = {
   dots: (function(){ var m=polyToLines(DOTS_G[0][4].lines); return '<svg viewBox="-0.5 -0.5 3 4">'+dotsSvgContent(3,4,m,'#e8590c',0.14)+'</svg>'; })(),
   sticks: sticksPreview(digit(D[8]))
 };
-var GRADE_ART = [ shapePreview(['◢◣'], true), shapePreview(['◢◣','##'], true), shapePreview(['.◢◣.','◢##◣'], true) ];
-
 function bar(done, total){
   return '<div class="bar"><i style="width:'+Math.round(100*done/total)+'%"></i></div>';
 }
+// ホーム：たんげん（ゲーム）を えらぶ
 function showHome(){
   setHeader('<span class="no">14</span>かたちづくり', null);
+  var s='<div class="q">あそびたい ゲームを えらんでね。</div><div class="modes">';
+  Object.keys(MODES).forEach(function(k){
+    var m=MODES[k], chips='';
+    GRADES.forEach(function(name, g){
+      var open=unlocked(k,g), d=gradeDone(k,g), t=gradeTotal(k,g);
+      chips+='<span class="gc'+(open?'':' off')+(d>=t?' clear':'')+'">'+(g+1)+'ねん<br>'+(open ? (d>=t?'✅':'⭐'+d+'/'+t) : '🔒')+'</span>';
+    });
+    s+='<div class="mode" data-m="'+k+'">'+MODE_ART[k]+'<b>'+m.no+'. '+m.name+'</b><small>'+m.sub+'</small>'+
+       '<div class="gcs">'+chips+'</div></div>';
+  });
+  s+='</div>';
+  screen.innerHTML=s;
+  screen.querySelectorAll('.mode').forEach(function(d){
+    d.onclick=function(){ SFX.sel(); showGrades(d.getAttribute('data-m')); };
+  });
+}
+// がくねん（レベル）を えらぶ
+function showGrades(k){
+  var m=MODES[k];
+  setHeader('<span class="no">'+m.no+'</span>'+m.name, showHome);
   var s='<div class="q">レベルを えらんでね。ぜんぶ クリアすると、つぎの レベルが ひらくよ！</div><div class="grades">';
   GRADES.forEach(function(name, g){
-    var open = unlocked(g), done = gradeDone(g), total = gradeTotal(g);
+    var open = unlocked(k,g), done = gradeDone(k,g), total = gradeTotal(k,g), ls = LV(k,g);
     s+='<div class="grade'+(open?'':' locked')+'" data-g="'+g+'">'+
        '<div class="gnum">'+(g+1)+'</div>'+
        '<div class="gbody"><b>'+name+' レベル</b>'+
        (open ? bar(done,total)+'<span class="prog">⭐ '+done+' / '+total+(done>=total?'　🎉 クリア！':'')+'</span>'
-             : '<span class="lockmsg">🔒 '+GRADES[g-1]+'を ぜんぶ クリアすると ひらくよ<br>（あと '+(gradeTotal(g-1)-gradeDone(g-1))+'もん）</span>')+
-       '</div><div class="gart">'+(open?GRADE_ART[g]:'<span class="lock">🔒</span>')+'</div></div>';
+             : '<span class="lockmsg">🔒 '+GRADES[g-1]+'を ぜんぶ クリアすると ひらくよ（あと '+(gradeTotal(k,g-1)-gradeDone(k,g-1))+'もん）</span>')+
+       '</div><div class="gart">'+(open ? m.prev(ls[Math.min(ls.length-1, 3)]) : '<span class="lock">🔒</span>')+'</div></div>';
   });
   s+='</div>';
   screen.innerHTML=s;
   screen.querySelectorAll('.grade').forEach(function(d){
     d.onclick=function(){
       var g=+d.getAttribute('data-g');
-      if(!unlocked(g)){ SFX.ng(); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake'); return; }
-      SFX.sel(); showGrade(g);
+      if(!unlocked(k,g)){ SFX.ng(); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake'); return; }
+      SFX.sel(); CUR_G = g; showLevels(k);
     };
   });
 }
-function showGrade(g){
-  CUR_G = g;
-  setHeader('<span class="no">'+(g+1)+'</span>'+GRADES[g]+' レベル', showHome);
-  var done = gradeDone(g), total = gradeTotal(g);
-  var s='<div class="q">あそびたい ゲームを えらんでね。<span class="gprog">⭐ '+done+' / '+total+'</span>'+
-        (g<GRADES.length-1 && done<total ? '<br><small>ぜんぶ クリアすると '+GRADES[g+1]+' レベルが ひらくよ！</small>' : '')+'</div><div class="modes">';
-  Object.keys(MODES).forEach(function(k){
-    var m=MODES[k], ls=LV(k), n=ls.filter(function(_,i){ return store.get(sk(k),i); }).length;
-    s+='<div class="mode" data-m="'+k+'">'+MODE_ART[k]+'<b>'+m.no+'. '+m.name+'</b><small>'+m.sub+'</small>'+
-       '<span class="prog">⭐ '+n+' / '+ls.length+(n>=ls.length?' ✅':'')+'</span></div>';
-  });
-  s+='</div>';
-  screen.innerHTML=s;
-  screen.querySelectorAll('.mode').forEach(function(d){
-    d.onclick=function(){ SFX.sel(); showLevels(d.getAttribute('data-m')); };
-  });
-}
+// もんだいを えらぶ
 function showLevels(k){
   var m=MODES[k];
-  setHeader('<span class="no">'+m.no+'</span>'+m.name+'<span class="gchip">'+GRADES[CUR_G]+'</span>', function(){ showGrade(CUR_G); });
+  setHeader('<span class="no">'+m.no+'</span>'+m.name+'<span class="gchip">'+GRADES[CUR_G]+'</span>', function(){ showGrades(k); });
   var s='<div class="q">もんだいを えらんでね。（⭐は できた もんだい）</div><div class="levels">';
   LV(k).forEach(function(l,i){
     s+='<div class="lv" data-i="'+i+'"><span class="num">'+(i+1)+'</span>'+(store.get(sk(k),i)?'<span class="star">⭐</span>':'')+m.prev(l)+
@@ -1089,9 +1095,9 @@ function showLevels(k){
   });
 }
 function celebrate(k, li){
-  var g = CUR_G, wasDone = gradeDone(g) >= gradeTotal(g);
+  var g = CUR_G, m = MODES[k], wasDone = gradeDone(k,g) >= gradeTotal(k,g);
   store.set(sk(k), li); SFX.ok();
-  var nowDone = gradeDone(g) >= gradeTotal(g), newly = nowDone && !wasDone;
+  var nowDone = gradeDone(k,g) >= gradeTotal(k,g), newly = nowDone && !wasDone;
   var hasNext = li+1 < LV(k).length;
   var conf='';
   for(var i=0;i<(newly?80:36);i++){
@@ -1099,11 +1105,11 @@ function celebrate(k, li){
   }
   var extra = '';
   if(newly && g < GRADES.length-1){
-    extra = '<div class="unlock">🎉 '+GRADES[g]+' レベル ぜんぶ クリア！<br><b>'+GRADES[g+1]+' レベル</b>が ひらいたよ！</div>';
+    extra = '<div class="unlock">🎉「'+m.name+'」の '+GRADES[g]+' レベルを ぜんぶ クリア！<br><b>'+GRADES[g+1]+' レベル</b>が ひらいたよ！</div>';
   }else if(newly){
-    extra = '<div class="unlock">🏆 ぜんぶの レベルを クリア！<br>かたちづくりの めいじん だね！</div>';
+    extra = '<div class="unlock">🏆「'+m.name+'」を ぜんぶ クリア！<br>めいじん だね！</div>';
   }else{
-    var left = gradeTotal(g) - gradeDone(g);
+    var left = gradeTotal(k,g) - gradeDone(k,g);
     if(left>0 && g < GRADES.length-1) extra = '<div class="left">'+GRADES[g+1]+' レベルまで あと '+left+'もん</div>';
   }
   var ov=el('<div class="overlay">'+conf+'<div class="ok"><div class="big">できた！</div><div class="stars">'+(newly?'🌟🌟🌟':'⭐')+'</div>'+extra+'<div class="btns">'+
@@ -1117,7 +1123,7 @@ function celebrate(k, li){
     ov.remove();
     if(a==='next') openLevel(k, li+1);
     else if(a==='again') openLevel(k, li);
-    else if(a==='grade') showGrade(g+1);
+    else if(a==='grade'){ CUR_G = g+1; showLevels(k); }
     else showLevels(k);
   };
 }
