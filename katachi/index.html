@@ -250,6 +250,7 @@ function nextRot(pieces, i){
 /* info: {o, c, offX, offY}  h: {start(), tap(), drop(cell or null), cancel()} */
 function startDrag(e, svg, hg, W, H, info, h){
   e.preventDefault();
+  if(e.currentTarget===svg){ try{ svg.setPointerCapture(e.pointerId); }catch(er){} }
   var sx = e.clientX, sy = e.clientY, moving = false;
   function snap(ev){
     var p = svgPt(svg, ev), x = Math.round(p.x-info.offX), y = Math.round(p.y-info.offY);
@@ -327,7 +328,7 @@ function playTile(li){
     Array.prototype.forEach.call(pal.children, function(b){ b.classList.toggle('on', b.getAttribute('data-o')===sel); });
   }
   function update(){
-    pg.innerHTML = piecesSvg(placed, function(p){ return p.c; }).replace(/<polygon/g, '<polygon class="pc"');
+    pg.innerHTML = piecesSvg(placed, function(p){ return p.c; });
     placed.forEach(function(p,i){ if(p.drag) pg.children[i].setAttribute('opacity','0.25'); });
     cnt.innerHTML = 'ならべた かず：<big>'+placed.length+'</big> まい<br><span style="font-size:15px;color:#666">（ぜんぶで '+target.length+' まい つかうよ）</span>';
   }
@@ -354,23 +355,35 @@ function playTile(li){
     });
   });
 
+  function removePiece(a){
+    var k = placed.indexOf(a); if(k<0) return;
+    placed.splice(k,1); SFX.pop(); msg('いろいたを とったよ'); afterChange();
+  }
   svg.addEventListener('pointerdown', function(e){
     if(done) return;
     var p = svgPt(svg,e), x = Math.floor(p.x), y = Math.floor(p.y);
     if(x<0||y<0||x>=W||y>=H) return;
-    var i = hitPiece(placed, p);
-    if(i<0){ e.preventDefault(); placeNew(x, y, sel); return; }
+    var i = hitPiece(placed, p), empty = false;
+    if(i<0){
+      // ますの あいて いる ところ：タッチなら あたらしく おく／ひっぱったら その ますの いろいたを うごかす
+      empty = true;
+      placed.forEach(function(a,k){ if(a.x===x && a.y===y) i = k; });
+      if(i<0){ e.preventDefault(); placeNew(x, y, sel); return; }
+    }
     var a = placed[i];
     startDrag(e, svg, dg, W, H, {o:a.o, c:a.c, offX:p.x-a.x, offY:p.y-a.y}, {
-      start:function(){ a.drag = true; update(); },
+      start:function(){
+        a.drag = true; var n = pg.children[placed.indexOf(a)]; if(n) n.setAttribute('opacity','0.25');
+      },
       tap:function(){
-        var o = nextRot(placed, i);
+        if(empty){ placeNew(x, y, sel); return; }
+        var o = nextRot(placed, placed.indexOf(a));
         if(!o){ SFX.ng(); msg('ここでは まわせないよ'); return; }
         a.o = o; SFX.sel(); msg(''); afterChange();
       },
       drop:function(cell){
         a.drag = false;
-        if(!cell){ placed.splice(placed.indexOf(a),1); SFX.pop(); msg('いろいたを とったよ'); afterChange(); return; }
+        if(!cell){ removePiece(a); return; }
         if(!fits(placed, cell[0], cell[1], a.o, placed.indexOf(a))){ SFX.ng(); msg('そこには はいらないよ'); update(); return; }
         a.x = cell[0]; a.y = cell[1]; SFX.put(); msg(''); afterChange();
       },
@@ -444,6 +457,7 @@ function playMove(li){
     pg.innerHTML = piecesSvg(pieces, function(p){ return p.c; });
     pieces.forEach(function(p,i){
       var n = pg.children[i];
+      n.setAttribute('data-id', p.id);
       if(p.drag) n.setAttribute('opacity','0.25');
       if(p.id===active){ n.setAttribute('stroke','#e8590c'); n.setAttribute('stroke-width','0.08'); }
     });
@@ -464,7 +478,11 @@ function playMove(li){
   svg.addEventListener('pointerdown', function(e){
     if(done) return;
     var p = svgPt(svg,e), i = hitPiece(pieces, p);
-    if(i<0) return;
+    if(i<0){
+      var cx = Math.floor(p.x), cy = Math.floor(p.y);
+      pieces.forEach(function(a,k){ if(a.x===cx && a.y===cy && (i<0 || a.id===active)) i = k; });
+      if(i<0) return;
+    }
     var a = pieces[i];
     if(active>=0 && a.id!==active){
       e.preventDefault(); SFX.ng();
@@ -472,7 +490,7 @@ function playMove(li){
       return;
     }
     startDrag(e, svg, dg, W, H, {o:a.o, c:a.c, offX:p.x-a.x, offY:p.y-a.y}, {
-      start:function(){ a.drag = true; active = a.id; update(); },
+      start:function(){ a.drag = true; var n = pg.querySelector('[data-id="'+a.id+'"]'); if(n) n.setAttribute('opacity','0.25'); },
       tap:function(){
         var o = nextRot(pieces, pieces.indexOf(a));
         if(!o){ SFX.ng(); msg('ここでは まわせないよ'); return; }
