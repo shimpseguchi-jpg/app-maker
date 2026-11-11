@@ -44,21 +44,23 @@ for (let i = 0; i < 5; i++) { await page.waitForSelector('.quiz'); if (i === 1) 
 await page.waitForSelector('.modal [data-ok]'); await shot('study-result'); await ok();
 // ぶんづくり（カードを ならべる・□に いれる・まちがいを なおす）を ほんとうに タップして とく
 const kinds = new Set();
-for (let round = 0; round < 6 && kinds.size < 3; round++) {
+for (let round = 0; round < 5; round++) { // 0〜2：ぶんづくり、3〜4：かなの きまり
   await page.evaluate((lv) => { const P = JSON.parse(localStorage.getItem('hotaru.profile')); P.learn.level.ja = lv; P.learn.streak.ja = 0; localStorage.setItem('hotaru.profile', JSON.stringify(P)); }, [2, 3, 5][round % 3]);
   await page.reload(); await page.evaluate(() => { window.__robot = true; }); await click('[data-go]'); await page.waitForSelector('.camp');
-  await click('[data-cmd="study"]'); await click('[data-st="bun"]');
+  await click('[data-cmd="study"]'); await click(round >= 3 ? '[data-st="hyoki"]' : '[data-st="bun"]');
   for (let i = 0; i < 5; i++) {
     await page.waitForSelector('.quiz'); const t = await page.evaluate(() => window.__q.type);
-    if (!t) errors.push('ぶんづくりで ほかの もんだいが でた');
-    if (!kinds.has(t)) { kinds.add(t); await shot('bun-' + t); }
+    const u = await page.evaluate(() => window.__q.unit);
+    if (!/^(bun|hyo)/.test(u)) errors.push('ぶんづくり・かなの きまりで ほかの もんだいが でた：' + u);
+    if (round < 3 && !kinds.has(t)) { kinds.add(t); await shot('bun-' + t); }
+    if (round >= 3 && !kinds.has(u + t)) { kinds.add(u + t); if (kinds.size < 9) await shot('kana-' + u + (t ? '-fix' : '')); }
     await answer(1);
   }
   const ok = await page.evaluate(() => /5 \/ 5/.test(document.querySelector('.modal h2')?.textContent || ''));
   if (!ok) errors.push('ぶんづくり：ただしく タップしたのに 5もん せいかいに ならない');
   await page.click('.modal [data-ok]'); await page.waitForSelector('.camp');
 }
-if (kinds.size < 3) errors.push('ぶんづくりの 3しゅるいが そろわない：' + [...kinds].join(','));
+if (!['build', 'fill', 'fix'].every((k) => kinds.has(k))) errors.push('ぶんづくりの 3しゅるいが そろわない：' + [...kinds].join(','));
 await click('[data-cmd="record"]'); await shot('record'); await click('.modal [data-x]');
 // キャンプの がめんを ひととおり ひらく
 await click('[data-cmd="shop"]'); await click('[data-buy="herb"]'); await shot('shop'); await click('.modal [data-x]');

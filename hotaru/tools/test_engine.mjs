@@ -7,7 +7,8 @@ import { newProfile, heroStats, gainExp, expNeed } from '../js/engine/hero.js';
 import { buyItem, buyEquip } from '../js/engine/camp.js';
 import { newLearn, nextQuestion, recordAnswer, subjectLevel, UNIT_NAMES } from '../js/engine/learn.js';
 import { FIREFLY_LIST, FIREFLY_HP } from '../js/data/fireflies.js';
-import { fixed, GA, JOSHI } from '../js/data/quiz_bun.js';
+import { fixed, swapOf, GA, JOSHI } from '../js/data/quiz_bun.js';
+import { DAKU, SOKU, CHOON, YOON, PAIRS, HYOKI } from '../js/data/quiz_hyoki.js';
 import { SPAWN, MOBS, LAST_FLOOR, isBossFloor } from '../js/data/enemies.js';
 
 let n = 0; const test = (name, f) => { f(); n++; console.log('ok  ' + name); };
@@ -92,8 +93,8 @@ test('まなび：がくねん・きょうかごとに もんだいが つくれ
         assert.ok(['build', 'fill', 'fix'].includes(q.type) && (keypad || q.type === 'fill'), `たたかいの さいちゅうに ${q.type} が でた`);
         if (q.type === 'build') { assert.equal(new Set(q.cards).size, q.cards.length); assert.equal(q.order.map((i) => q.cards[i]).join('').replace('。', ''), q.answer.replace(/[ 。]/g, '')); }
         if (q.type === 'fill') { assert.equal(q.parts.filter((p) => p === null).length, q.slots.length); let k = 0; assert.equal(q.parts.map((p) => p ?? q.slots[k++]).join(''), q.answer.replace(/ /g, '')); q.slots.forEach((c) => assert.ok(q.pool.includes(c))); }
-        if (q.type === 'fix') { assert.ok(q.wrong.length >= 1); assert.notEqual(fixed(q, new Set()), q.answer); assert.equal(fixed(q, new Set(q.wrong)), q.answer); }
-      } else if (q.choices) assert.ok(q.choices.map(String).includes(String(q.answer)), `${q.q}：えらぶ なかに こたえが ない`);
+        if (q.type === 'fix') { assert.ok(q.wrong.length >= 1); q.wrong.forEach((i) => assert.ok(swapOf(q)[q.chars[i]], 'タップで なおせない じ')); assert.notEqual(fixed(q, new Set()), q.answer); assert.equal(fixed(q, new Set(q.wrong)), q.answer); }
+      } else if (q.choices) assert.ok(new Set(q.choices.map(String)).size === q.choices.length && q.choices.map(String).includes(String(q.answer)), `${q.q}：えらぶ なかに こたえが ない`);
       else assert.ok(/^\d+$/.test(String(q.answer)), `${q.q}：キーパッドで こたえられない（${q.answer}）`);
       assert.ok(UNIT_NAMES[`${q.subj}:${q.unit || q.topic}`], `たんげんの なまえが ない：${q.subj}:${q.unit || q.topic}`);
     }
@@ -114,15 +115,28 @@ test('まなび：せいかいが つづくと むずかしく、まちがえる
   const G = g.enterFloor(P, 1, 5); G.hero.hp = 5; // めいきゅうの なかでは せいかいで HPも かいふく
   assert.ok(g.learnReward(G, P, true).some((e) => e.t === 'learnheal') && G.hero.hp > 5);
 });
-test('ぶんづくり：れいぶんの かたち・3だんかいが レベルに あわせて でる・こくごの はんぶん ほどが ぶんづくり（1ねんせい）', () => {
+test('ぶんづくり：れいぶんの かたち・3だんかいが レベルに あわせて でる・こくごの 3わり ほどが ぶんづくり（1ねんせい）', () => {
   for (const [, s, p] of GA) assert.ok(s && p && !/[がはをへ]$/.test(s));
   for (const it of JOSHI) { assert.ok(it.length >= 3); for (const [w, p] of it.slice(1, -1)) assert.ok(w && ['は', 'を', 'へ'].includes(p)); }
   const rng = makeRng(21), count = (lv, opt) => { const L = newLearn(1, ['ja']); const c = {}; for (let k = 0; k < 400; k++) { L.level.ja = lv; L.recent = []; const q = nextQuestion(L, rng, opt); c[q.unit] = (c[q.unit] || 0) + 1; } return c; };
-  const lo = count(2, { keypad: true, bun: true }), hi = count(5, { keypad: true, bun: true });
+  const lo = count(2, { keypad: true, group: 'bun' }), hi = count(5, { keypad: true, group: 'bun' });
   assert.ok(lo.bunGa > lo.bunJoshi && !lo.bunFix); assert.ok(hi.bunFix > hi.bunJoshi && hi.bunJoshi > 0);
   const mix = count(3, { keypad: true }); const bun = (mix.bunGa || 0) + (mix.bunJoshi || 0) + (mix.bunFix || 0);
-  assert.ok(bun > 140 && bun < 260, `ぶんづくり ${bun}/400`);
-  const L = newLearn(1, ['ja']); const q = nextQuestion(L, rng, { keypad: true, bun: true }); recordAnswer(L, q, false, 'd');
+  assert.ok(bun > 80 && bun < 170, `ぶんづくり ${bun}/400`);
+  const L = newLearn(1, ['ja']); const q = nextQuestion(L, rng, { keypad: true, group: 'bun' }); recordAnswer(L, q, false, 'd');
   assert.equal(L.mistakes[0].topic, q.topic); const r = nextQuestion(L, rng, { keypad: true, reviewOnly: true }); assert.equal(r.topic, q.topic); // にがての ふくしゅうでも でる
+});
+test('かなの きまり：ことばの かたち・4たんげんが レベルに あわせて でる・じぶんで なおす もんだいは たたかいの さいちゅうには でない', () => {
+  for (const [, right, w1, w2] of [...DAKU, ...CHOON]) assert.ok(new Set([right, w1, w2]).size === 3, right);
+  for (const [, w] of SOKU) assert.ok(w.includes('っ'), w);
+  for (const [, w] of YOON) assert.ok(/[ゃゅょ]/.test(w), w);
+  for (const [a, b, unit] of PAIRS) assert.ok(a[0] !== b[0] && a[1] !== b[1] && HYOKI[unit]);
+  const rng = makeRng(33), count = (lv, opt) => { const L = newLearn(1, ['ja']); const c = { fix: 0 }; for (let k = 0; k < 600; k++) { L.level.ja = lv; L.recent = []; const q = nextQuestion(L, rng, opt); c[q.unit] = (c[q.unit] || 0) + 1; if (q.type === 'fix') c.fix++; } return c; };
+  const lo = count(2, { keypad: true, group: 'hyoki' }), hi = count(4, { keypad: true, group: 'hyoki' });
+  assert.ok(lo.hyoDaku && lo.hyoSoku && !lo.hyoChoon && !lo.hyoYoon && lo.fix > 100);
+  assert.ok(hi.hyoDaku && hi.hyoSoku && hi.hyoChoon > hi.hyoDaku && hi.hyoYoon > hi.hyoSoku);
+  assert.equal(count(4, { keypad: false, group: 'hyoki' }).fix, 0);
+  const mix = count(3, { keypad: true }); const h = mix.hyoDaku + mix.hyoSoku + mix.hyoChoon + mix.hyoYoon;
+  assert.ok(h > 130 && h < 240, `かなの きまり ${h}/600`);
 });
 console.log(`\n${n} こ ぜんぶ OK`);

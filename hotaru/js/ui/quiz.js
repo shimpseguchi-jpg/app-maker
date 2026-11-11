@@ -5,7 +5,7 @@ import { sfx } from '../../../js/audio.js';
 import { clockSvg, gridSvg, coinsSvg, shapeSvg } from '../../../js/ui/art.js';
 import { SUBJECTS, nextQuestion, recordAnswer } from '../engine/learn.js';
 import { settings } from '../save.js';
-import { fixed, FIX_SWAP } from '../data/quiz_bun.js';
+import { fixed, swapOf } from '../data/quiz_bun.js';
 
 const rng = makeRng(newSeed());
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -29,7 +29,7 @@ function visHtml(vis) {
 export function askQuiz(stage, P, opts = {}) {
   return new Promise((res) => {
     const L = P.learn;
-    const q = nextQuestion(L, rng, { keypad: !!opts.keypad, subj: opts.subj || null, reviewOnly: !!opts.reviewOnly, bun: !!opts.bun });
+    const q = nextQuestion(L, rng, { keypad: !!opts.keypad, subj: opts.subj || null, reviewOnly: !!opts.reviewOnly, group: opts.group || null });
     window.__q = q; // つうしテスト用
     const sj = SUBJECTS[q.subj];
     const dots = opts.dots ? `<span class="dots">${opts.dots.map((d) => `<i class="${d === true ? 'ok' : d === false ? 'ng' : ''}"></i>`).join('')}</span>` : '';
@@ -129,8 +129,8 @@ function wireBun(back, q, finish) {
     okBtn.addEventListener('click', () => { slots.forEach((b, i) => b.classList.add(vals[i] === q.slots[i] ? 'right' : 'wrong')); finish(vals.join() === q.slots.join()); });
     draw();
   } else {
-    // じを タップすると「わ⇔は」「お⇔を」「え⇔へ」が いれかわる
-    const flips = new Set();
+    // じを タップすると「わ⇔は」「つ⇔っ」「か⇔が」などが いれかわる
+    const flips = new Set(), FIX_SWAP = swapOf(q);
     okBtn.disabled = false;
     $$('.ch', back).forEach((b) => b.addEventListener('click', () => {
       const i = +b.dataset.i, c = q.chars[i];

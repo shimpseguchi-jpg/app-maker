@@ -75,7 +75,9 @@ export const BUN = {
 };
 // タップで いれかわる じ（まちがいなおし）
 export const FIX_SWAP = { わ: 'は', は: 'わ', お: 'を', を: 'お', え: 'へ', へ: 'え' };
-export const fixed = (q, flips) => q.chars.map((c, i) => (flips.has(i) && FIX_SWAP[c] ? FIX_SWAP[c] : c)).join('');
+// q.swap が あれば その いれかえ（かなの きまりの もんだい）
+export const swapOf = (q) => q.swap || FIX_SWAP;
+export const fixed = (q, flips) => q.chars.map((c, i) => (flips.has(i) && swapOf(q)[c] ? swapOf(q)[c] : c)).join('');
 
 // レベルに あわせて 1もん つくる（1ねんせいの レベルは 1〜5）。quick＝たたかいの さいちゅう（すぐ こたえられる「□に いれる」だけ）
 export function makeBun(topic, level, rng, { quick = false } = {}) {
