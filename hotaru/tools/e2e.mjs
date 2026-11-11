@@ -25,7 +25,11 @@ let asked = 0;
 async function answer(rate = 0.8) {
   const q = await page.evaluate(() => window.__q); asked++;
   const right = Math.random() < rate;
-  if (q.choices) {
+  if (q.type && !right) await page.click('.quiz [data-giveup]');
+  else if (q.type === 'build') { for (const i of q.order) await page.click(`.quiz .bun-pool [data-i="${i}"]`); await page.click('.quiz [data-bunok]'); }
+  else if (q.type === 'fill') { for (const c of q.slots) await page.click(`.quiz .bun-pool [data-p="${c}"]`); await page.click('.quiz [data-bunok]'); }
+  else if (q.type === 'fix') { for (const i of q.wrong) await page.click(`.quiz .ch[data-i="${i}"]`); await page.click('.quiz [data-bunok]'); }
+  else if (q.choices) {
     const i = q.choices.findIndex((c) => String(c) === String(q.answer));
     await page.click(`.quiz [data-c="${right ? i : (i + 1) % q.choices.length}"]`);
   } else {
@@ -38,6 +42,23 @@ async function answer(rate = 0.8) {
 await click('[data-cmd="study"]'); await shot('study'); await click('[data-st="any"]');
 for (let i = 0; i < 5; i++) { await page.waitForSelector('.quiz'); if (i === 1) await shot('quiz'); await answer(i === 2 ? 0 : 1); if (i === 2) { /* まちがい */ } }
 await page.waitForSelector('.modal [data-ok]'); await shot('study-result'); await ok();
+// ぶんづくり（カードを ならべる・□に いれる・まちがいを なおす）を ほんとうに タップして とく
+const kinds = new Set();
+for (let round = 0; round < 6 && kinds.size < 3; round++) {
+  await page.evaluate((lv) => { const P = JSON.parse(localStorage.getItem('hotaru.profile')); P.learn.level.ja = lv; P.learn.streak.ja = 0; localStorage.setItem('hotaru.profile', JSON.stringify(P)); }, [2, 3, 5][round % 3]);
+  await page.reload(); await page.evaluate(() => { window.__robot = true; }); await click('[data-go]'); await page.waitForSelector('.camp');
+  await click('[data-cmd="study"]'); await click('[data-st="bun"]');
+  for (let i = 0; i < 5; i++) {
+    await page.waitForSelector('.quiz'); const t = await page.evaluate(() => window.__q.type);
+    if (!t) errors.push('ぶんづくりで ほかの もんだいが でた');
+    if (!kinds.has(t)) { kinds.add(t); await shot('bun-' + t); }
+    await answer(1);
+  }
+  const ok = await page.evaluate(() => /5 \/ 5/.test(document.querySelector('.modal h2')?.textContent || ''));
+  if (!ok) errors.push('ぶんづくり：ただしく タップしたのに 5もん せいかいに ならない');
+  await page.click('.modal [data-ok]'); await page.waitForSelector('.camp');
+}
+if (kinds.size < 3) errors.push('ぶんづくりの 3しゅるいが そろわない：' + [...kinds].join(','));
 await click('[data-cmd="record"]'); await shot('record'); await click('.modal [data-x]');
 // キャンプの がめんを ひととおり ひらく
 await click('[data-cmd="shop"]'); await click('[data-buy="herb"]'); await shot('shop'); await click('.modal [data-x]');

@@ -1,6 +1,7 @@
 // まなび：もんだいを えらぶ・こたえを きろくする（がめんから どくりつ）
 // もんだいの つくりかた・レベルちょうせい・にがての きろくは「まなびサクセス」の しくみを りゅうよう
 import { makeQuestion, adaptLevel, levelRange } from '../../../manabi/js/engine/quiz.js';
+import { makeBun, BUN } from '../data/quiz_bun.js';
 
 export const SUBJECTS = {
   math: { id: 'math', name: 'さんすう', emo: '🔢', color: '#4f8dff' },
@@ -12,6 +13,7 @@ export const UNIT_NAMES = {
   'math:arith': 'けいさん', 'math:tenComp': '10の まとまり', 'math:missing': '□の かず', 'math:legs': 'あしの かず', 'math:pattern': 'きまり さがし',
   'math:clock': 'とけい', 'math:money': 'おかね', 'math:shape': 'かたち', 'math:unit': 'たんい',
   'ja:kanji': 'かんじ', 'ja:antonym': 'はんたいの ことば', 'ja:katakana': 'カタカナ', 'ja:group': 'なかまの ことば', 'ja:particle': 'は・を・へ', 'ja:order': 'ぶんの じゅんばん', 'ja:kosoado': 'こそあど',
+  'ja:bunGa': 'ぶんを つくる（〜が 〜。）', 'ja:bunJoshi': 'は・を・へを つかう', 'ja:bunFix': 'まちがいを なおす',
   'en:word': 'えいたんご', 'en:listen': 'ききとり', 'en:alphabet': 'アルファベット', 'en:greeting': 'あいさつ', 'en:number': 'かず',
 };
 
@@ -22,13 +24,20 @@ export const subjectLevel = (L, subj) => L.level[subj] ?? levelRange(L.grade)[0]
 
 // つぎの もんだい。にがてな たんげんが あれば ときどき そこから だす（ふくしゅう）
 // keypad: true＝すうじは じぶんで うつ / false＝3たく（たたかいの さいちゅう など）
-export function nextQuestion(L, rng, { keypad = false, subj = null, reviewOnly = false } = {}) {
+// bun＝こくごの「ぶんづくり」だけを だす（まなびの こや）
+export function nextQuestion(L, rng, { keypad = false, subj = null, reviewOnly = false, bun = false } = {}) {
   const subjects = L.subjects.length ? L.subjects : ['math'];
   const weak = L.mistakes.filter((m) => subjects.includes(m.subj) && (!subj || m.subj === subj));
   let topic = null, review = false;
-  if (weak.length && (reviewOnly || rng() < 0.3)) { const m = weak[Math.floor(rng() * weak.length)]; subj = m.subj; topic = m.topic; review = true; }
+  if (weak.length && !bun && (reviewOnly || rng() < 0.3)) { const m = weak[Math.floor(rng() * weak.length)]; subj = m.subj; topic = m.topic; review = true; }
   if (!subj) subj = subjects[Math.floor(rng() * subjects.length)];
-  const q = makeQuestion(subj, L.grade, subjectLevel(L, subj), rng, { recent: L.recent, topic, keypad });
+  if (bun) subj = 'ja';
+  // こくごは、ぶんづくり（は・を・へ など）を おおめに だす。1ねんせいは はんぶん、2・3ねんせいは ふくしゅうとして 4ぶんの1
+  const useBun = subj === 'ja' && (bun || (topic ? !!BUN[topic] : rng() < (L.grade === 1 ? 0.5 : 0.25)));
+  let q;
+  if (useBun) {
+    for (let t = 0; t < 8; t++) { q = makeBun(bun && !BUN[topic] ? null : topic, subjectLevel(L, 'ja'), rng, { quick: !keypad }); if (!L.recent.includes(q.q + '|' + q.answer)) break; }
+  } else q = makeQuestion(subj, L.grade, subjectLevel(L, subj), rng, { recent: L.recent, topic, keypad });
   q.review = review;
   return q;
 }

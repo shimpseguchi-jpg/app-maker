@@ -200,6 +200,23 @@ button.item { cursor: pointer; box-shadow: 0 4px 0 #cfc198; } button.item:active
 .rec-wrong div { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; background: #f3e9c9; border-radius: 12px; padding: 5px 10px; margin-bottom: 5px; font-size: 16px; font-weight: 700; } .rec-wrong b { color: #d2452e; font-size: 18px; }
 .parents { margin-top: 14px; background: #2a2440; color: #e9e4ff; border-radius: 16px; padding: 12px 16px; font-size: 15px; font-weight: 700; line-height: 1.7; }
 
+/* ── ぶんづくり ── */
+.bun { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.bun-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; min-height: 84px; width: 100%; background: #fff; border: 4px dashed #cfc198; border-radius: 22px; padding: 10px 16px; font-size: 34px; font-weight: 900; }
+.bun-line .ph { font-size: 18px; color: #b9ab80; } .bun-line .word { padding: 0 2px; }
+.bun-pool { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.bun .card { border: none; border-radius: 16px; background: #fff3b0; box-shadow: 0 5px 0 #d9b84a; font-size: 30px; font-weight: 900; padding: 8px 20px; min-width: 64px; min-height: 60px; cursor: pointer; color: var(--ink); font-family: inherit; }
+.bun .card:active { transform: translateY(4px); box-shadow: 0 1px 0 #d9b84a; } .bun .card.used { opacity: .25; pointer-events: none; }
+.bun .card.on { background: #cfe8ff; box-shadow: 0 5px 0 #7fb2e0; }
+.bun .slot { width: 64px; height: 64px; border: 4px solid #cfc198; border-radius: 14px; background: #fff8e6; font-size: 34px; font-weight: 900; cursor: pointer; color: #b25a00; padding: 0; font-family: inherit; }
+.bun .slot.cur { border-color: #ffb92e; box-shadow: 0 0 12px #ffcf5c; animation: pulse 1s infinite; } .bun .slot.filled { background: #fff3b0; }
+.bun .slot.right { border-color: var(--green); background: #e2f9e6; } .bun .slot.wrong { border-color: var(--red); background: #ffe2dc; }
+.bun-line.fix { gap: 2px; border-style: solid; } .bun-line.fix .gap { width: 18px; }
+.bun .ch { border: none; background: none; font: inherit; color: var(--ink); width: 46px; height: 60px; border-radius: 12px; cursor: pointer; padding: 0; border-bottom: 4px solid #e6dcb8; }
+.bun .ch:active { background: #fff3b0; } .bun .ch.on { background: #cfe8ff; color: #1f5fa8; border-bottom-color: #7fb2e0; }
+.bun-right { font-size: 28px; font-weight: 900; color: #1f6b3a; background: #e2f9e6; border-radius: 14px; padding: 4px 18px; }
+.bun [data-bunok][disabled] { opacity: .35; }
+
 /* ── ひらめき こうげき ── */
 .spark { border: none; border-radius: 20px; background: linear-gradient(#fff3a0, #ffc93c); color: #4a3200; box-shadow: 0 6px 0 #b98a16; padding: 12px 8px 10px; display: flex; flex-direction: column; align-items: center; font-weight: 900; cursor: pointer; }
 .spark:active { transform: translateY(4px); box-shadow: 0 2px 0 #b98a16; }
