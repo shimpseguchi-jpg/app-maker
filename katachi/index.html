@@ -40,6 +40,18 @@ header h1 .no{display:inline-grid;place-items:center;width:1.7em;height:1.7em;bo
 .bonus .bart{flex:0 0 120px;height:100px}
 .bonus .bart svg{width:100%;height:100%}
 .bonus .prog{font-size:15px;color:#e8590c;font-weight:bold}
+.boardWrap.wide{max-width:780px;flex-basis:480px}
+.galOv{align-items:center;padding:12px}
+.gal{background:#fff;border-radius:20px;width:min(760px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 8px 0 #2a8c82;overflow:hidden}
+.galHead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:2px solid #e3eef2;font-size:20px}
+.galList{flex:1;overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.galEmpty{grid-column:1/-1;text-align:center;color:#666;font-weight:bold;padding:30px 0;line-height:1.8}
+.galNote{font-size:12px;color:#888;padding:6px 14px 10px}
+.work{border:3px solid #cfe6ee;border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.work svg{width:100%;height:100px}
+.work small{font-size:12px;color:#666}
+.wbtns{display:flex;gap:4px;margin-top:4px}
+.wbtns .btn{font-size:13px;padding:5px 8px;border-width:2px;box-shadow:0 2px 0 currentColor}
 .bbadge{background:#e8590c;color:#fff;font-weight:bold;font-size:13px;border-radius:999px;padding:2px 12px}
 @media (max-width:560px){ .bonus .bart:last-child{display:none} .bonus .bart{flex-basis:80px;height:80px} }
 .mode{background:#fff;border-radius:18px;padding:12px;cursor:pointer;border:4px solid transparent;box-shadow:0 4px 0 #b9dbe9;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
@@ -947,7 +959,9 @@ var BONUS = [
   { name:'ピラミッド',        sticks:[[[0,0,0],[2,0,0]],[[2,0,0],[2,0,2]],[[2,0,2],[0,0,2]],[[0,0,2],[0,0,0]],
                                       [[0,0,0],[1,2,1]],[[2,0,0],[1,2,1]],[[2,0,2],[1,2,1]],[[0,0,2],[1,2,1]]] },
   { name:'おうち',            sticks:boxEdges(2,1,1).concat([[[0,1,0],[1,2,0]],[[2,1,0],[1,2,0]],[[0,1,1],[1,2,1]],[[2,1,1],[1,2,1]],[[1,2,0],[1,2,1]]]) },
-  { name:'じゆうに つくろう', free:true, sticks:[] }
+  { name:'じゆうあそび（小）', free:true, N:[4,3,3], size:'小', sticks:[] },
+  { name:'じゆうあそび（中）', free:true, N:[6,4,6], size:'中', sticks:[] },
+  { name:'じゆうあそび（大）', free:true, N:[8,5,8], size:'大', sticks:[] }
 ];
 function boxEdges(w, h, d){   // よこ w・たかさ h・おくゆき d の はこの ほね（ぼう 12ほん）
   var P = function(x,y,z){ return [x*w, y*h, z*d]; }, out = [];
@@ -965,7 +979,7 @@ function proj3(p, v){
   var x1 = x*cy + z*sy, z1 = -x*sy + z*cy;
   var cp=Math.cos(v.pitch), sp=Math.sin(v.pitch);
   var y2 = y*cp - z1*sp, z2 = y*sp + z1*cp;   // pitch が プラスだと うえから みおろす
-  var s = 9/(9 - z2);
+  var D = v.D || 9, s = D/(D - z2);
   return { x:x1*s, y:-y2*s, d:z2, s:s };
 }
 function samePt(a,b){ return a && b && a[0]===b[0] && a[1]===b[1] && a[2]===b[2]; }
@@ -1001,29 +1015,32 @@ function key3(sticks, f){
 // えを かく（とおい ものから じゅんに）
 function draw3(sticks, v, o){
   o = o || {};
-  var items = [], s = '';
+  var items = [], s = '', K = o.k || 1, N = o.N || [C3.NX, C3.NY, C3.NZ];
   if(o.lattice){
-    for(var x=0;x<C3.NX;x++) for(var z=0;z<C3.NZ;z++){   // ゆか
-      if(x<C3.NX-1){ var a=proj3([x,0,z],v), b=proj3([x+1,0,z],v); s+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#cfe0e8" stroke-width="0.03"/>'; }
-      if(z<C3.NZ-1){ var a2=proj3([x,0,z],v), b2=proj3([x,0,z+1],v); s+='<line x1="'+a2.x+'" y1="'+a2.y+'" x2="'+b2.x+'" y2="'+b2.y+'" stroke="#cfe0e8" stroke-width="0.03"/>'; }
+    var fw = 0.03*K, dr = 0.055*K, dop = 2/Math.max(2, v.D ? v.D/4.5 : 2);   // おおきい ますめは てんを すこし うすく
+    for(var x=0;x<N[0];x++) for(var z=0;z<N[2];z++){   // ゆか
+      if(x<N[0]-1){ var a=proj3([x,0,z],v), b=proj3([x+1,0,z],v); s+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#cfe0e8" stroke-width="'+fw+'"/>'; }
+      if(z<N[2]-1){ var a2=proj3([x,0,z],v), b2=proj3([x,0,z+1],v); s+='<line x1="'+a2.x+'" y1="'+a2.y+'" x2="'+b2.x+'" y2="'+b2.y+'" stroke="#cfe0e8" stroke-width="'+fw+'"/>'; }
     }
-    for(var x3=0;x3<C3.NX;x3++) for(var y3=0;y3<C3.NY;y3++) for(var z3=0;z3<C3.NZ;z3++){
+    for(var x3=0;x3<N[0];x3++) for(var y3=0;y3<N[1];y3++) for(var z3=0;z3<N[2];z3++){
       var q = proj3([x3,y3,z3], v);
-      items.push({ d:q.d-0.01, h:'<circle cx="'+q.x+'" cy="'+q.y+'" r="'+(0.055*q.s)+'" fill="#7fa6bb" opacity="'+(0.35+0.15*q.d)+'"/>' });
+      items.push({ d:q.d-0.01, h:'<circle cx="'+q.x+'" cy="'+q.y+'" r="'+(dr*q.s)+'" fill="#7fa6bb" opacity="'+Math.max(0.12, (0.35+0.15*q.d/(K*K))*dop)+'"/>' });
     }
   }
+  if(o.hint){ var hq = proj3(o.hint, v); items.push({ d:98, h:'<circle cx="'+hq.x+'" cy="'+hq.y+'" r="'+(0.22*K*hq.s)+'" fill="#e8590c" fill-opacity="0.25" stroke="#e8590c" stroke-width="'+(0.04*K)+'"/>' }); }
   sticks.forEach(function(st, i){
-    var a=proj3(st[0],v), b=proj3(st[1],v), w=0.11*(a.s+b.s)/2;
+    var a=proj3(st[0],v), b=proj3(st[1],v), w=0.11*K*(a.s+b.s)/2;
     var hl = o.hl===i ? '#e8590c' : '#8a5a2b';
     items.push({ d:(a.d+b.d)/2, h:'<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="'+hl+'" stroke-width="'+(w*1.45)+'" stroke-linecap="round"/>'+
                                    '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="'+(o.color||'#f2c27a')+'" stroke-width="'+w+'" stroke-linecap="round"/>' });
   });
   ballsOf(sticks).forEach(function(p){
     var q = proj3(p, v);
-    items.push({ d:q.d+0.02, h:'<circle cx="'+q.x+'" cy="'+q.y+'" r="'+(0.15*q.s)+'" fill="'+(o.ball||'#f7a8b8')+'" stroke="#b5536e" stroke-width="'+(0.035*q.s)+'"/>'+
-                               '<circle cx="'+(q.x-0.045*q.s)+'" cy="'+(q.y-0.05*q.s)+'" r="'+(0.045*q.s)+'" fill="#fff" opacity="0.7"/>' });
+    var bs = q.s*K;
+    items.push({ d:q.d+0.02, h:'<circle cx="'+q.x+'" cy="'+q.y+'" r="'+(0.15*bs)+'" fill="'+(o.ball||'#f7a8b8')+'" stroke="#b5536e" stroke-width="'+(0.035*bs)+'"/>'+
+                               '<circle cx="'+(q.x-0.045*bs)+'" cy="'+(q.y-0.05*bs)+'" r="'+(0.045*bs)+'" fill="#fff" opacity="0.7"/>' });
   });
-  if(o.sel){ var r = proj3(o.sel, v); items.push({ d:99, h:'<circle cx="'+r.x+'" cy="'+r.y+'" r="'+(0.3*r.s)+'" fill="none" stroke="#e8590c" stroke-width="0.06"/>' }); }
+  if(o.sel){ var r = proj3(o.sel, v); items.push({ d:99, h:'<circle cx="'+r.x+'" cy="'+r.y+'" r="'+(0.3*K*r.s)+'" fill="none" stroke="#e8590c" stroke-width="'+(0.06*K)+'"/>' }); }
   items.sort(function(a,b){ return a.d-b.d; });
   return s + items.map(function(it){ return it.h; }).join('');
 }
@@ -1060,41 +1077,100 @@ function centerOf(sticks){
   sticks.forEach(function(st){ st.forEach(function(p){ for(var i=0;i<3;i++){ mn[i]=Math.min(mn[i],p[i]); mx[i]=Math.max(mx[i],p[i]); } }); });
   return [(mn[0]+mx[0])/2, (mn[1]+mx[1])/2, (mn[2]+mx[2])/2];
 }
+function shapeRadius(sticks){
+  var mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity];
+  sticks.forEach(function(st){ st.forEach(function(p){ for(var i=0;i<3;i++){ mn[i]=Math.min(mn[i],p[i]); mx[i]=Math.max(mx[i],p[i]); } }); });
+  return sticks.length ? Math.hypot(mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2])/2 : 0;
+}
 function cubePreview(l, yaw){
-  if(l.free) return '<svg viewBox="-1.5 -1.1 3 2.2"><text x="0" y="0.35" font-size="1" text-anchor="middle">✏️</text></svg>';
-  var v = { yaw:yaw==null?-0.6:yaw, pitch:0.45, c:centerOf(l.sticks) };
-  return '<svg viewBox="-1.9 -1.6 3.8 3.2">'+draw3(l.sticks, v, {})+'</svg>';
+  if(l.free){   // じゆうあそび：ますめの おおきさを はこで みせる
+    var bx = boxEdges(l.N[0]-1, l.N[1]-1, l.N[2]-1), r0 = shapeRadius(bx), f0 = Math.max(1, r0/1.75);
+    var v0 = { yaw:-0.6, pitch:0.45, c:centerOf(bx), D:Math.max(9, 4*r0) };
+    var outline = bx.map(function(st){ var a=proj3(st[0],v0), b=proj3(st[1],v0); return '<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#b9cbd6" stroke-width="'+(0.05*f0)+'" stroke-dasharray="'+(0.12*f0)+' '+(0.1*f0)+'"/>'; }).join('');
+    return '<svg viewBox="'+(-1.9*f0)+' '+(-1.6*f0)+' '+(3.8*f0)+' '+(3.2*f0)+'">'+outline+
+           '<text x="0" y="'+(0.45*f0)+'" font-size="'+(1.3*f0)+'" text-anchor="middle" font-weight="900" fill="#e8590c" opacity="0.85">'+l.size+'</text></svg>';
+  }
+  var r = shapeRadius(l.sticks), f = Math.max(1, r/1.75);
+  var v = { yaw:yaw==null?-0.6:yaw, pitch:0.45, c:centerOf(l.sticks), D:Math.max(9, 4*r) };
+  return '<svg viewBox="'+(-1.9*f)+' '+(-1.6*f)+' '+(3.8*f)+' '+(3.2*f)+'">'+draw3(l.sticks, v, { k:Math.sqrt(f) })+'</svg>';
+}
+// ほぞん（この きかいの ブラウザの なかに しまう。つかえない ときは ひらいて いる あいだだけ）
+var memStore = {};
+function lsGet(k, def){ try{ var t = localStorage.getItem(k); if(t!=null) return JSON.parse(t); }catch(e){ if(k in memStore) return memStore[k]; } return k in memStore ? memStore[k] : def; }
+function lsSet(k, v){ memStore[k] = v; try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+var WORKS_KEY = 'katachi-works', WORKS_MAX = 30;
+var PENDING_LOAD = null;   // べつの おおきさの さくひんを よびだす とき
+
+function showGallery(curLi, onLoad){
+  var old = document.querySelector('.galOv'); if(old) old.remove();
+  var ov = el('<div class="overlay galOv"><div class="gal"><div class="galHead"><b>📂 さくひん</b><button class="btn" data-a="close">とじる</button></div><div class="galList"></div>'+
+              '<div class="galNote">さくひんは、いま つかって いる きかいの なかに ほぞん されるよ（さいだい '+WORKS_MAX+'こ）。</div></div></div>');
+  document.body.appendChild(ov);
+  var list = ov.querySelector('.galList');
+  function draw(){
+    var works = lsGet(WORKS_KEY, []).slice().reverse();
+    if(!works.length){ list.innerHTML = '<div class="galEmpty">まだ さくひんが ないよ。<br>つくったら「💾 ほぞん」を おしてね。</div>'; return; }
+    list.innerHTML = works.map(function(w){
+      var lv = BONUS[w.li] || BONUS[6], d = new Date(w.t);
+      return '<div class="work" data-id="'+w.id+'">'+cubePreview({ sticks:w.sticks }, -0.6)+
+             '<b>さくひん '+w.no+'</b><small>'+(lv.size||'')+'・ぼう '+w.sticks.length+'ほん・'+(d.getMonth()+1)+'/'+d.getDate()+'</small>'+
+             '<div class="wbtns"><button class="btn primary" data-a="load">よびだす</button><button class="btn" data-a="del">けす</button></div></div>';
+    }).join('');
+  }
+  ov.onclick = function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var a = b.getAttribute('data-a');
+    if(a==='close'){ ov.remove(); return; }
+    var card = b.closest('.work'), id = card && +card.getAttribute('data-id');
+    var works = lsGet(WORKS_KEY, []), w = works.filter(function(x){ return x.id===id; })[0];
+    if(!w) return;
+    if(a==='load'){ ov.remove(); SFX.sel(); onLoad(w); }
+    if(a==='del'){
+      if(b.getAttribute('data-sure')){ lsSet(WORKS_KEY, works.filter(function(x){ return x.id!==id; })); SFX.pop(); draw(); }
+      else { b.setAttribute('data-sure','1'); b.textContent = 'ほんとうに けす？'; b.classList.add('orange'); }
+    }
+  };
+  draw();
 }
 
 function playCube(li){
   var L = LV('bonus')[li];
-  var sticks = [], hist = [], sel = null, done = false;
-  var v = { yaw:-0.9, pitch:0.33, c:[(C3.NX-1)/2, (C3.NY-1)/2, (C3.NZ-1)/2] };
+  var N = L.N || [C3.NX, C3.NY, C3.NZ];
+  var sticks = [], hist = [], sel = null, done = false, hint = null;
+  var r0 = Math.hypot(N[0]-1, N[1]-1, N[2]-1)/2;
+  var v = { yaw:-0.9, pitch:0.33, c:[(N[0]-1)/2, (N[1]-1)/2, (N[2]-1)/2], D:Math.max(9, 4*r0) };
+  // どの むきに まわしても ますめが はみださない ように、えの はんいを きめる（いちばん とおい かどで けいさん）
+  var Rmax = 0;
+  for(var ay=0; ay<6.3; ay+=0.15) for(var ap=-1.58; ap<=1.58; ap+=0.15) [0,N[0]-1].forEach(function(x){ [0,N[1]-1].forEach(function(y){ [0,N[2]-1].forEach(function(z){
+    var q = proj3([x,y,z], { yaw:ay, pitch:ap, c:v.c, D:v.D }); Rmax = Math.max(Rmax, Math.hypot(q.x,q.y));
+  }); }); });
+  var F = Math.max(1, Rmax/2.12), K = Math.sqrt(F);
+  var VB = [-3*F, -2.5*F, 6.6*F, 5.2*F];
   var modelKeys = {};
   if(!L.free) TF3.forEach(function(f){ modelKeys[key3(L.sticks, f)] = 1; });
   var ID = function(p){ return p; };
 
   setHeader('<span class="no">★</span>'+L.name, function(){ showLevels('bonus'); });
   var side = L.free
-    ? '<div class="panel"><h3>じゆうに つくろう</h3><div style="font-size:15px">ぼうと ねんどだまで、すきな りったいを つくってみよう。<br>できたら「できた！」を おしてね。</div></div>'
+    ? '<div class="panel"><h3>'+L.name+'</h3><div style="font-size:15px">ぼうと ねんどだまで、すきな りったいを つくってみよう。<br>「💾 ほぞん」で さくひんを のこせるよ。「📂 さくひん」で よびだせるよ。<br>つくりかけも じどうで のこるよ。</div></div>'
     : '<div class="panel"><h3>おてほん（くるくる まわるよ）</h3><div id="mdl"></div></div>';
   screen.innerHTML =
     '<div class="q">ぼうと ねんどだまで、'+(L.free?'すきな かたちを':'おてほんと おなじ かたちを')+' つくりましょう。</div>'+
-    '<div class="play"><div class="boardWrap">'+
-      '<svg id="bd" viewBox="-3 -2.5 6.6 5.2"><rect x="-3" y="-2.5" width="6.6" height="5.2" fill="#fffdf4"/>'+
-        '<g id="g3"></g><line id="rub" stroke="#e8590c" stroke-width="0.07" stroke-dasharray="0.14 0.1" stroke-linecap="round" visibility="hidden"/></svg>'+
+    '<div class="play"><div class="boardWrap'+(L.free?' wide':'')+'">'+
+      '<svg id="bd" viewBox="'+VB.join(' ')+'"><rect x="'+VB[0]+'" y="'+VB[1]+'" width="'+VB[2]+'" height="'+VB[3]+'" fill="#fffdf4"/>'+
+        '<g id="g3"></g><line id="rub" stroke="#e8590c" stroke-width="'+(0.07*K)+'" stroke-dasharray="'+(0.14*K)+' '+(0.1*K)+'" stroke-linecap="round" visibility="hidden"/></svg>'+
       '<div class="navc"><svg id="nav" viewBox="-1.55 -1.55 3.1 3.1"></svg></div></div>'+
       '<div class="side">'+ side +
         '<div class="panel"><div class="count" id="cnt"></div><div class="howto">・てんを さわって、つぎの てんを さわると ぼうで つながる（なぞっても いいよ）<br>・なにも ない ところを ひっぱると ぐるっと まわる<br>・みぎしたの さいころを ひっぱっても まわる。めんを さわると その むきから みられる<br>・ぼうを さわると とれる</div><div class="msg" id="msg"></div></div>'+
         '<div class="btns"><button class="btn" id="undo">↶ ひとつ もどす</button><button class="btn" id="clr">ぜんぶ とる</button><button class="btn" id="view">🔄 みかた</button>'+
-        (L.free?'<button class="btn primary" id="fin">できた！</button>':'')+'</div>'+
+        (L.free?'<button class="btn orange" id="save">💾 ほぞん</button><button class="btn" id="gal">📂 さくひん</button><button class="btn primary" id="fin">できた！</button>':'')+'</div>'+
       '</div></div>';
   var svg=document.getElementById('bd'), g3=document.getElementById('g3'), rub=document.getElementById('rub');
   var cnt=document.getElementById('cnt'), msgEl=document.getElementById('msg'), mdl=document.getElementById('mdl');
   function msg(t){ msgEl.textContent=t||''; }
   var nav = document.getElementById('nav');
   function render(hl){
-    g3.innerHTML = draw3(sticks, v, { lattice:true, sel:sel, hl:hl });
+    g3.innerHTML = draw3(sticks, v, { lattice:true, sel:sel, hl:hl, N:N, k:K, hint:hint });
     nav.innerHTML = navSvg(v);
     cnt.innerHTML = '<span style="white-space:nowrap">ぼう：<big>'+sticks.length+'</big> ほん</span><br><span style="white-space:nowrap">ねんどだま：<big>'+ballsOf(sticks).length+'</big> こ</span>';
   }
@@ -1110,15 +1186,15 @@ function playCube(li){
   var pickDist = 9;
   function pick(p){
     var best=null, bs=0.3; pickDist = 9;
-    for(var x=0;x<C3.NX;x++) for(var y=0;y<C3.NY;y++) for(var z=0;z<C3.NZ;z++){
-      var q = proj3([x,y,z], v), raw = Math.hypot(q.x-p.x, q.y-p.y), dd = raw - 0.03*q.d;   // てまえの てんを えらびやすく
+    for(var x=0;x<N[0];x++) for(var y=0;y<N[1];y++) for(var z=0;z<N[2];z++){
+      var q = proj3([x,y,z], v), raw = Math.hypot(q.x-p.x, q.y-p.y), dd = raw - 0.03*q.d/K;   // てまえの てんを えらびやすく
       if(dd < bs){ bs = dd; best = [x,y,z]; pickDist = raw; }
     }
     return best;
   }
   var stickDist = 9;
   function pickStick(p){
-    var best=-1, bd=0.14; stickDist = 9;
+    var best=-1, bd=0.14*K; stickDist = 9;
     sticks.forEach(function(st,i){
       var a=proj3(st[0],v), b=proj3(st[1],v), dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
       var t = L2 ? Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/L2)) : 0;
@@ -1128,6 +1204,9 @@ function playCube(li){
     return best;
   }
   function snapshot(){ hist.push(sticks.slice()); }
+  var AUTO_KEY = 'katachi-free-'+li;
+  function autosave(){ if(L.free) lsSet(AUTO_KEY, sticks); }
+  function inside(st){ return st.every(function(p){ return p[0]>=0&&p[1]>=0&&p[2]>=0&&p[0]<N[0]&&p[1]<N[1]&&p[2]<N[2]; }); }
   function check(){
     if(!L.free && modelKeys[key3(sticks, ID)]){
       done = true; sel = null; render();
@@ -1139,9 +1218,9 @@ function playCube(li){
     snapshot();
     for(var i=0;i<sticks.length;i++){
       var s0=sticks[i];
-      if((samePt(s0[0],a)&&samePt(s0[1],b)) || (samePt(s0[0],b)&&samePt(s0[1],a))){ sticks.splice(i,1); SFX.pop(); msg('ぼうを とったよ'); check(); return false; }
+      if((samePt(s0[0],a)&&samePt(s0[1],b)) || (samePt(s0[0],b)&&samePt(s0[1],a))){ sticks.splice(i,1); SFX.pop(); msg('ぼうを とったよ'); autosave(); check(); return false; }
     }
-    sticks.push([a.slice(), b.slice()]); SFX.put(); msg(''); check(); return true;
+    sticks.push([a.slice(), b.slice()]); SFX.put(); msg(''); autosave(); check(); return true;
   }
   var mode=null, drag=null, wasSel=false, sx=0, sy=0, lastX=0, lastY=0, moved=false, stickIdx=-1;
   svg.addEventListener('pointerdown', function(e){
@@ -1150,7 +1229,7 @@ function playCube(li){
     try{ svg.setPointerCapture(e.pointerId); }catch(er){}
     var p = svgPt(svg,e), pt = pick(p), si = pickStick(p);
     sx = lastX = e.clientX; sy = lastY = e.clientY; moved = false;
-    if(pt && si>=0 && stickDist + 0.06 < pickDist) pt = null;   // ぼうの ほうが ずっと ちかい ときは ぼうを えらぶ
+    if(pt && si>=0 && stickDist + 0.06*K < pickDist) pt = null;   // ぼうの ほうが ずっと ちかい ときは ぼうを えらぶ
     if(pt){
       if(sel && !samePt(sel,pt)){ sel = addStick(sel, pt) ? pt : null; mode=null; render(); return; }
       wasSel = samePt(sel,pt); sel = pt; drag = pt; mode = 'pt'; if(!wasSel) SFX.sel(); render(); return;
@@ -1162,8 +1241,11 @@ function playCube(li){
     if(!mode) return;
     if(Math.hypot(e.clientX-sx, e.clientY-sy) > 6) moved = true;
     if(mode==='pt'){
-      var p=svgPt(svg,e), a=proj3(drag,v);
-      rub.setAttribute('x1',a.x); rub.setAttribute('y1',a.y); rub.setAttribute('x2',p.x); rub.setAttribute('y2',p.y);
+      var p=svgPt(svg,e), a=proj3(drag,v), u=moved ? pick(p) : null;
+      var nh = (u && !samePt(u,drag)) ? u : null;
+      if(String(nh) !== String(hint)){ hint = nh; render(); }
+      var e2 = hint ? proj3(hint, v) : p;   // つながる てんに すいつく
+      rub.setAttribute('x1',a.x); rub.setAttribute('y1',a.y); rub.setAttribute('x2',e2.x); rub.setAttribute('y2',e2.y);
       rub.setAttribute('visibility', moved ? 'visible' : 'hidden');
       return;
     }
@@ -1177,21 +1259,42 @@ function playCube(li){
   });
   function up(e){
     if(!mode) return;
-    rub.setAttribute('visibility','hidden');
+    rub.setAttribute('visibility','hidden'); hint = null;
     if(mode==='pt'){
       var u = pick(svgPt(svg,e));
       if(moved && u && !samePt(u,drag)){ sel = addStick(drag,u) && !done ? u : null; }
       else if(!moved && wasSel){ sel = null; }
     }else if(mode==='stick' && !moved){
-      snapshot(); sticks.splice(stickIdx,1); SFX.pop(); msg('ぼうを とったよ'); sel = null; check();
+      snapshot(); sticks.splice(stickIdx,1); SFX.pop(); msg('ぼうを とったよ'); sel = null; autosave(); check();
     }else if(mode==='rot' && !moved){ sel = null; }
     mode = null; drag = null; wasSel = false;
     if(!done) render();
   }
   svg.addEventListener('pointerup', up);
   svg.addEventListener('pointercancel', function(){ mode=null; drag=null; rub.setAttribute('visibility','hidden'); render(); });
-  document.getElementById('undo').onclick=function(){ if(done || !hist.length) return; sticks=hist.pop(); sel=null; SFX.pop(); msg(''); render(); };
-  document.getElementById('clr').onclick=function(){ if(done || !sticks.length) return; snapshot(); sticks=[]; sel=null; msg(''); render(); };
+  document.getElementById('undo').onclick=function(){ if(done || !hist.length) return; sticks=hist.pop(); sel=null; SFX.pop(); msg(''); autosave(); render(); };
+  document.getElementById('clr').onclick=function(){ if(done || !sticks.length) return; snapshot(); sticks=[]; sel=null; msg(''); autosave(); render(); };
+  // さくひんを ほぞん・よびだす
+  function loadSticks(list){
+    snapshot(); sticks = list.filter(inside).map(function(st){ return [st[0].slice(), st[1].slice()]; }); sel = null; autosave();
+  }
+  if(L.free){
+    if(PENDING_LOAD){ loadSticks(PENDING_LOAD); hist = []; PENDING_LOAD = null; msg('さくひんを よびだしたよ'); }
+    else { var saved = lsGet(AUTO_KEY, null); if(saved && saved.length){ sticks = saved.filter(inside); msg('つくりかけの つづきから だよ'); } }
+    document.getElementById('save').onclick = function(){
+      if(!sticks.length){ SFX.ng(); msg('まずは ぼうを つないでみよう'); return; }
+      var works = lsGet(WORKS_KEY, []);
+      if(works.length >= WORKS_MAX){ SFX.ng(); msg('さくひんが いっぱいだよ。「📂 さくひん」で いらない ものを けしてね'); return; }
+      var no = works.reduce(function(m,w){ return Math.max(m, w.no||0); }, 0) + 1;
+      works.push({ id:Date.now(), no:no, li:li, sticks:sticks, t:Date.now() });
+      lsSet(WORKS_KEY, works);
+      SFX.ok(); msg('「さくひん '+no+'」として ほぞんしたよ！');
+    };
+    document.getElementById('gal').onclick = function(){ SFX.sel(); showGallery(li, function(w){
+      if(w.li === li){ loadSticks(w.sticks); render(); msg('「さくひん '+w.no+'」を よびだしたよ'); }
+      else { PENDING_LOAD = w.sticks; openLevel('bonus', w.li); }
+    }); };
+  }
   // なめらかに むきを かえる
   var anim = null;
   function turnTo(yaw, pitch){
