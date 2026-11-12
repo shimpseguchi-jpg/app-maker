@@ -1,0 +1,11 @@
+{
+  "name": "ほたるの めいきゅう",
+  "short_name": "ほたるの めいきゅう",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0d1530",
+  "theme_color": "#0d1530",
+  "lang": "ja",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
