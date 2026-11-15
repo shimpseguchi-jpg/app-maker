@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">撮ってDrive</string>
+    <string name="settings_title">送信先の設定</string>
+    <string name="mode_photo">写真</string>
+    <string name="mode_video">動画</string>
+    <string name="shutter">撮影</string>
+    <string name="open_settings">設定</string>
+    <string name="permission_needed">撮影にはカメラの許可が必要です</string>
+    <string name="permission_grant">許可する</string>
+    <string name="status_pending">未送信 %1$d件</string>
+    <string name="status_none">未送信なし</string>
+    <string name="status_wifi">Wi-Fi接続中</string>
+    <string name="status_wait_wifi">Wi-Fi待ち</string>
+    <string name="status_uploading">送信中…</string>
+    <string name="status_not_configured">送信先が未設定です（右上の⚙）</string>
+    <string name="status_needs_login">ログインし直してください（右上の⚙）</string>
+    <string name="toast_saved_video">動画を送信待ちにしました</string>
+    <string name="toast_capture_failed">撮影に失敗しました</string>
+    <string name="toast_no_audio">マイクが許可されていないので音声なしで録画します</string>
+
+    <string name="settings_intro">組織の Google アカウントでログインし、保存先のフォルダを指定してください。準備の手順は photodrive/README.md にあります。</string>
+    <string name="settings_account_title">Google アカウント</string>
+    <string name="settings_no_account">ログインしていません</string>
+    <string name="settings_account_needs_login">%1$s（許可が切れています。もう一度ログインしてください）</string>
+    <string name="settings_sign_in">ログイン</string>
+    <string name="settings_sign_out">ログアウト</string>
+    <string name="settings_sign_in_failed">ログインできませんでした：%1$s</string>
+    <string name="settings_folder_title">保存先フォルダ</string>
+    <string name="settings_folder">フォルダの URL（または ID）</string>
+    <string name="settings_test">接続テストして保存</string>
+    <string name="settings_need_account">先にログインしてください</string>
+    <string name="settings_testing">確認中…</string>
+    <string name="settings_test_ok">OK：保存先フォルダ「%1$s」に保存します</string>
+    <string name="settings_test_ng">NG：%1$s</string>
+    <string name="settings_pending_title">送信待ちのデータ</string>
+    <string name="settings_pending_count">送信待ち %1$d件（暗号化してアプリ内だけに保管。送信後すぐ消えます）</string>
+    <string name="settings_delete_pending">送信待ちをすべて消す</string>
+    <string name="settings_delete_confirm">送信していない写真・動画をすべて消します。元に戻せません。よろしいですか？</string>
+    <string name="settings_delete_yes">消す</string>
+    <string name="settings_cancel">やめる</string>
+    <string name="settings_privacy">・写真・動画はギャラリー（端末の共有フォルダ）には保存しません\n・Wi-Fi につながっていないときだけ、アプリ専用の領域に暗号化して一時保管し、アップロードが終わったらすぐ削除します\n・位置情報は記録しません\n・端末のバックアップや機種変更の転送の対象外です</string>
+</resources>
