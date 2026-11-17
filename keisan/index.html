@@ -57,7 +57,7 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
   background:linear-gradient(90deg,transparent,#fff9,transparent);animation:sh 2.6s infinite}
 @keyframes sh{60%,100%{left:140%}}
 /* もんだい */
-.quiz{flex:1;display:grid;grid-template-columns:1fr 340px;gap:14px;min-height:0}
+.quiz{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;min-height:0}
 .board{background:#fffdf5;color:#2b1b4a;border-radius:24px;border:5px solid #ffd23c;padding:14px 20px;position:relative;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;box-shadow:0 0 24px #ffb80055}
 .board.lucky{border-color:#ff5dd0;box-shadow:0 0 40px #ff5dd0;animation:lk .6s ease-in-out infinite alternate}
@@ -83,7 +83,7 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 .bar{height:14px;background:#fff3;border-radius:9px;overflow:hidden;margin-top:4px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd23c,#ff5dd0);transition:width .4s}
 .combo{font-size:22px;font-weight:900;color:#ffe04a;min-width:150px;text-align:center}
-.combo.fv{font-size:25px;animation:bump .5s infinite}
+.combo.fv{font-size:23px;white-space:nowrap;animation:bump .5s infinite}
 /* ぶんしょうもんだい */
 .steps{display:flex;gap:8px;font-size:17px;font-weight:bold}
 .steps span{padding:4px 14px;border-radius:999px;background:#e6def7;color:#8c7bb5}
@@ -181,6 +181,20 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 @keyframes pulse2{to{box-shadow:0 0 22px #fff}}
 .flip .fr{transform:rotateY(180deg)}
 .flip .new{font-size:15px;top:-8px;right:-10px;padding:2px 8px;border-width:2px}
+#glow{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:4;
+  background:linear-gradient(120deg,#ff5d5d,#ffb13d,#fff35c,#5dff8f,#5dc8ff,#b56bff,#ff5dd0)}
+#stage.fv:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;box-shadow:inset 0 0 70px 16px #ff3d9a;animation:hue 1.6s linear infinite}
+@keyframes hue{to{filter:hue-rotate(360deg)}}
+/* もんだいスロット：かずと ＋− が リールで まわって とまる */
+.slotq{gap:6px;font-size:80px;padding:12px;border-radius:24px;border:5px solid #fff3a0;
+  background:linear-gradient(180deg,#ff3d6e,#a3002f);box-shadow:0 0 26px #ff5dd088,inset 0 0 16px #0008;color:#fff}
+.reel{min-width:88px;height:140px;padding:0 10px;border-radius:14px;background:linear-gradient(180deg,#aaa,#fff 28%,#fff 72%,#aaa);border:4px solid #5a2c00;
+  display:inline-grid;place-items:center;overflow:hidden;color:#2b1b4a}
+.reel.w{min-width:124px}
+.reel.spin span{animation:rs .13s linear infinite;filter:blur(2px)}
+@keyframes rs{from{transform:translateY(-100px)}to{transform:translateY(100px)}}
+.reel.hit{animation:bump .35s 2;border-color:#ffe04a;box-shadow:0 0 26px #ffe04a}
+.slotq .ans{min-width:112px;height:140px}
 .cf{position:absolute;top:-20px;width:12px;height:20px;z-index:25;pointer-events:none}
 .quake{animation:qk .5s}
 @keyframes qk{10%{margin:-10px 0 0 12px}30%{margin:12px 0 0 -12px}50%{margin:-8px 0 0 -10px}70%{margin:8px 0 0 10px}90%{margin:-4px 0 0 4px}}
@@ -190,13 +204,14 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 <div id="stage">
   <div id="scr"></div>
   <div id="ov"><div id="rays"></div><div id="ovc"></div></div>
+  <div id="glow"></div>
   <div id="flash"></div>
 </div>
 <script>
 (function(){
 'use strict';
 var $=function(s){return document.querySelector(s)};
-var stage=$('#stage'),scr=$('#scr'),ov=$('#ov'),ovc=$('#ovc'),rays=$('#rays'),flashEl=$('#flash');
+var stage=$('#stage'),scr=$('#scr'),ov=$('#ov'),ovc=$('#ovc'),rays=$('#rays'),flashEl=$('#flash'),glowEl=$('#glow');
 function fit(){var s=Math.min(innerWidth/1024,innerHeight/640);stage.style.transform='translate(-50%,-50%) scale('+s+')'}
 addEventListener('resize',fit);fit();
 function rnd(a,b){return a+Math.floor(Math.random()*(b-a+1))}
@@ -277,6 +292,19 @@ function flyCoins(n){
       {transform:'translate(560px,-280px) scale(.6)',opacity:.6}],{duration:900,delay:i*45,easing:'ease-in-out'}).onfinish=function(){e.remove()};
   })(i)}
 }
+function burst(){   /* せいかいの しゅんかんに ほしが はじける */
+  glowEl.animate([{opacity:.4},{opacity:0}],{duration:700});
+  var em=['⭐','✨','🎉','💥','🌟','🎊'];
+  for(var i=0;i<18;i++){(function(i){
+    var e=document.createElement('span');e.className='fly';e.textContent=pick(em);e.style.left='320px';e.style.top='290px';
+    var a=i/18*6.283+Math.random()*.4,d=rnd(170,360);
+    stage.appendChild(e);
+    e.animate([{transform:'translate(0,0) scale(.3) rotate(0)',opacity:1},
+      {transform:'translate('+Math.cos(a)*d+'px,'+Math.sin(a)*d+'px) scale(1.5) rotate('+rnd(-200,200)+'deg)',opacity:0}],
+      {duration:rnd(600,950),easing:'cubic-bezier(.1,.7,.3,1)'}).onfinish=function(){e.remove()};
+  })(i)}
+  confetti(24);
+}
 function waitTap(el){return new Promise(function(r){var h=function(){el.removeEventListener('click',h);r()};el.addEventListener('click',h)})}
 
 /* ---------- がめん ---------- */
@@ -284,6 +312,7 @@ var view='home',Q=null,busy=false,combo=0;
 function coinHTML(){return '<div class="coin" id="coin">🪙<span>'+S.coins+'</span></div>'}
 function topBar(t,extra){return '<div class="top"><button class="sub" data-act="home">◀ もどる</button><h2>'+t+'</h2>'+(extra||'')+coinHTML()+'</div>'}
 function render(){
+  stage.classList.toggle('fv',view==='quiz'&&combo>=5);
   if(view==='home')scr.innerHTML=
     '<div class="top"><button class="sub" data-act="mute">'+(S.mute?'🔇 おと なし':'🔊 おと あり')+'</button><h2></h2>'+
     '<button class="sub" data-act="zukan">📖 ずかん '+Object.keys(S.cards).length+'/'+(CARDS.length+1)+'</button>'+coinHTML()+'</div>'+
@@ -334,7 +363,9 @@ function newQ(){
     if(op==='+'){a=rnd(2,9);b=rnd(Math.max(2,11-a),9)}   /* こたえ 11〜18 */
     else{a=rnd(11,18);b=rnd(a-9,9)}                       /* こたえ 2〜9 */
   }while(a===Q.a&&b===Q.b);
-  Q={mode:m,a:a,b:b,op:op,ans:op==='+'?a+b:a-b,input:'',miss:0,done:false,lucky:Math.random()<.15,word:m==='word'};
+  Q={mode:m,a:a,b:b,op:op,ans:op==='+'?a+b:a-b,input:'',miss:0,done:false,word:m==='word'};
+  Q.zoro=!Q.word&&op==='+'&&a===b;            /* スロットが ゾロめ（7＋7 など）なら ボーナス */
+  Q.lucky=Q.zoro||Math.random()<.12;Q.spin=!Q.word;
   if(Q.word){
     var w=pick(WP[op])(a,b);Q.u=w[1];Q.step=0;Q.bad=0;Q.kw=[];
     Q.toks=w[0].split(' ').map(function(t){
@@ -351,15 +382,18 @@ function hintHTML(){
   return '<b>'+a+'</b>を 10と <b>'+(a-10)+'</b>に わけよう。　10−'+b+'＝<b>'+(10-b)+'</b>。<br><b>'+(10-b)+'</b>と <b>'+(a-10)+'</b>で …？';
 }
 function eqHTML(small){
-  return '<div class="eq'+(small?' s':'')+'" id="eq">'+Q.a+'<span class="op'+(Q.op==='-'?' mi':'')+'">'+(Q.op==='+'?'＋':'−')+'</span>'+Q.b+'＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+
+  var sp=Q.spin?' spin':'',opH='<span class="op'+(Q.op==='-'?' mi':'')+'">'+(Q.op==='+'?'＋':'−')+'</span>';
+  return '<div class="eq'+(small?' s':' slotq')+'" id="eq">'+(small?Q.a+opH+Q.b:
+    '<span class="reel w'+sp+'" id="r0"><span>'+Q.a+'</span></span><span class="reel'+(Q.mode==='mix'?sp:'')+'" id="r1">'+opH+'</span><span class="reel'+sp+'" id="r2"><span>'+Q.b+'</span></span>')+
+    '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+
     (Q.input||'？')+'</span>'+(small?'<span style="font-size:.5em">'+cnt(Q.ans,Q.u).slice(String(Q.ans).length)+'</span>':'')+'</div>';
 }
 function mult(){return Math.max(Q.lucky?3:1,combo>=10?3:combo>=5?2:1)}
 function renderQuiz(){
   var names={add:'たしざん',sub:'ひきざん',mix:'まぜまぜ',word:'ぶんしょうもんだい'};
-  var cb=combo>=2?'<div class="combo'+(combo>=5?' fv rain':'')+'">'+(combo>=5?'🔥フィーバー '+(combo>=10?'3':'2')+'ばい！ ':'')+combo+'れんぞく！</div>':'<div class="combo"></div>';
-  var h=topBar(names[Q.mode],cb)+'<div class="quiz"><div class="board'+(Q.lucky?' lucky':'')+'" id="board">';
-  if(Q.lucky)h+='<div class="tag">⭐ ラッキーもんだい！ コイン 3ばい ⭐</div>';
+  var cb=combo>=2?'<div class="combo'+(combo>=5?' fv rain':'')+'">'+(combo>=5?'🔥フィーバー×'+(combo>=10?'3':'2')+'　':'')+combo+'れんぞく！</div>':'<div class="combo"></div>';
+  var h=topBar(names[Q.mode],cb)+'<div class="quiz"><div class="board'+(Q.lucky&&!Q.spin?' lucky':'')+'" id="board">';
+  if(Q.lucky&&!Q.spin)h+='<div class="tag">⭐ '+(Q.zoro?'ゾロめ ボーナス':'ラッキーもんだい')+'！ コイン 3ばい ⭐</div>';
   var side;
   if(!Q.word){
     h+=eqHTML()+(Q.miss?'<div class="hint">'+hintHTML()+'</div>':'');
@@ -383,6 +417,29 @@ function renderQuiz(){
     '<div class="bar"><i style="width:'+(full?100:(S.coins%PRICE)*100/PRICE)+'%"></i></div></div>'+
     '<button class="gold" data-act="gacha" style="font-size:22px;padding:8px"'+(can&&!op?'':' disabled')+'>'+(op?'パックは また あした！':'🎴 パックを あけに いく')+'</button></div></div>';
   scr.innerHTML=h;
+  if(Q.spin&&!Q.spinning){Q.spinning=true;spinQ()}
+}
+function spinQ(){   /* ひだりから じゅんに リールが とまって もんだいが きまる */
+  var q=Q,tick=0,stop=[7,12,17];
+  var iv=setInterval(function(){
+    if(Q!==q||view!=='quiz'){clearInterval(iv);return}
+    tick++;
+    [0,1,2].forEach(function(i){
+      var e=$('#r'+i),f=e.firstChild;
+      if(tick===stop[i]){
+        if(i===1){f.textContent=q.op==='+'?'＋':'−';f.className='op'+(q.op==='-'?' mi':'')}else f.textContent=i?q.b:q.a;
+        e.classList.remove('spin');e.classList.add('hit');tone(170,.12,0,'square',.1);
+      }else if(e.classList.contains('spin')){
+        if(i===1){var pl=tick%2;f.textContent=pl?'＋':'−';f.className='op'+(pl?'':' mi')}
+        else f.textContent=i===0&&q.op==='-'?rnd(11,18):rnd(2,9);
+      }
+    });
+    if(tick%2)tone(500+tick%3*90,.03,0,'triangle',.03);
+    if(tick>=stop[2]){
+      clearInterval(iv);q.spin=false;
+      if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
+    }
+  },70);
 }
 function padHTML(){
   var h='<div class="pad">';
@@ -398,13 +455,13 @@ function gain(base,label){
   setTimeout(function(){var c=$('#coin');if(c){c.lastChild.textContent=S.coins;c.classList.add('bump')}},800);
 }
 function answer(){
-  if(busy||Q.done||!Q.input)return;
+  if(busy||Q.done||Q.spin||!Q.input)return;
   if(+Q.input===Q.ans){
     Q.done=true;busy=true;
     combo=Q.miss||Q.bad?0:combo+1;
-    sfx.ok();$('#ans').classList.add('ok');
-    if(combo===5||combo===10){confetti(50);flash(.5)}
-    gain(Q.word?20:10,combo>=5?'🔥フィーバー！':'せいかい！');
+    sfx.ok();$('#ans').classList.add('ok');burst();
+    if(combo===5||combo===10){confetti(50);flash(.5);stage.classList.add('fv')}
+    gain(Q.word?20:10,combo>=5?'🔥フィーバー！':pick(['せいかい！','すごい！','てんさい！','やったね！','かんぺき！','ナイス！']));
     setTimeout(function(){busy=false;newQ();if(view==='quiz')render()},1300);
   }else{
     Q.miss++;Q.input='';combo=0;sfx.ng();render();$('#eq').classList.add('shake');
@@ -523,8 +580,8 @@ scr.addEventListener('click',function(e){
   else if(act==='zukan'){view='zukan';sfx.tap();render()}
   else if(act==='gacha'){view='gacha';sfx.tap();render()}
   else if(act==='go'){Q={mode:el.dataset.m};combo=0;newQ();view='quiz';sfx.tap();render()}
-  else if(act==='key'){if(Q.done)return;if(Q.input.length<2)Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
-  else if(act==='del'){Q.input='';sfx.tap();$('#ans').textContent='？'}
+  else if(act==='key'){if(Q.done||Q.spin)return;if(Q.input.length<2)Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
+  else if(act==='del'){if(Q.spin)return;Q.input='';sfx.tap();$('#ans').textContent='？'}
   else if(act==='ent')answer();
   else if(act==='tok'){
     if(!Q.word||Q.step!==0)return;
