@@ -9,6 +9,7 @@
   ・このファイル1つだけで動きます（外部の画像・フォント・ライブラリなし）。
   ・Google サイト：「挿入」→「埋め込む」→「コードを埋め込む」に、このファイルの中身をまるごと貼りつけてください。
   ・iPad の横画面向け。1024×640 の画面を、埋め込みわくの大きさに合わせて自動で拡大縮小します。
+  ・Google Apps Script のウェブアプリとして開いたときだけ、セーブをサーバーにも保存します（gas/README.md）。それ以外では通信しません。
   ・コインは計算に正解したときだけ手に入ります（課金・通信はありません）。パックの開封は1日1回です。
 -->
 <style>
@@ -225,6 +226,13 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 .slotq.zg #r2{border-color:#ffd23c;box-shadow:0 0 22px #ffd23c}
 .reel.hit{animation:bump .35s 2;border-color:#ffe04a;box-shadow:0 0 26px #ffe04a}
 .slotq .ans{min-width:112px;height:140px}
+.load{flex:1;display:grid;place-items:center;font-size:30px;font-weight:bold}
+/* たんまつID（せんせいよう）：こどもが まちがって さわらない ように、ちいさく すみに */
+.devid{position:absolute;left:16px;bottom:1px;font-size:9px;line-height:11px;opacity:.4;letter-spacing:1px;z-index:2;padding:0 4px}
+#idd{position:absolute;inset:0;z-index:40;background:#000c;display:grid;place-items:center}
+.idb{background:#fff;color:#222;border-radius:18px;padding:16px 26px;width:540px;text-align:center;font-size:17px}
+.idb p{margin:8px 0}.idb .sub{color:#222;border-color:#999;background:#eee}.idb .gold{font-size:20px;padding:8px 26px}
+.idb input{font:inherit;font-size:26px;width:100%;text-align:center;padding:8px;border:2px solid #999;border-radius:10px;-webkit-user-select:text;user-select:text}
 .cf{position:absolute;top:-20px;width:12px;height:20px;z-index:25;pointer-events:none}
 .quake{animation:qk .5s}
 @keyframes qk{10%{margin:-10px 0 0 12px}30%{margin:12px 0 0 -12px}50%{margin:-8px 0 0 -10px}70%{margin:8px 0 0 10px}90%{margin:-4px 0 0 4px}}
@@ -267,10 +275,90 @@ function cardHTML(c,size,cnt){
 
 /* ---------- セーブ ---------- */
 var KEY='keisan-oripa-v1',S={coins:50,cards:{},box:null,boxNo:1,mute:false};
-try{var d=JSON.parse(localStorage.getItem(KEY));if(d&&typeof d.coins==='number')S=d}catch(e){}
-if(!S.box)S.box=Object.assign({},BOX0);
-if(!S.cards)S.cards={};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function fix(o){   /* セーブの かたちを たしかめる（おかしければ null） */
+  if(!o||typeof o.coins!=='number')return null;
+  if(!o.box)o.box=Object.assign({},BOX0);
+  if(!o.cards)o.cards={};
+  if(!o.boxNo)o.boxNo=1;
+  return o;
+}
+try{var d=fix(JSON.parse(localStorage.getItem(KEY)));if(d)S=d}catch(e){}
+fix(S);
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){
+  S.updatedAt=Date.now();saveLocal();
+  if(GS&&dev){clearTimeout(pushT);pushT=setTimeout(push,1500)}   /* サーバーへは まとめて おくる */
+}
+
+/* ---------- サーバーほぞん（Google Apps Script で ひらいた ときだけ） ----------
+   google.script.run が ない ばしょ（Google サイトの コードうめこみ・GitHub Pages・ファイルを ちょくせつ ひらく）では
+   なにも しない（つうしんも エラーも なし）。たんまつごとに 1セーブで、たんまつIDで みわける。 */
+var GS=null;
+try{if(typeof google!=='undefined'&&google.script&&google.script.run)GS=google.script}catch(e){}
+var DKEY='keisan-oripa-dev',dev='',pushT=0,sending=false,again=false;
+function validId(v){return /^[0-9a-z]{12}$/.test(v)}
+function normId(v){return String(v||'').toLowerCase().replace(/[^0-9a-z]/g,'')}
+function fmtId(v){return v.replace(/(.{4})(?=.)/g,'$1-')}
+function newId(){var c='abcdefghjkmnpqrstuvwxyz23456789',v='';for(var i=0;i<12;i++)v+=c.charAt(rnd(0,c.length-1));return v}
+function setDev(v){dev=v;try{localStorage.setItem(DKEY,v)}catch(e){}}
+function push(){
+  clearTimeout(pushT);pushT=0;
+  if(!GS||!dev)return;
+  if(sending){again=true;return}
+  sending=true;
+  try{
+    GS.run.withSuccessHandler(function(){sending=false;if(again){again=false;push()}})
+      .withFailureHandler(function(){sending=false;again=false})   /* しっぱいしても ゲームは とめない。つぎの ほぞんで また おくる */
+      .saveKeisan(dev,JSON.stringify(S));
+  }catch(e){sending=false}
+}
+function pull(id,ok,ng){
+  try{
+    GS.run.withSuccessHandler(function(j){var o=null;try{o=fix(JSON.parse(j))}catch(e){}ok(o)})
+      .withFailureHandler(function(){ng()}).loadKeisan(id);
+  }catch(e){ng()}
+}
+function boot(){
+  if(!GS){render();return}
+  scr.innerHTML='<div class="load">よみこみちゅう…</div>';
+  var done=false,started=false;
+  function go(){if(done)return;done=true;render()}
+  setTimeout(go,8000);                    /* サーバーが こたえなくても てもとの セーブで はじめる */
+  function start(){
+    if(started)return;started=true;
+    if(!validId(dev)){try{dev=localStorage.getItem(DKEY)||''}catch(e){}}
+    if(!validId(dev))setDev(newId());     /* はじめての たんまつ：IDを つくる */
+    pull(dev,function(o){
+      if(done)return;
+      if(o&&(o.updatedAt||0)>(S.updatedAt||0)){S=o;saveLocal()}   /* あたらしい ほうを つかう */
+      else push();                        /* サーバーが から、または てもとが あたらしい → てもとを サーバーへ */
+      go();
+    },go);
+  }
+  /* URL に ?game=keisan&dev=（たんまつID）と つけて ひらくと、その IDを つかう（てもとの IDが きえても もどせる） */
+  try{GS.url.getLocation(function(loc){var v=normId(((loc&&loc.parameter)||{}).dev);if(validId(v))setDev(v);start()})}catch(e){}
+  setTimeout(start,1500);
+}
+function idDialog(){   /* せんせいよう：たんまつIDを いれなおして、その IDの セーブを よみこむ */
+  if($('#idd'))return;
+  var d=document.createElement('div');d.id='idd';
+  d.innerHTML='<div class="idb"><b>せんせいよう：たんまつID</b><p>いまの ID： <b>'+fmtId(dev)+'</b></p>'+
+    '<p>べつの IDを いれると、その IDの セーブ（コインと カード）を よみこみます。</p>'+
+    '<input id="idin" maxlength="20" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx">'+
+    '<p id="idmsg">&nbsp;</p><button class="sub" id="idno">やめる</button>　<button class="gold" id="idok">よみこむ</button></div>';
+  stage.appendChild(d);
+  $('#idno').onclick=function(){d.remove()};
+  $('#idok').onclick=function(){
+    var v=normId($('#idin').value),msg=$('#idmsg');
+    if(!validId(v)){msg.textContent='IDは えいすうじ 12もじです';return}
+    msg.textContent='よみこみちゅう…';
+    pull(v,function(o){
+      if(!o){msg.textContent='この IDの セーブは みつかりませんでした';return}
+      setDev(v);S=o;saveLocal();d.remove();view='home';render();
+    },function(){msg.textContent='つうしんに しっぱいしました。もういちど ためして ください'});
+  };
+}
+document.addEventListener('visibilitychange',function(){if(document.hidden&&pushT)push()});
 function boxLeft(){return RAR.reduce(function(t,r){return t+S.box[r]},0)}
 /* パックを あけられるのは 1にち 1かい。ためた コイン 50まいに つき カード 1まい（さいだい 10まい） */
 function today(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
@@ -355,6 +443,7 @@ function render(){
   if(view==='home')scr.innerHTML=
     '<div class="top"><button class="sub" data-act="mute">'+(S.mute?'🔇 おと なし':'🔊 おと あり')+'</button><h2></h2>'+
     '<button class="sub" data-act="zukan">📖 ずかん '+Object.keys(S.cards).length+'/'+(CARDS.length+1)+'</button>'+coinHTML()+'</div>'+
+    (GS&&dev?'<span class="devid" data-act="devid">ID '+fmtId(dev)+'</span>':'')+
     '<h1 class="title rain">けいさんオリパ</h1><p class="lead">けいさんで コインを ためて、1にち 1かいの パックかいふうで レアカードを あつめよう！</p>'+
     '<div class="home">'+
     '<button class="mode m-add shine" data-act="go" data-m="add"><i>＋</i><b>たしざん</b><small>くりあがり</small></button>'+
@@ -712,6 +801,7 @@ scr.addEventListener('click',function(e){
   if(busy)return;
   if(act==='home'){view='home';combo=0;sfx.tap();render()}
   else if(act==='mute'){S.mute=!S.mute;save();sfx.tap();render()}
+  else if(act==='devid')idDialog();
   else if(act==='zukan'){view='zukan';sfx.tap();render()}
   else if(act==='gacha'){view='gacha';sfx.tap();render()}
   else if(act==='go'){Q={mode:el.dataset.m};combo=0;newQ();view='quiz';sfx.tap();render()}
@@ -736,7 +826,7 @@ function gainSmall(label){
   stage.appendChild(p);setTimeout(function(){p.remove()},1100);
   var c=$('#coin');if(c)c.lastChild.textContent=S.coins;
 }
-render();
+boot();
 })();
 </script>
 </body>
