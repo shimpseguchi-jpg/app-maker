@@ -220,12 +220,45 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 .reel{min-width:88px;height:140px;padding:0 10px;border-radius:14px;background:linear-gradient(180deg,#aaa,#fff 28%,#fff 72%,#aaa);border:4px solid #5a2c00;
   display:inline-grid;place-items:center;overflow:hidden;color:#2b1b4a}
 .reel.w{min-width:124px}
-.reel.spin span{animation:rs .13s linear infinite;filter:blur(2px)}
+.slotq .reel.spin span{animation:rs .13s linear infinite;filter:blur(2px)}
 @keyframes rs{from{transform:translateY(-100px)}to{transform:translateY(100px)}}
 .reel.slow span{animation-duration:.32s;filter:none}
 .slotq.zg{border-color:#ffd23c;box-shadow:0 0 44px 12px #ffd23c,inset 0 0 16px #0008}
 .slotq.zg #r2{border-color:#ffd23c;box-shadow:0 0 22px #ffd23c}
-.reel.hit{animation:bump .35s 2;border-color:#ffe04a;box-shadow:0 0 26px #ffe04a}
+.slotq .reel.hit{animation:bump .35s 2;border-color:#ffe04a;box-shadow:0 0 26px #ffe04a}
+/* スロット いがいの もんだいの だしかた（ガチャだま・カードめくり・サイコロ）。3つの ます #r0 #r1 #r2 は スロットと おなじ */
+.pq{gap:8px;font-size:70px;padding:12px 0}
+.pq .reel{width:124px;min-width:0;height:124px;padding:0;background:#fff;border:5px solid #b79cf0}
+.pq #r1{width:84px}
+.pq .ans{min-width:112px;height:124px}
+.pq .reel.spin span{opacity:0}
+.pq.zg #r0{border-color:#ffd23c;box-shadow:0 0 32px 10px #ffd23c}   /* ゾロめに なるかも：さいしょの かずが きんいろ */
+/* ガチャだま：うえから おちて きて、われて かずが でる */
+.gq .reel{border-radius:50%}.gq #r1{height:84px}
+.gq .reel.spin{border-color:#fff;background:linear-gradient(180deg,var(--cap) 0 46%,#fff 46% 54%,#f2f2f7 54%);box-shadow:inset -10px -10px 0 #0002;
+  animation:gdrop .38s cubic-bezier(.3,1.5,.5,1) backwards,wob .45s .4s ease-in-out infinite}
+.gq #r0{--cap:#19b8a6}.gq #r1{--cap:#ff8a3d}.gq #r2{--cap:#8a63d2}
+.gq #r1.spin{animation-delay:.14s,.54s}.gq #r2.spin{animation-delay:.28s,.68s}
+@keyframes gdrop{from{transform:translateY(-330px);opacity:0}}
+.gq .reel.hit{animation:gpop .32s cubic-bezier(.2,1.8,.4,1)}
+@keyframes gpop{from{transform:scale(.2)}}
+/* カードめくり：うらは こん色の しまもよう（パックの レアリティの いろとは べつ） */
+.cq .reel{height:150px;border-radius:14px;border-color:#2b3a67;background:#fffdf5}.cq .ans{height:150px}
+.cq .reel.spin{border-color:#dfe6ff;background:repeating-linear-gradient(45deg,#24345e 0 10px,#2f4479 10px 20px);transition:transform .13s ease-in;animation:cdeal .22s ease-out backwards}
+.cq #r1.spin{animation-delay:.08s}.cq #r2.spin{animation-delay:.16s}
+@keyframes cdeal{from{transform:translate(-160px,-40px) rotate(-18deg);opacity:0}}
+.cq .reel.turn{transform:rotateY(90deg)}
+.cq .reel.hit{animation:cflip .2s ease-out}
+@keyframes cflip{from{transform:rotateY(-90deg)}}
+/* サイコロ：ころがりながら めが かわり、かずで とまる。＋−は ポンと でる */
+.dq .reel{border-radius:24px;border-color:#c9c9d6;box-shadow:inset 0 -9px 0 #e3e3ee}
+.dq .reel.spin{animation:droll .3s linear infinite}.dq .reel.spin span{opacity:1;filter:blur(1px)}
+.dq #r2.spin{animation-delay:-.12s}
+@keyframes droll{0%{transform:translateY(0) rotate(0)}25%{transform:translateY(-30px) rotate(90deg)}50%{transform:translateY(0) rotate(180deg)}75%{transform:translateY(-16px) rotate(270deg)}100%{transform:translateY(0) rotate(360deg)}}
+.dq .reel.hit{animation:bump .3s}
+.dq #r1{background:none;border-color:transparent;box-shadow:none}
+.dq #r1.spin{animation:none;transform:scale(0)}.dq #r1.spin span{opacity:0}
+.dq #r1.hit{animation:gpop .32s cubic-bezier(.2,1.8,.4,1)}
 .slotq .ans{min-width:112px;height:140px}
 .load{flex:1;display:grid;place-items:center;font-size:30px;font-weight:bold}
 /* たんまつID（せんせいよう）：こどもが まちがって さわらない ように、ちいさく すみに */
@@ -492,7 +525,9 @@ var WP={'+':[
     return [p[f]+'が '+cnt(f?b:a,u)+'、 '+p[1-f]+'が '+cnt(f?a:b,u)+' '+p[3]+'。 どちらが '+NAN[u]+' [おおい]ですか。',u]}
 ]};
 var PROMO_P=.09,TM=[1,2,3,5,5],TN=['','ほんのすこし むずかしい','すこし むずかしい','さんけた','かけざん 九九'];
-var FT=+(/^#t([1-4])$/.exec(location.hash)||[])[1]||0;   /* どうさかくにんよう：URL の さいごに #t1〜#t4 を つけると その ティアが かならず でる */
+var FT=+(/t([1-4])/.exec(location.hash)||[])[1]||0;   /* どうさかくにんよう：URL の さいごに #t1〜#t4 を つけると その ティアが かならず でる */
+/* もんだいの だしかた：まいかい ランダム。おなじ だしかたは つづけない。どうさかくにんよう：#pslot #pgacha #pcard #pdice で こてい（#t3,pdice も できる） */
+var PRES=['slot','gacha','card','dice'],lastPres='',FP=(/p(slot|gacha|card|dice)/.exec(location.hash)||[])[1]||'';
 function promote(q){   /* q.pt の ティアの もんだいに つくりかえる（＋−は もとの もんだいと おなじ。ティア4は ×） */
   var t=q.pt,op=q.op,a,b;
   if(t===4){a=rnd(2,9);b=rnd(2,9);q.op='×';q.ans=a*b}
@@ -520,6 +555,7 @@ function newQ(){
   Q.pt=0;Q.tier=0;
   if(!Q.word&&!Q.zoro&&(FT||Math.random()<PROMO_P)){var tr=Math.random();Q.pt=FT||(tr<.45?1:tr<.75?2:tr<.92?3:4)}
   Q.spin=!Q.word;Q.intro=Q.word;
+  if(!Q.word){Q.pres=FP||pick(PRES.filter(function(x){return x!==lastPres}));lastPres=Q.pres}
   if(Q.word){
     var w=pick(WP[op])(a,b);Q.u=w[1];Q.step=0;Q.bad=0;Q.kw=[];
     Q.toks=w[0].split(' ').map(function(t){
@@ -543,8 +579,9 @@ function eqHTML(small){
   if(Q.tier&&!small)return '<div class="eq tq" id="eq">'+Q.a+'<span class="op'+(Q.op==='-'?' mi':Q.op==='×'?' mu':'')+'">'+(Q.op==='+'?'＋':Q.op==='-'?'−':'×')+'</span>'+Q.b+
     '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+(Q.input||'？')+'</span></div>';
   var sp=Q.spin?' spin':'',opH='<span class="op'+(Q.op==='-'?' mi':'')+'">'+(Q.op==='+'?'＋':'−')+'</span>';
-  return '<div class="eq'+(small?' s':' slotq')+'" id="eq">'+(small?Q.a+opH+Q.b:
-    '<span class="reel w'+sp+'" id="r0"><span>'+Q.a+'</span></span><span class="reel'+(Q.mode==='mix'?sp:'')+'" id="r1">'+opH+'</span><span class="reel'+sp+'" id="r2"><span>'+Q.b+'</span></span>')+
+  var slot=Q.pres==='slot',kind=slot?' slotq':' pq '+{gacha:'gq',card:'cq',dice:'dq'}[Q.pres];
+  return '<div class="eq'+(small?' s':kind)+'" id="eq">'+(small?Q.a+opH+Q.b:
+    '<span class="reel w'+sp+'" id="r0"><span>'+Q.a+'</span></span><span class="reel'+(!slot||Q.mode==='mix'?sp:'')+'" id="r1">'+opH+'</span><span class="reel'+sp+'" id="r2"><span>'+Q.b+'</span></span>')+
     '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+
     (Q.input||'？')+'</span>'+(small?'<span style="font-size:.5em">'+cnt(Q.ans,Q.u).slice(String(Q.ans).length)+'</span>':'')+'</div>';
 }
@@ -584,13 +621,13 @@ function renderQuiz(){
     '<button class="gold" data-act="gacha" style="font-size:22px;padding:8px"'+(can&&!op?'':' disabled')+'>'+(op?'パックは また あした！':'🎴 パックを あけに いく')+'</button></div></div>';
   scr.innerHTML=h;
   if(Q.intro){Q.intro=false;for(var k=0;k<sn;k++)tone(520+k*130,.09,k*.35,'triangle',.06)}
-  if(Q.spin&&!Q.spinning){Q.spinning=true;spinQ()}
+  if(Q.spin&&!Q.spinning){Q.spinning=true;presentQ(Q)}
 }
-function spinQ(){   /* ひだりから じゅんに リールが とまって もんだいが きまる。3つめは すこし ながく まわる */
-  var q=Q,tick=0,stop=[7,12,21],zc=q.op==='+'&&q.a>=6;   /* zc：ゾロめに なるかも しれない */
-  function alive(){return Q===q&&view==='quiz'}
+function alive(q){return Q===q&&view==='quiz'}
+function spinQ(q){   /* スロット：ひだりから じゅんに リールが とまって もんだいが きまる。3つめは すこし ながく まわる */
+  var tick=0,stop=[7,12,21],zc=q.op==='+'&&q.a>=6;   /* zc：ゾロめに なるかも しれない */
   var iv=setInterval(function(){
-    if(!alive()){clearInterval(iv);return}
+    if(!alive(q)){clearInterval(iv);return}
     tick++;
     [0,1,2].forEach(function(i){
       var e=$('#r'+i),f=e.firstChild;
@@ -603,27 +640,54 @@ function spinQ(){   /* ひだりから じゅんに リールが とまって �
       }
     });
     if(tick===18){$('#r2').classList.add('slow');if(zc)$('#eq').classList.add('zg')}   /* ため。ゾロめの かのうせいが あれば きんいろ */
-    if(tick>17?tick%2:tick%2)tone(tick>17?700+tick*20:500+tick%3*90,.03,0,'triangle',.03);
-    if(tick>=stop[2]){clearInterval(iv);$('#eq').classList.remove('zg');finish()}
+    if(tick%2)tone(tick>17?700+tick*20:500+tick%3*90,.03,0,'triangle',.03);
+    if(tick>=stop[2]){clearInterval(iv);$('#eq').classList.remove('zg');finish(q)}
   },70);
-  async function finish(){
-    if(q.pt){      /* しょうかく：ふつうに とまった あと、あんてん → ティアを 1だんずつ のぼって、むずかしい もんだいに ばける */
-      await sleep(200);if(!alive())return;
-      await dark(300);if(!alive())return;
-      var bd=$('#board');
-      [0,1,2].forEach(function(i){$('#r'+i).classList.remove('hit');$('#r'+i).classList.add('spin')});
-      bd.insertAdjacentHTML('afterbegin','<div class="tag" id="tt"></div>');
-      for(var t=1;t<=q.pt;t++){
-        bd.className='board tier'+t;$('#tt').className='tag t'+t;$('#tt').textContent='しょうかく！ '+TN[t];
-        flash(.35);sfx.up(t+3);if(t>=3)quake();
-        await sleep(250);if(!alive())return;
+}
+/* ガチャだま・カードめくり・サイコロ：3つの ますが きまった じゅんに ひらく（1コマ 70ms） */
+var REV={gacha:[9,13,17],card:[7,11,16],dice:[8,11,17]};
+function presentQ(q){
+  if(q.pres==='slot')return spinQ(q);
+  var tick=0,rev=REV[q.pres],zc=q.op==='+'&&q.a>=6,kind=q.pres;
+  var iv=setInterval(function(){
+    if(!alive(q)){clearInterval(iv);return}
+    tick++;
+    [0,1,2].forEach(function(i){
+      var e=$('#r'+i),f=e.firstChild;
+      if(kind==='card'&&tick===rev[i]-2){e.classList.add('turn');sfx.flip()}
+      if(tick===rev[i]){
+        if(i!==1)f.textContent=i?q.b:q.a;
+        e.classList.remove('spin','turn');e.classList.add('hit');
+        if(kind==='gacha'){tone(880,.07,0,'square',.07);tone(1319,.12,.06,'square',.06)}
+        else if(kind==='dice'&&i===1)tone(660,.1,0,'triangle',.08);
+        else tone(170,.12,0,'square',.1);
+        if(i===0&&zc)$('#eq').classList.add('zg');       /* ゾロめに なるかも：さいしょの かずを きんいろに */
+      }else if(kind==='dice'&&i!==1&&e.classList.contains('spin')&&tick%2){
+        f.textContent=i===0&&q.op==='-'?rnd(11,18):rnd(2,9);   /* ころがって いる あいだ めが かわる */
       }
-      promote(q);
+    });
+    if(kind==='gacha'&&(tick===2||tick===4||tick===6))tone(150,.1,0,'triangle',.09);   /* カプセルが おちる おと */
+    if(kind==='dice'&&tick%2)tone(380+tick%3*70,.03,0,'triangle',.03);
+    if(tick>=rev[2]){clearInterval(iv);setTimeout(function(){if(alive(q)){$('#eq').classList.remove('zg');finish(q)}},70)}
+  },70);
+}
+async function finish(q){
+  if(q.pt){      /* しょうかく：ふつうに とまった あと、あんてん → ティアを 1だんずつ のぼって、むずかしい もんだいに ばける */
+    await sleep(200);if(!alive(q))return;
+    await dark(300);if(!alive(q))return;
+    var bd=$('#board');
+    [0,1,2].forEach(function(i){$('#r'+i).classList.remove('hit');$('#r'+i).classList.add('spin')});
+    bd.insertAdjacentHTML('afterbegin','<div class="tag" id="tt"></div>');
+    for(var t=1;t<=q.pt;t++){
+      bd.className='board tier'+t;$('#tt').className='tag t'+t;$('#tt').textContent='しょうかく！ '+TN[t];
+      flash(.35);sfx.up(t+3);if(t>=3)quake();
+      await sleep(250);if(!alive(q))return;
     }
-    q.spin=false;
-    if(q.tier){flash(.8);sfx.fan(Math.min(q.tier,4));confetti(20+q.tier*15);if(q.tier===4)glowEl.animate([{opacity:.7},{opacity:0}],{duration:900});render()}
-    else if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
+    promote(q);
   }
+  q.spin=false;
+  if(q.tier){flash(.8);sfx.fan(Math.min(q.tier,4));confetti(20+q.tier*15);if(q.tier===4)glowEl.animate([{opacity:.7},{opacity:0}],{duration:900});render()}
+  else if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
 }
 function padHTML(){
   var h='<div class="pad">';
