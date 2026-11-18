@@ -70,6 +70,14 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 @keyframes lk{to{box-shadow:0 0 60px #ffe04a}}
 .tag{position:absolute;top:-6px;left:50%;transform:translateX(-50%);background:#ff2d8f;color:#fff;font-weight:900;font-size:19px;
   padding:4px 20px;border-radius:0 0 16px 16px;white-space:nowrap}
+/* しょうかく もんだい：むずかしさの ティア（みどり → きん → あか → にじ） */
+.board.tier1{border-color:#22c55e;box-shadow:0 0 36px #22c55e}.board.tier2{border-color:#ffb800;box-shadow:0 0 38px #ffb800}
+.board.tier3{border-color:#ff2d55;box-shadow:0 0 40px #ff2d55}.board.tier4{animation:rbb 1.2s linear infinite}
+.tag.t1{background:#16a34a}.tag.t2{background:#d48a00}.tag.t3{background:#e11d48}
+.tag.t4{background:linear-gradient(90deg,#ff5d5d,#ffb13d,#3ccf6e,#3ba8ff,#b56bff)}
+.eq.tq{font-size:72px;gap:10px}.eq.tq .ans{min-width:132px;height:104px}
+.eq .op.mu{color:#8a2be2}
+.skip{font-size:18px;font-weight:bold;background:#e6def7;color:#2b1b4a;border:2px solid #b79cf0;border-radius:12px;padding:6px 16px}
 .eq{font-size:104px;font-weight:900;display:flex;align-items:center;gap:16px;line-height:1}
 .eq.s{font-size:68px}
 .eq .op{color:#e8360c}.eq .op.mi{color:#1466d8}
@@ -388,6 +396,22 @@ var WP={'+':[
   function(a,b){var p=pick([['おとこのこ','おんなのこ','にん','います'],['あかい はな','しろい はな','ほん','あります'],['おおきい さかな','ちいさい さかな','ひき','います']]),u=p[2],f=rnd(0,1);
     return [p[f]+'が '+cnt(f?b:a,u)+'、 '+p[1-f]+'が '+cnt(f?a:b,u)+' '+p[3]+'。 どちらが '+NAN[u]+' [おおい]ですか。',u]}
 ]};
+var PROMO_P=.09,TM=[1,2,3,5,5],TN=['','ほんのすこし むずかしい','すこし むずかしい','さんけた','かけざん 九九'];
+var FT=+(/^#t([1-4])$/.exec(location.hash)||[])[1]||0;   /* どうさかくにんよう：URL の さいごに #t1〜#t4 を つけると その ティアが かならず でる */
+function promote(q){   /* q.pt の ティアの もんだいに つくりかえる（＋−は もとの もんだいと おなじ。ティア4は ×） */
+  var t=q.pt,op=q.op,a,b;
+  if(t===4){a=rnd(2,9);b=rnd(2,9);q.op='×';q.ans=a*b}
+  else{
+    for(;;){
+      if(t===1){a=op==='+'?rnd(11,89):rnd(20,39);b=rnd(2,9)}                       /* 16＋7、28＋5／24−7 */
+      else if(t===2){if(op==='+'){a=rnd(11,79);b=rnd(11,99-a)}else{a=rnd(31,98);b=rnd(11,a-11)}}   /* 27＋15／43−18 */
+      else{a=op==='+'?rnd(101,899):rnd(120,999);b=rnd(0,1)?rnd(2,9):rnd(11,89)}    /* 125＋8、148＋37／132−7、214−38 */
+      if(op==='+'?(a%10+b%10>=10&&(t===3||a+b<=99)):(a%10<b%10&&a-b>=(t===3?100:2)))break;
+    }
+    q.ans=op==='+'?a+b:a-b;
+  }
+  q.a=a;q.b=b;q.tier=t;q.input='';
+}
 function newQ(){
   var m=Q.mode,op=m==='add'?'+':m==='sub'?'-':pick(['+','-']),a,b;
   do{
@@ -396,10 +420,10 @@ function newQ(){
   }while(a===Q.a&&b===Q.b);
   Q={mode:m,a:a,b:b,op:op,ans:op==='+'?a+b:a-b,input:'',miss:0,done:false,word:m==='word'};
   Q.zoro=!Q.word&&op==='+'&&a===b;            /* スロットが ゾロめ（7＋7 など）なら ボーナス */
-  /* ラッキー（ゾロめ いがい）は ぜんぶで 12%。けいさんは「さいしょから 8%」＋「あとから しょうかく 4%」、ぶんしょうは さいしょから 12% */
-  var lr=Math.random();
-  Q.lucky=Q.zoro||lr<(Q.word?.12:.08);
-  Q.promo=!Q.word&&!Q.lucky&&lr<.12;
+  Q.lucky=Q.zoro||Math.random()<.12;
+  /* しょうかく もんだい：けいさんもんだい（ゾロめ いがい）の 9% が、とまった あとで むずかしい もんだいに ばける */
+  Q.pt=0;Q.tier=0;
+  if(!Q.word&&!Q.zoro&&(FT||Math.random()<PROMO_P)){var tr=Math.random();Q.pt=FT||(tr<.45?1:tr<.75?2:tr<.92?3:4)}
   Q.spin=!Q.word;Q.intro=Q.word;
   if(Q.word){
     var w=pick(WP[op])(a,b);Q.u=w[1];Q.step=0;Q.bad=0;Q.kw=[];
@@ -416,23 +440,31 @@ function hintHTML(){
     return '<b>'+a+'</b>は あと <b>'+n+'</b>で 10。　<b>'+b+'</b>を <b>'+n+'</b>と <b>'+(b-n)+'</b>に わけよう。<br>10と <b>'+(b-n)+'</b>で …？'}
   return '<b>'+a+'</b>を 10と <b>'+(a-10)+'</b>に わけよう。　10−'+b+'＝<b>'+(10-b)+'</b>。<br><b>'+(10-b)+'</b>と <b>'+(a-10)+'</b>で …？';
 }
+function tierHint(){
+  if(Q.op==='×')return '<b>'+Q.a+'</b>×<b>'+Q.b+'</b> は 「<b>'+Q.a+'</b>が <b>'+Q.b+'</b>こ」の こと。<br><span style="font-size:.8em">'+Array(Q.b+1).join('＋'+Q.a).slice(1)+'</span>';
+  return 'いちの くらいから じゅんに けいさんしよう。<br>'+(Q.op==='+'?'くりあがった <b>1</b>を たすのを わすれずに！':'ひけない ときは となりの くらいから <b>10</b> かりよう！');
+}
 function eqHTML(small){
+  if(Q.tier&&!small)return '<div class="eq tq" id="eq">'+Q.a+'<span class="op'+(Q.op==='-'?' mi':Q.op==='×'?' mu':'')+'">'+(Q.op==='+'?'＋':Q.op==='-'?'−':'×')+'</span>'+Q.b+
+    '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+(Q.input||'？')+'</span></div>';
   var sp=Q.spin?' spin':'',opH='<span class="op'+(Q.op==='-'?' mi':'')+'">'+(Q.op==='+'?'＋':'−')+'</span>';
   return '<div class="eq'+(small?' s':' slotq')+'" id="eq">'+(small?Q.a+opH+Q.b:
     '<span class="reel w'+sp+'" id="r0"><span>'+Q.a+'</span></span><span class="reel'+(Q.mode==='mix'?sp:'')+'" id="r1">'+opH+'</span><span class="reel'+sp+'" id="r2"><span>'+Q.b+'</span></span>')+
     '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+
     (Q.input||'？')+'</span>'+(small?'<span style="font-size:.5em">'+cnt(Q.ans,Q.u).slice(String(Q.ans).length)+'</span>':'')+'</div>';
 }
-function mult(){return Math.max(Q.lucky?3:1,combo>=10?3:combo>=5?2:1)}
+function mult(){return Math.max(Q.lucky?3:1,combo>=10?3:combo>=5?2:1,TM[Q.tier||0])}
 function renderQuiz(){
   var names={add:'たしざん',sub:'ひきざん',mix:'まぜまぜ',word:'ぶんしょうもんだい'};
   var cc=combo>=10?' c10':combo>=5?' c5':combo>=2?' c'+combo:'';
   var cb=combo>=2?'<div class="combo'+cc+(combo>=5?' fv':'')+(combo>=10?' rain':'')+'">'+(combo>=5?'🔥フィーバー×'+(combo>=10?'3':'2')+'　':'')+combo+'れんぞく！</div>':'<div class="combo"></div>';
-  var h=topBar(names[Q.mode],cb)+'<div class="quiz"><div class="board'+cc+(Q.lucky&&!Q.spin?' lucky':'')+'" id="board">';
-  if(Q.lucky&&!Q.spin)h+='<div class="tag">⭐ '+(Q.promo?'しょうかく！ ラッキーもんだい':Q.zoro?'ゾロめ ボーナス':'ラッキーもんだい')+'！ コイン 3ばい ⭐</div>';
+  var h=topBar(names[Q.mode],cb)+'<div class="quiz"><div class="board'+cc+(Q.tier?' tier'+Q.tier:Q.lucky&&!Q.spin?' lucky':'')+'" id="board">';
+  if(Q.tier)h+='<div class="tag t'+Q.tier+'" id="tt">しょうかく！ '+TN[Q.tier]+'　コイン '+Math.max(TM[Q.tier],Q.lucky?3:1)+'ばい</div>';
+  else if(Q.lucky&&!Q.spin)h+='<div class="tag">⭐ '+(Q.zoro?'ゾロめ ボーナス':'ラッキーもんだい')+'！ コイン 3ばい ⭐</div>';
   var side;
   if(!Q.word){
-    h+=eqHTML()+(Q.miss?'<div class="hint">'+hintHTML()+'</div>':'');
+    h+=eqHTML()+(Q.miss?'<div class="hint">'+(Q.tier?tierHint():hintHTML())+'</div>':'')+
+      (Q.tier&&Q.miss>=2?'<button class="skip" data-act="skip">パスして つぎの もんだいへ</button>':'');
     side=padHTML();
   }else{
     var st=Q.step;
@@ -480,17 +512,22 @@ function spinQ(){   /* ひだりから じゅんに リールが とまって �
     if(tick>=stop[2]){clearInterval(iv);$('#eq').classList.remove('zg');finish()}
   },70);
   async function finish(){
-    if(q.promo){      /* あとから しょうかく：ふつうに とまった あと、あんてん → にじいろで ラッキーに ばける */
-      await sleep(300);if(!alive())return;
+    if(q.pt){      /* しょうかく：ふつうに とまった あと、あんてん → ティアを 1だんずつ のぼって、むずかしい もんだいに ばける */
+      await sleep(200);if(!alive())return;
       await dark(300);if(!alive())return;
-      q.lucky=true;
+      var bd=$('#board');
+      [0,1,2].forEach(function(i){$('#r'+i).classList.remove('hit');$('#r'+i).classList.add('spin')});
+      bd.insertAdjacentHTML('afterbegin','<div class="tag" id="tt"></div>');
+      for(var t=1;t<=q.pt;t++){
+        bd.className='board tier'+t;$('#tt').className='tag t'+t;$('#tt').textContent='しょうかく！ '+TN[t];
+        flash(.35);sfx.up(t+3);if(t>=3)quake();
+        await sleep(250);if(!alive())return;
+      }
+      promote(q);
     }
     q.spin=false;
-    if(q.lucky){
-      flash(q.promo?.9:.6);sfx.up(q.promo?7:3);confetti(q.promo?60:30);
-      if(q.promo)glowEl.animate([{opacity:.7},{opacity:0}],{duration:900});
-      render();
-    }
+    if(q.tier){flash(.8);sfx.fan(Math.min(q.tier,4));confetti(20+q.tier*15);if(q.tier===4)glowEl.animate([{opacity:.7},{opacity:0}],{duration:900});render()}
+    else if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
   }
 }
 function padHTML(){
@@ -513,7 +550,7 @@ function answer(){
     combo=Q.miss||Q.bad?0:combo+1;
     sfx.ok();$('#ans').classList.add('ok');burst();
     if(combo===5||combo===10){confetti(50);flash(.5);stage.classList.toggle('fv',combo===5);stage.classList.toggle('fv10',combo===10)}
-    gain(Q.word?20:10,combo>=5?'🔥フィーバー！':pick(['せいかい！','すごい！','てんさい！','やったね！','かんぺき！','ナイス！']));
+    gain(10,combo>=5?'🔥フィーバー！':pick(['せいかい！','すごい！','てんさい！','やったね！','かんぺき！','ナイス！']));
     setTimeout(function(){busy=false;newQ();if(view==='quiz')render()},1300);
   }else{
     Q.miss++;Q.input='';combo=0;sfx.ng();render();$('#eq').classList.add('shake');
@@ -678,9 +715,10 @@ scr.addEventListener('click',function(e){
   else if(act==='zukan'){view='zukan';sfx.tap();render()}
   else if(act==='gacha'){view='gacha';sfx.tap();render()}
   else if(act==='go'){Q={mode:el.dataset.m};combo=0;newQ();view='quiz';sfx.tap();render()}
-  else if(act==='key'){if(Q.done||Q.spin)return;if(Q.input.length<2)Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
+  else if(act==='key'){if(Q.done||Q.spin)return;if(Q.input.length<(Q.tier?3:2))Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
   else if(act==='del'){if(Q.spin)return;Q.input='';sfx.tap();$('#ans').textContent='？'}
   else if(act==='ent')answer();
+  else if(act==='skip'){combo=0;sfx.tap();newQ();render()}
   else if(act==='tok'){
     if(!Q.word||Q.step!==0)return;
     if(Q.toks[+el.dataset.i].k){Q.step=1;sfx.ok();render();gainSmall('みつけた！')}
@@ -692,9 +730,9 @@ scr.addEventListener('click',function(e){
   }
 });
 function gainSmall(label){
-  S.coins+=5;save();
+  S.coins+=10;save();
   var p=document.createElement('div');p.className='pop';p.style.fontSize='54px';p.style.top='8%';
-  p.innerHTML=label+' <span style="font-size:.6em;color:#fff">🪙+5</span>';
+  p.innerHTML=label+' <span style="font-size:.6em;color:#fff">🪙+10</span>';
   stage.appendChild(p);setTimeout(function(){p.remove()},1100);
   var c=$('#coin');if(c)c.lastChild.textContent=S.coins;
 }
