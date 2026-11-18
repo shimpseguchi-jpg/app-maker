@@ -126,6 +126,7 @@ function keisanClean_(o) {
     boxNo: num(o.boxNo, 1, 99999),
     last: /^\d{4}-\d{1,2}-\d{1,2}$/.test(last) ? last : '',
     mute: !!o.mute,
+    combo: num(o.combo, 0, 9999),   // れんぞく せいかいの かず（ふるい セーブは 0）
     updatedAt: num(o.updatedAt, 0, Date.now() + 86400000)
   };
 }

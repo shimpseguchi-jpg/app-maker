@@ -99,6 +99,7 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd23c,#ff5dd0);transition:width .4s}
 .combo{font-size:22px;font-weight:900;color:#ffe04a;min-width:150px;text-align:center}
 .combo.fv{font-size:23px;white-space:nowrap;animation:bump .5s infinite}
+.lead.streak{font-size:22px;font-weight:900;margin-bottom:7px}.lead.c2{color:#6bb8ff}.lead.c3{color:#3fd9c4}.lead.c4{color:#5fe08a}.lead.c5{color:#ffe04a}
 .tin{opacity:0;animation:tin .25s ease-out forwards}
 @keyframes tin{from{opacity:0;transform:translateY(12px)}to{opacity:1}}
 /* ぶんしょうもんだい */
@@ -284,9 +285,13 @@ function fix(o){   /* セーブの かたちを たしかめる（おかしけ�
 }
 try{var d=fix(JSON.parse(localStorage.getItem(KEY)));if(d)S=d}catch(e){}
 fix(S);
+/* れんぞく せいかいの かず。たんげんを かえても、ページを ひらきなおしても つづく（セーブに いれる）。ふるい セーブは 0 */
+var combo=0;
+function loadCombo(){combo=Math.max(0,Math.min(9999,Math.floor(+S.combo||0)))}
+loadCombo();
 function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function save(){
-  S.updatedAt=Date.now();saveLocal();
+  S.combo=combo;S.updatedAt=Date.now();saveLocal();
   if(GS&&dev){clearTimeout(pushT);pushT=setTimeout(push,1500)}   /* サーバーへは まとめて おくる */
 }
 
@@ -330,7 +335,7 @@ function boot(){
     if(!validId(dev))setDev(newId());     /* はじめての たんまつ：IDを つくる */
     pull(dev,function(o){
       if(done)return;
-      if(o&&(o.updatedAt||0)>(S.updatedAt||0)){S=o;saveLocal()}   /* あたらしい ほうを つかう */
+      if(o&&(o.updatedAt||0)>(S.updatedAt||0)){S=o;loadCombo();saveLocal()}   /* あたらしい ほうを つかう */
       else push();                        /* サーバーが から、または てもとが あたらしい → てもとを サーバーへ */
       go();
     },go);
@@ -354,7 +359,7 @@ function idDialog(){   /* せんせいよう：たんまつIDを いれなおし
     msg.textContent='よみこみちゅう…';
     pull(v,function(o){
       if(!o){msg.textContent='この IDの セーブは みつかりませんでした';return}
-      setDev(v);S=o;saveLocal();d.remove();view='home';render();
+      setDev(v);S=o;loadCombo();saveLocal();d.remove();view='home';render();
     },function(){msg.textContent='つうしんに しっぱいしました。もういちど ためして ください'});
   };
 }
@@ -435,7 +440,7 @@ function burst(){   /* せいかいの しゅんかんに ほしが はじける
 function waitTap(el){return new Promise(function(r){var h=function(){el.removeEventListener('click',h);r()};el.addEventListener('click',h)})}
 
 /* ---------- がめん ---------- */
-var view='home',Q=null,busy=false,combo=0;
+var view='home',Q=null,busy=false;
 function coinHTML(){return '<div class="coin" id="coin">🪙<span>'+S.coins+'</span></div>'}
 function topBar(t,extra){return '<div class="top"><button class="sub" data-act="home">◀ もどる</button><h2>'+t+'</h2>'+(extra||'')+coinHTML()+'</div>'}
 function render(){
@@ -444,7 +449,8 @@ function render(){
     '<div class="top"><button class="sub" data-act="mute">'+(S.mute?'🔇 おと なし':'🔊 おと あり')+'</button><h2></h2>'+
     '<button class="sub" data-act="zukan">📖 ずかん '+Object.keys(S.cards).length+'/'+(CARDS.length+1)+'</button>'+coinHTML()+'</div>'+
     (GS&&dev?'<span class="devid" data-act="devid">ID '+fmtId(dev)+'</span>':'')+
-    '<h1 class="title rain">けいさんオリパ</h1><p class="lead">けいさんで コインを ためて、1にち 1かいの パックかいふうで レアカードを あつめよう！</p>'+
+    '<h1 class="title rain">けいさんオリパ</h1>'+(combo>=2?'<p class="lead streak'+(combo>=10?' rain':combo>=5?' c5':' c'+combo)+'">🔥 '+combo+'れんぞく中！'+(combo>=5?' フィーバー×'+(combo>=10?3:2)+' つづいてるよ！':' まちがえなければ つづくよ！')+'</p>':
+      '<p class="lead">けいさんで コインを ためて、1にち 1かいの パックかいふうで レアカードを あつめよう！</p>')+
     '<div class="home">'+
     '<button class="mode m-add shine" data-act="go" data-m="add"><i>＋</i><b>たしざん</b><small>くりあがり</small></button>'+
     '<button class="mode m-sub shine" data-act="go" data-m="sub"><i>−</i><b>ひきざん</b><small>くりさがり</small></button>'+
@@ -642,7 +648,7 @@ function answer(){
     gain(10,combo>=5?'🔥フィーバー！':pick(['せいかい！','すごい！','てんさい！','やったね！','かんぺき！','ナイス！']));
     setTimeout(function(){busy=false;newQ();if(view==='quiz')render()},1300);
   }else{
-    Q.miss++;Q.input='';combo=0;sfx.ng();render();$('#eq').classList.add('shake');
+    Q.miss++;Q.input='';combo=0;save();sfx.ng();render();$('#eq').classList.add('shake');
   }
 }
 
@@ -799,24 +805,24 @@ scr.addEventListener('click',function(e){
   var act=el.dataset.act;
   if(act==='draw'){sfx.tap();draw();return}
   if(busy)return;
-  if(act==='home'){view='home';combo=0;sfx.tap();render()}
+  if(act==='home'){view='home';sfx.tap();render()}
   else if(act==='mute'){S.mute=!S.mute;save();sfx.tap();render()}
   else if(act==='devid')idDialog();
   else if(act==='zukan'){view='zukan';sfx.tap();render()}
   else if(act==='gacha'){view='gacha';sfx.tap();render()}
-  else if(act==='go'){Q={mode:el.dataset.m};combo=0;newQ();view='quiz';sfx.tap();render()}
+  else if(act==='go'){Q={mode:el.dataset.m};newQ();view='quiz';sfx.tap();render()}
   else if(act==='key'){if(Q.done||Q.spin)return;if(Q.input.length<(Q.tier?3:2))Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
   else if(act==='del'){if(Q.spin)return;Q.input='';sfx.tap();$('#ans').textContent='？'}
   else if(act==='ent')answer();
-  else if(act==='skip'){combo=0;sfx.tap();newQ();render()}
+  else if(act==='skip'){combo=0;save();sfx.tap();newQ();render()}
   else if(act==='tok'){
     if(!Q.word||Q.step!==0)return;
     if(Q.toks[+el.dataset.i].k){Q.step=1;sfx.ok();render();gainSmall('みつけた！')}
-    else{Q.bad++;sfx.ng();if(Q.bad===2)render();else el.classList.add('ng');setTimeout(function(){el.classList.remove('ng')},400)}
+    else{Q.bad++;combo=0;save();sfx.ng();if(Q.bad===2)render();else el.classList.add('ng');setTimeout(function(){el.classList.remove('ng')},400)}
   }
   else if(act==='op'){
     if(el.dataset.o===Q.op){Q.step=2;sfx.ok();render();gainSmall(Q.op==='+'?'たしざん！':'ひきざん！')}
-    else{Q.bad++;sfx.ng();render();$('#board').classList.add('shake')}
+    else{Q.bad++;combo=0;save();sfx.ng();render();$('#board').classList.add('shake')}
   }
 });
 function gainSmall(label){
