@@ -42,6 +42,16 @@ URL は変わりません。セーブデータもそのまま残ります。
 けいさんオリパは、GAS のウェブアプリとして開いたときだけ、セーブ（コインと取得カード）をこのスクリプトの **スクリプト プロパティ** にも保存します。
 iPad のブラウザ内のセーブ（localStorage）が消える環境でも、コインとカードが残ります。**端末ごとに1セーブ**です（子どもごと・クラス共有ではありません）。
 
+### けいさんオリパだけの新しいプロジェクトで公開する場合
+
+アルカナンバーとは別のプロジェクトにできます。そのプロジェクトのセーブ置き場は、ランキングと分け合わずに、けいさんオリパだけで使えます。
+
+1. https://script.google.com で「新しいプロジェクト」を作り、名前を「けいさんオリパ」などにする
+2. 最初からある `コード.gs` の中身を全部消して、[`Code.gs`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/Code.gs) の中身を貼る（アルカナンバーと同じファイルでよい）
+3. 左の「ファイル」の **＋** →「HTML」→ 名前を **`keisan`** にして、[`keisan.html`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/keisan.html) の中身を貼る。`arcanumber` などは入れなくてよい
+4. 保存して、「デプロイ」→「新しいデプロイ」→ 種類「ウェブアプリ」→（実行：自分／アクセス：上の「手順」5 と同じ）→「デプロイ」。承認を求められたら許可する
+5. 表示された `…/exec` のURLをそのまま開く。`keisan` しか入っていないプロジェクトでは、`?game=keisan` を付けなくても けいさんオリパが開く（付けても同じ）
+
 ### 追加の手順（すでにアルカナンバーを公開している場合）
 
 1. GAS のエディタで `コード.gs` の中身を全部消して、新しい [`Code.gs`](https://raw.githubusercontent.com/shimpseguchi-jpg/app-maker/ccr-a96fc02a-yijbz1/gas/Code.gs) の中身に貼り替える（`loadKeisan` / `saveKeisan` と `?game=keisan` の表示が入った版）

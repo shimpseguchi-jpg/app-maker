@@ -2,19 +2,20 @@
 // ・ふつうに ひらく → アルカナンバー
 // ・URL の さいごに ?game=kazumaho を つける → かずまほ（kazumaho.html を いれた ときだけ）
 // ・URL の さいごに ?game=keisan を つける → けいさんオリパ（keisan.html を いれた ときだけ）
+// ・keisan.html だけを いれた プロジェクトでは、なにも つけなくても けいさんオリパが ひらく
 // ・「きょうの ちょうせん」の ランキングを この スクリプトに ほぞんする（スクリプト プロパティ）
 // ・けいさんオリパの セーブ（コインと カード）を たんまつごとに ほぞんする（スクリプト プロパティ）
 function doGet(e) {
   var want = (e && e.parameter && e.parameter.game) || 'arcanumber';
   var game = (want === 'kazumaho' || want === 'keisan') ? want : 'arcanumber';
   var titles = { arcanumber: 'アルカナンバー', kazumaho: 'かずまほ', keisan: 'けいさんオリパ' };
-  var out;
-  try {
-    out = HtmlService.createHtmlOutputFromFile(game);
-  } catch (err) {
-    game = 'arcanumber';
-    out = HtmlService.createHtmlOutputFromFile(game);
+  // えらんだ ゲームの HTML が ない ときは、ある ものを ひらく
+  // （けいさんオリパ だけを いれた プロジェクトでは、?game=keisan を つけなくても けいさんオリパが ひらく）
+  var out = null, tries = [game, 'arcanumber', 'keisan'];
+  for (var i = 0; i < tries.length && !out; i++) {
+    try { out = HtmlService.createHtmlOutputFromFile(tries[i]); game = tries[i]; } catch (err) { /* つぎを ためす */ }
   }
+  if (!out) throw new Error('ゲームの HTML ファイルが ありません（arcanumber か keisan を いれて ください）');
   out.setTitle(titles[game])
     // Google サイトに うめこめる ように する
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
