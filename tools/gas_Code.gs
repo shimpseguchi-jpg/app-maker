@@ -1,18 +1,21 @@
 // アルカナンバー を Google Apps Script の ウェブアプリとして ひらく
 // ・ふつうに ひらく → アルカナンバー
 // ・URL の さいごに ?game=kazumaho を つける → かずまほ（kazumaho.html を いれた ときだけ）
+// ・URL の さいごに ?game=keisan を つける → けいさんオリパ（keisan.html を いれた ときだけ）
+// ・keisan.html だけを いれた プロジェクトでは、なにも つけなくても けいさんオリパが ひらく
 // ・「きょうの ちょうせん」の ランキングを この スクリプトに ほぞんする（スクリプト プロパティ）
+// ・けいさんオリパの セーブ（コインと カード）を たんまつごとに ほぞんする（スクリプト プロパティ）
 function doGet(e) {
   var want = (e && e.parameter && e.parameter.game) || 'arcanumber';
-  var game = want === 'kazumaho' ? 'kazumaho' : 'arcanumber';
-  var titles = { arcanumber: 'アルカナンバー', kazumaho: 'かずまほ' };
-  var out;
-  try {
-    out = HtmlService.createHtmlOutputFromFile(game);
-  } catch (err) {
-    game = 'arcanumber';
-    out = HtmlService.createHtmlOutputFromFile(game);
+  var game = (want === 'kazumaho' || want === 'keisan') ? want : 'arcanumber';
+  var titles = { arcanumber: 'アルカナンバー', kazumaho: 'かずまほ', keisan: 'けいさんオリパ' };
+  // えらんだ ゲームの HTML が ない ときは、ある ものを ひらく
+  // （けいさんオリパ だけを いれた プロジェクトでは、?game=keisan を つけなくても けいさんオリパが ひらく）
+  var out = null, tries = [game, 'arcanumber', 'keisan'];
+  for (var i = 0; i < tries.length && !out; i++) {
+    try { out = HtmlService.createHtmlOutputFromFile(tries[i]); game = tries[i]; } catch (err) { /* つぎを ためす */ }
   }
+  if (!out) throw new Error('ゲームの HTML ファイルが ありません（arcanumber か keisan を いれて ください）');
   out.setTitle(titles[game])
     // Google サイトに うめこめる ように する
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -93,4 +96,60 @@ function submitDaily(entry) {
   var rank = 0;
   for (var j = 0; j < list.length; j++) if (list[j].g === e.g) rank = j + 1;
   return { rank: rank, total: tags.length, list: list.slice(0, DAILY_SHOW) };
+}
+
+// ───── けいさんオリパの セーブ（たんまつごとに 1つ） ─────
+var KEISAN_MAX = 8192;   // セーブ（JSON）の おおきさの うわげん
+var KEISAN_BOX = { N: 50, R: 30, SR: 15, SSR: 4, UR: 1 };   // 1はこ 100くちの なかみ
+
+function keisanKey_(devId) {
+  devId = String(devId || '');
+  if (!/^[0-9a-z]{12}$/.test(devId)) throw new Error('たんまつIDが おかしいよ');
+  return 'keisan:' + devId;
+}
+function keisanClean_(o) {
+  if (!o || typeof o !== 'object') throw new Error('セーブが おかしいよ');
+  var num = function (v, lo, hi) { v = Math.floor(Number(v) || 0); return Math.max(lo, Math.min(hi, v)); };
+  var cards = {}, n = 0, src = (o.cards && typeof o.cards === 'object') ? o.cards : {};
+  for (var k in src) {
+    if (!/^(?:(?:N|R|SR|SSR|UR)\d{1,2}|LAST)$/.test(k)) continue;
+    var c = num(src[k], 0, 99999);
+    if (c > 0 && n < 60) { cards[k] = c; n++; }
+  }
+  var box = {}, left = 0, bsrc = (o.box && typeof o.box === 'object') ? o.box : {};
+  for (var r in KEISAN_BOX) { box[r] = num(bsrc[r], 0, KEISAN_BOX[r]); left += box[r]; }
+  if (!left) box = JSON.parse(JSON.stringify(KEISAN_BOX));   // からの はこは ない（ひききったら あたらしい はこに なる）
+  var last = String(o.last || '');
+  return {
+    coins: num(o.coins, 0, 9999999),
+    cards: cards,
+    box: box,
+    boxNo: num(o.boxNo, 1, 99999),
+    last: /^\d{4}-\d{1,2}-\d{1,2}$/.test(last) ? last : '',
+    mute: !!o.mute,
+    combo: num(o.combo, 0, 9999),   // れんぞく せいかいの かず（ふるい セーブは 0）
+    updatedAt: num(o.updatedAt, 0, Date.now() + 86400000)
+  };
+}
+
+// セーブを よむ（ない ときは ''）
+function loadKeisan(devId) {
+  var key = keisanKey_(devId);
+  return PropertiesService.getScriptProperties().getProperty(key) || '';
+}
+
+// セーブを かく
+function saveKeisan(devId, json) {
+  var key = keisanKey_(devId);
+  json = String(json || '');
+  if (json.length > KEISAN_MAX) throw new Error('セーブが おおきすぎるよ');
+  var o = keisanClean_(JSON.parse(json));
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(o));
+  } finally {
+    lock.releaseLock();
+  }
+  return { ok: true, updatedAt: o.updatedAt };
 }

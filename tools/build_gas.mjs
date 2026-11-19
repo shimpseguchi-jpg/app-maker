@@ -1,5 +1,5 @@
 // Google Apps Script（GAS）で くばる ための「1ファイル版」を つくる
-// つかいかた：node tools/build_gas.mjs   → gas/ に Code.gs・arcanumber.html・kazumaho.html が できる
+// つかいかた：node tools/build_gas.mjs   → gas/ に Code.gs・arcanumber.html・kazumaho.html・manabi.html・keisan.html が できる
 import { execFileSync } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
@@ -59,6 +59,24 @@ for (const g of GAMES) {
   if (html.includes('src="js/') || html.includes('href="css/')) throw new Error(`${g.id}: のこった ファイル よみこみが ある`);
   writeFileSync(join(OUT, `${g.id}.html`), html);
   sizes.push(`${g.id}.html ${(Buffer.byteLength(html) / 1024).toFixed(0)}KB`);
+}
+
+// けいさんオリパ：もとから 1ファイル（<style> と <script> が なかに ある）ので esbuild は つかわない。
+// ただし GAS が おおきな スクリプトを こわさない ように、ほかの ゲームと おなじく CSS と JS を base64 に つめる
+{
+  const b64 = (str) => Buffer.from(str, 'utf8').toString('base64').replace(/.{1,100}/g, '$&\n');
+  let html = readFileSync(join(ROOT, 'keisan/index.html'), 'utf8');
+  const css = /<style>\n?([\s\S]*?)<\/style>/.exec(html);
+  const js = /<script>\n?([\s\S]*?)<\/script>/.exec(html);
+  if (!css || !js) throw new Error('keisan: <style> か <script> が みつからない');
+  html = html
+    .replace(/<meta name="viewport"[^>]*>\n?/, '') // GAS では Code.gs の addMetaTag で つける
+    .replace(/<style>[\s\S]*?<\/style>\n?/, '')
+    .replace(/<script>[\s\S]*?<\/script>/, () => `<div id="pack-css" hidden>\n${b64(css[1])}</div>\n<div id="pack-js" hidden>\n${b64(js[1])}</div>\n<script>\n${LOADER}</script>`)
+    .replace('<head>', '<head>\n<base target="_top">');
+  if (/<style|<script(?![>])/.test(html) || (html.match(/<script>/g) || []).length !== 1) throw new Error('keisan: つめのこしが ある');
+  writeFileSync(join(OUT, 'keisan.html'), html);
+  sizes.push(`keisan.html ${(Buffer.byteLength(html) / 1024).toFixed(0)}KB`);
 }
 
 // Code.gs は tools/gas_Code.gs を そのまま つかう（ランキングの サーバーも はいっている）
