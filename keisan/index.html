@@ -71,7 +71,7 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 @keyframes lk{to{box-shadow:0 0 60px #ffe04a}}
 .tag{position:absolute;top:-6px;left:50%;transform:translateX(-50%);background:#ff2d8f;color:#fff;font-weight:900;font-size:19px;
   padding:4px 20px;border-radius:0 0 16px 16px;white-space:nowrap}
-/* しょうかく もんだい：むずかしさの ティア（みどり → きん → あか → にじ） */
+/* じごくモードの もんだいの ティア */
 .board.tier1{border-color:#22c55e;box-shadow:0 0 36px #22c55e}.board.tier2{border-color:#ffb800;box-shadow:0 0 38px #ffb800}
 .board.tier3{border-color:#ff2d55;box-shadow:0 0 40px #ff2d55}.board.tier4{animation:rbb 1.2s linear infinite}
 .tag.t1{background:#16a34a}.tag.t2{background:#d48a00}.tag.t3{background:#e11d48}
@@ -79,6 +79,35 @@ button{font:inherit;color:inherit;border:none;cursor:pointer;padding:0}
 .eq.tq{font-size:72px;gap:10px}.eq.tq .ans{min-width:132px;height:104px}
 .eq .op.mu{color:#8a2be2}
 .skip{font-size:18px;font-weight:bold;background:#e6def7;color:#2b1b4a;border:2px solid #b79cf0;border-radius:12px;padding:6px 16px}
+/* じごくモード（じぶんで えらぶ ハードモード） */
+#stage.hell{background:radial-gradient(circle at 50% 115%,#ff4a00 0%,#8a0d00 28%,#240000 62%,#000 100%)}
+#stage.hell:before{opacity:.12;animation:none}
+#stage.hell.hell:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;box-shadow:inset 0 0 90px 22px #ff2a00;animation:hellp 1.1s ease-in-out infinite alternate}
+@keyframes hellp{to{box-shadow:inset 0 0 130px 40px #ff5a00}}
+#stage.hell .board{background:linear-gradient(180deg,#1b0403,#3a0906);color:#ffe9d6;border-color:#ff3b00;box-shadow:0 0 46px #ff3b00,inset 0 0 70px #7a0a00;animation:none}
+#stage.hell .ans{background:#2a0705;border-color:#ff7a3d;color:#ffd23c}
+#stage.hell .ans.ok{background:#3a2a00;border-color:#ffd23c;color:#fff3a0}
+#stage.hell .eq .op,#stage.hell .eq .op.mi,#stage.hell .eq .op.mu{color:#ff7a3d}
+#stage.hell .key{background:linear-gradient(180deg,#6a1a12,#2a0705);color:#ffe0cc;box-shadow:0 5px 0 #000}
+#stage.hell .key.del{background:linear-gradient(180deg,#444,#1c1c1c);color:#ddd}
+#stage.hell .hint{background:#2a0705;border-color:#ff7a3d;color:#ffe9d6}#stage.hell .hint b{color:#ffd23c}
+#stage.hell .tag{background:linear-gradient(90deg,#7a0a00,#ff3b00,#7a0a00);border:2px solid #ffb38a;border-top:none}
+#stage.hell .top h2{color:#ff9a6b;text-shadow:0 0 12px #ff3b00}
+.flames{position:absolute;left:-20px;right:-20px;bottom:-40px;display:flex;justify-content:space-between;font-size:74px;line-height:1;pointer-events:none;z-index:1;opacity:.85}
+.flames i{font-style:normal;transform-origin:50% 100%;animation:flick .5s ease-in-out infinite alternate}
+@keyframes flick{from{transform:scale(.85,.8) rotate(-4deg)}to{transform:scale(1.1,1.35) rotate(4deg)}}
+.eq.hin{animation:hin .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes hin{from{transform:scale(2.6);opacity:0;filter:blur(8px)}}
+#ov.hellov{background:radial-gradient(circle at 50% 120%,#ff3b00 0%,#6a0800 35%,#000 80%)}
+.hq{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.hq .oni{font-size:120px;line-height:1;animation:wob 1s ease-in-out infinite;filter:drop-shadow(0 0 30px #ff3b00)}
+.hq .big{font-size:50px;color:#ffd23c}
+.hq p{margin:0;font-size:24px;font-weight:bold;line-height:1.6;color:#ffe9d6}.hq p b{color:#ffd23c;font-size:1.25em}
+.hbtn{font-size:34px;font-weight:900;color:#fff;padding:14px 60px;border-radius:20px;border:4px solid #ffd23c;background:linear-gradient(180deg,#ff5a1f,#a30d00);
+  box-shadow:0 6px 0 #4a0500,0 0 34px #ff3b00;animation:pulse3 .8s ease-in-out infinite alternate}
+@keyframes pulse3{to{box-shadow:0 6px 0 #4a0500,0 0 70px #ffb000}}
+.hbtn:active{transform:translateY(4px)}
+.unhell{font-size:14px;padding:4px 12px;white-space:nowrap}
 .eq{font-size:104px;font-weight:900;display:flex;align-items:center;gap:16px;line-height:1}
 .eq.s{font-size:68px}
 .eq .op{color:#e8360c}.eq .op.mi{color:#1466d8}
@@ -477,12 +506,13 @@ var view='home',Q=null,busy=false;
 function coinHTML(){return '<div class="coin" id="coin">🪙<span>'+S.coins+'</span></div>'}
 function topBar(t,extra){return '<div class="top"><button class="sub" data-act="home">◀ もどる</button><h2>'+t+'</h2>'+(extra||'')+coinHTML()+'</div>'}
 function render(){
+  stage.classList.toggle('hell',view==='quiz'&&!!Q&&!!Q.tier);
   stage.classList.toggle('fv',view==='quiz'&&combo>=5&&combo<10);stage.classList.toggle('fv10',view==='quiz'&&combo>=10);
   if(view==='home')scr.innerHTML=
     '<div class="top"><button class="sub" data-act="mute">'+(S.mute?'🔇 おと なし':'🔊 おと あり')+'</button><h2></h2>'+
     '<button class="sub" data-act="zukan">📖 ずかん '+Object.keys(S.cards).length+'/'+(CARDS.length+1)+'</button>'+coinHTML()+'</div>'+
     (GS&&dev?'<span class="devid" data-act="devid">ID '+fmtId(dev)+'</span>':'')+
-    '<h1 class="title rain">けいさんオリパ</h1>'+(combo>=2?'<p class="lead streak'+(combo>=10?' rain':combo>=5?' c5':' c'+combo)+'">🔥 '+combo+'れんぞく中！'+(combo>=5?' フィーバー×'+(combo>=10?3:2)+' つづいてるよ！':' まちがえなければ つづくよ！')+'</p>':
+    '<h1 class="title rain">けいさんオリパ</h1>'+(combo>=2?'<p class="lead streak'+(combo>=10?' rain':combo>=5?' c5':' c'+combo)+'">'+(hell?'👹 じごくモード中！ ':'🔥 ')+combo+'れんぞく中！'+(combo>=5?' フィーバー×'+(combo>=10?3:2)+' つづいてるよ！':' まちがえなければ つづくよ！')+'</p>':
       '<p class="lead">けいさんで コインを ためて、1にち 1かいの パックかいふうで レアカードを あつめよう！</p>')+
     '<div class="home">'+
     '<button class="mode m-add shine" data-act="go" data-m="add"><i>＋</i><b>たしざん</b><small>くりあがり</small></button>'+
@@ -524,8 +554,13 @@ var WP={'+':[
   function(a,b){var p=pick([['おとこのこ','おんなのこ','にん','います'],['あかい はな','しろい はな','ほん','あります'],['おおきい さかな','ちいさい さかな','ひき','います']]),u=p[2],f=rnd(0,1);
     return [p[f]+'が '+cnt(f?b:a,u)+'、 '+p[1-f]+'が '+cnt(f?a:b,u)+' '+p[3]+'。 どちらが '+NAN[u]+' [おおい]ですか。',u]}
 ]};
-var PROMO_P=.09,TM=[1,2,3,5,5],TN=['','ほんのすこし むずかしい','すこし むずかしい','さんけた','かけざん 九九'];
-var FT=+(/t([1-4])/.exec(location.hash)||[])[1]||0;   /* どうさかくにんよう：URL の さいごに #t1〜#t4 を つけると その ティアが かならず でる */
+/* じごくモード：フィーバー（5れんぞく）が たまると「ちょうせんする？」と きかれ、じぶんで えらぶと はいる ハードモード。
+   むずかしい もんだい（ティア1〜4）が つづき、コインは 4〜10ばい。まちがえる・パスすると ふつうに もどる。 */
+var TM=[1,4,6,10,10],TN=['','ほんのすこし むずかしい','すこし むずかしい','さんけた','かけざん 九九'];
+var hell=false,hellN=0;   /* hellN：じごくで せいかいした かず（ふえると ティアが あがる） */
+function hellTier(){return hellN<3?1:hellN<6?2:hellN<9?3:(Math.random()<.3?4:3)}
+var FT=+(/t([1-4])/.exec(location.hash)||[])[1]||0;   /* どうさかくにんよう：URL の さいごに #t1〜#t4 を つけると、さいしょから じごくモードで その ティアが でる */
+if(FT)hell=true;
 /* もんだいの だしかた：まいかい ランダム。おなじ だしかたは つづけない。どうさかくにんよう：#pslot #pgacha #pcard #pdice で こてい（#t3,pdice も できる） */
 var PRES=['slot','gacha','card','dice'],lastPres='',FP=(/p(slot|gacha|card|dice)/.exec(location.hash)||[])[1]||'';
 function promote(q){   /* q.pt の ティアの もんだいに つくりかえる（＋−は もとの もんだいと おなじ。ティア4は ×） */
@@ -551,9 +586,9 @@ function newQ(){
   Q={mode:m,a:a,b:b,op:op,ans:op==='+'?a+b:a-b,input:'',miss:0,done:false,word:m==='word'};
   Q.zoro=!Q.word&&op==='+'&&a===b;            /* スロットが ゾロめ（7＋7 など）なら ボーナス */
   Q.lucky=Q.zoro||Math.random()<.12;
-  /* しょうかく もんだい：けいさんもんだい（ゾロめ いがい）の 9% が、とまった あとで むずかしい もんだいに ばける */
   Q.pt=0;Q.tier=0;
-  if(!Q.word&&!Q.zoro&&(FT||Math.random()<PROMO_P)){var tr=Math.random();Q.pt=FT||(tr<.45?1:tr<.75?2:tr<.92?3:4)}
+  if(hell&&combo<5&&!FT)hell=false;                      /* まちがえた・パスした あとは ふつうに もどる */
+  if(!Q.word&&hell){Q.pt=FT||hellTier();promote(Q);Q.lucky=false;Q.zoro=false}
   Q.spin=!Q.word;Q.intro=Q.word;
   if(!Q.word){Q.pres=FP||pick(PRES.filter(function(x){return x!==lastPres}));lastPres=Q.pres}
   if(Q.word){
@@ -576,7 +611,7 @@ function tierHint(){
   return 'いちの くらいから じゅんに けいさんしよう。<br>'+(Q.op==='+'?'くりあがった <b>1</b>を たすのを わすれずに！':'ひけない ときは となりの くらいから <b>10</b> かりよう！');
 }
 function eqHTML(small){
-  if(Q.tier&&!small)return '<div class="eq tq" id="eq">'+Q.a+'<span class="op'+(Q.op==='-'?' mi':Q.op==='×'?' mu':'')+'">'+(Q.op==='+'?'＋':Q.op==='-'?'−':'×')+'</span>'+Q.b+
+  if(Q.tier&&!small)return '<div class="eq tq'+(Q.spin?' hin':'')+'" id="eq">'+Q.a+'<span class="op'+(Q.op==='-'?' mi':Q.op==='×'?' mu':'')+'">'+(Q.op==='+'?'＋':Q.op==='-'?'−':'×')+'</span>'+Q.b+
     '＝<span class="ans'+(Q.done?' ok':'')+'" id="ans">'+(Q.input||'？')+'</span></div>';
   var sp=Q.spin?' spin':'',opH='<span class="op'+(Q.op==='-'?' mi':'')+'">'+(Q.op==='+'?'＋':'−')+'</span>';
   var slot=Q.pres==='slot',kind=slot?' slotq':' pq '+{gacha:'gq',card:'cq',dice:'dq'}[Q.pres];
@@ -589,9 +624,9 @@ function mult(){return Math.max(Q.lucky?3:1,combo>=10?3:combo>=5?2:1,TM[Q.tier||
 function renderQuiz(){
   var names={add:'たしざん',sub:'ひきざん',mix:'まぜまぜ',word:'ぶんしょうもんだい'};
   var cc=combo>=10?' c10':combo>=5?' c5':combo>=2?' c'+combo:'';
-  var cb=combo>=2?'<div class="combo'+cc+(combo>=5?' fv':'')+(combo>=10?' rain':'')+'">'+(combo>=5?'🔥フィーバー×'+(combo>=10?'3':'2')+'　':'')+combo+'れんぞく！</div>':'<div class="combo"></div>';
-  var h=topBar(names[Q.mode],cb)+'<div class="quiz"><div class="board'+cc+(Q.tier?' tier'+Q.tier:Q.lucky&&!Q.spin?' lucky':'')+'" id="board">';
-  if(Q.tier)h+='<div class="tag t'+Q.tier+'" id="tt">しょうかく！ '+TN[Q.tier]+'　コイン '+Math.max(TM[Q.tier],Q.lucky?3:1)+'ばい</div>';
+  var cb=combo>=2?'<div class="combo'+cc+(combo>=5?' fv':'')+(combo>=10?' rain':'')+'">'+(combo>=5&&!Q.tier?'🔥フィーバー×'+(combo>=10?'3':'2')+'　':'')+combo+'れんぞく！</div>':'<div class="combo"></div>';
+  var h=topBar(Q.tier?'👹 じごくモード':names[Q.mode],(hell&&Q.tier&&!FT?'<button class="sub unhell" data-act="unhell">ふつうに もどる</button>':'')+cb)+'<div class="quiz"><div class="board'+cc+(Q.tier?' tier'+Q.tier:Q.lucky&&!Q.spin?' lucky':'')+'" id="board">';
+  if(Q.tier)h+='<div class="tag t'+Q.tier+'" id="tt">👹 じごく：'+TN[Q.tier]+'　コイン '+mult()+'ばい</div>';
   else if(Q.lucky&&!Q.spin)h+='<div class="tag">⭐ '+(Q.zoro?'ゾロめ ボーナス':'ラッキーもんだい')+'！ コイン 3ばい ⭐</div>';
   var side;
   if(!Q.word){
@@ -621,7 +656,8 @@ function renderQuiz(){
     '<button class="gold" data-act="gacha" style="font-size:22px;padding:8px"'+(can&&!op?'':' disabled')+'>'+(op?'パックは また あした！':'🎴 パックを あけに いく')+'</button></div></div>';
   scr.innerHTML=h;
   if(Q.intro){Q.intro=false;for(var k=0;k<sn;k++)tone(520+k*130,.09,k*.35,'triangle',.06)}
-  if(Q.spin&&!Q.spinning){Q.spinning=true;presentQ(Q)}
+  if(Q.spin&&!Q.spinning){Q.spinning=true;if(Q.tier)hellIn(Q);else presentQ(Q)}
+  if(Q.tier)scr.insertAdjacentHTML('beforeend','<div class="flames">'+[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map(function(i){return '<i style="animation-delay:-'+(i*137%500)+'ms">🔥</i>'}).join('')+'</div>');
 }
 function alive(q){return Q===q&&view==='quiz'}
 function spinQ(q){   /* スロット：ひだりから じゅんに リールが とまって もんだいが きまる。3つめは すこし ながく まわる */
@@ -671,23 +707,33 @@ function presentQ(q){
     if(tick>=rev[2]){clearInterval(iv);setTimeout(function(){if(alive(q)){$('#eq').classList.remove('zg');finish(q)}},70)}
   },70);
 }
-async function finish(q){
-  if(q.pt){      /* しょうかく：ふつうに とまった あと、あんてん → ティアを 1だんずつ のぼって、むずかしい もんだいに ばける */
-    await sleep(200);if(!alive(q))return;
-    await dark(300);if(!alive(q))return;
-    var bd=$('#board');
-    [0,1,2].forEach(function(i){$('#r'+i).classList.remove('hit');$('#r'+i).classList.add('spin')});
-    bd.insertAdjacentHTML('afterbegin','<div class="tag" id="tt"></div>');
-    for(var t=1;t<=q.pt;t++){
-      bd.className='board tier'+t;$('#tt').className='tag t'+t;$('#tt').textContent='しょうかく！ '+TN[t];
-      flash(.35);sfx.up(t+3);if(t>=3)quake();
-      await sleep(250);if(!alive(q))return;
-    }
-    promote(q);
-  }
+function finish(q){
   q.spin=false;
-  if(q.tier){flash(.8);sfx.fan(Math.min(q.tier,4));confetti(20+q.tier*15);if(q.tier===4)glowEl.animate([{opacity:.7},{opacity:0}],{duration:900});render()}
-  else if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
+  if(q.lucky){flash(.6);sfx.up(3);confetti(30);render()}
+}
+function hellIn(q){   /* じごくの もんだい：しきが とびだして くる（0.55びょう。その あいだは にゅうりょく できない） */
+  tone(70,.5,0,'sawtooth',.12);tone(55,.5,.05,'sawtooth',.1);quake();
+  setTimeout(function(){if(alive(q))q.spin=false},550);
+}
+function askHell(){    /* フィーバーが たまった とき：じごくモードに ちょうせんするか じぶんで えらぶ */
+  return new Promise(function(res){
+    setRays(0);ov.classList.add('on','hellov');
+    ovc.innerHTML='<div class="hq"><div class="oni">👹</div><div class="big slam">じごくモードに ちょうせんする？</div>'+
+      '<p>むずかしい もんだいが つづくよ。コインは <b>4ばい いじょう</b>！<br>まちがえると ふつうの もんだいに もどるよ。</p>'+
+      '<button class="hbtn" id="hy">🔥 ちょうせんする！</button><button class="sub" id="hn">ふつうで つづける</button></div>';
+    tone(90,.6,0,'sawtooth',.12);tone(60,.8,.15,'sawtooth',.12);
+    function done(v){ov.classList.remove('on','hellov');ovc.innerHTML='';res(v)}
+    $('#hy').onclick=function(){done(true)};$('#hn').onclick=function(){sfx.tap();done(false)};
+  });
+}
+async function enterHell(){
+  hell=true;hellN=0;
+  await dark(300);
+  stage.classList.add('hell');quake();
+  [110,92,73,55].forEach(function(f,i){tone(f,.35,i*.16,'sawtooth',.13)});
+  var p=document.createElement('div');p.className='pop';p.style.color='#ff5a1f';p.innerHTML='👹 じごくモード<small>とつにゅう！！</small>';
+  stage.appendChild(p);setTimeout(function(){p.remove()},1100);
+  await sleep(950);
 }
 function padHTML(){
   var h='<div class="pad">';
@@ -707,10 +753,15 @@ function answer(){
   if(+Q.input===Q.ans){
     Q.done=true;busy=true;
     combo=Q.miss||Q.bad?0:combo+1;
+    if(Q.tier&&combo)hellN++;
     sfx.ok();$('#ans').classList.add('ok');burst();
     if(combo===5||combo===10){confetti(50);flash(.5);stage.classList.toggle('fv',combo===5);stage.classList.toggle('fv10',combo===10)}
     gain(10,combo>=5?'🔥フィーバー！':pick(['せいかい！','すごい！','てんさい！','やったね！','かんぺき！','ナイス！']));
-    setTimeout(function(){busy=false;newQ();if(view==='quiz')render()},1300);
+    setTimeout(async function(){
+      /* フィーバーが たまる たび（5・10・15…れんぞく）に、じごくモードに ちょうせんするか きく（けいさんもんだい だけ） */
+      if(!Q.word&&!hell&&combo>=5&&combo%5===0&&view==='quiz'&&await askHell())await enterHell();
+      busy=false;newQ();if(view==='quiz')render();
+    },1300);
   }else{
     Q.miss++;Q.input='';combo=0;save();sfx.ng();render();$('#eq').classList.add('shake');
   }
@@ -878,6 +929,7 @@ scr.addEventListener('click',function(e){
   else if(act==='key'){if(Q.done||Q.spin)return;if(Q.input.length<(Q.tier?3:2))Q.input=String(+(Q.input+el.dataset.n));sfx.tap();$('#ans').textContent=Q.input}
   else if(act==='del'){if(Q.spin)return;Q.input='';sfx.tap();$('#ans').textContent='？'}
   else if(act==='ent')answer();
+  else if(act==='unhell'){hell=false;sfx.tap();newQ();render()}
   else if(act==='skip'){combo=0;save();sfx.tap();newQ();render()}
   else if(act==='tok'){
     if(!Q.word||Q.step!==0)return;
